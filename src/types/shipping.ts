@@ -1,10 +1,12 @@
 // Shipping and consolidation types
 
+import type { Address } from "./index";
+
 export interface ShippingQuote {
   id: string;
   userId: string;
   origin: string; // "Korea"
-  destination: string;
+  destination: Address;
   items: ShippingItem[];
   totalWeight: number;
   totalVolume: number; // CBM

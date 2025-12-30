@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react"; // Added Suspense
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { productService } from "@/services/api";
@@ -8,8 +8,7 @@ import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
 import { categories } from "@/lib/mockData";
 
-// 1. Move the logic into a content component
-function ProductList() {
+function ProductsContent() {
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get("category");
   const [products, setProducts] = useState<Product[]>([]);
@@ -187,15 +186,17 @@ function ProductList() {
   );
 }
 
-// 2. Wrap the component in Suspense in the export
 export default function ProductsPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto px-4 py-8 text-center">
-        <p className="text-muted-foreground">Initializing catalog...</p>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="mb-8 text-4xl font-bold text-foreground">Product Catalog</h1>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Loading products...</p>
+        </div>
       </div>
     }>
-      <ProductList />
+      <ProductsContent />
     </Suspense>
   );
 }

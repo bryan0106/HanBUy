@@ -1,5 +1,7 @@
 // Order and payment types
 
+import type { Address } from "./index";
+
 export interface Order {
   id: string;
   userId: string;
@@ -14,7 +16,7 @@ export interface Order {
   paymentMethod?: PaymentMethod;
   qrCode?: string;
   proofOfPayment?: string;
-  shippingAddress: string;
+  shippingAddress: Address;
   createdAt: Date;
   updatedAt: Date;
   paidAt?: Date;
