@@ -4,7 +4,7 @@ export interface ShippingQuote {
   id: string;
   userId: string;
   origin: string; // "Korea"
-  destination: Address;
+  destination: string;
   items: ShippingItem[];
   totalWeight: number;
   totalVolume: number; // CBM

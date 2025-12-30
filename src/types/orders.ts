@@ -14,7 +14,7 @@ export interface Order {
   paymentMethod?: PaymentMethod;
   qrCode?: string;
   proofOfPayment?: string;
-  shippingAddress: Address;
+  shippingAddress: string;
   createdAt: Date;
   updatedAt: Date;
   paidAt?: Date;
