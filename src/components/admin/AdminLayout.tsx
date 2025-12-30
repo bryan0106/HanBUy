@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,20 +25,57 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     router.push("/store");
   };
 
+  const handleNavClick = () => {
+    setMobileMenuOpen(false);
+  };
+
   return (
     <div className="flex min-h-screen bg-grey-50">
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="relative flex w-64 flex-col border-r border-border bg-white">
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-white transition-transform duration-300 lg:relative lg:translate-x-0",
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
         <div className="flex h-16 items-center justify-between border-b border-border px-6">
-          <Link href="/admin" className="text-xl font-bold text-primary">
+          <Link href="/admin" className="text-xl font-bold text-primary" onClick={handleNavClick}>
             Admin Panel
           </Link>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden"
+            aria-label="Close menu"
+          >
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
         {user && (
           <div className="border-b border-border px-6 py-3">
@@ -57,6 +95,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    onClick={handleNavClick}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                       isActive
@@ -75,6 +114,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="border-t border-border p-4">
           <Link
             href="/store"
+            onClick={handleNavClick}
             className="mb-2 block w-full rounded-lg border border-border px-3 py-2 text-center text-sm font-medium text-muted-foreground transition-colors hover:bg-grey-50"
           >
             View Store
@@ -89,8 +129,34 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <div className="container mx-auto p-6">{children}</div>
+      <main className="flex-1 overflow-auto lg:ml-0">
+        {/* Mobile Header */}
+        <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-white px-4 lg:hidden">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-2"
+            aria-label="Open menu"
+          >
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+          <Link href="/admin" className="text-lg font-bold text-primary">
+            Admin Panel
+          </Link>
+          <div className="w-10" /> {/* Spacer for centering */}
+        </div>
+        <div className="container mx-auto p-4 lg:p-6">{children}</div>
       </main>
     </div>
   );

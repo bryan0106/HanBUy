@@ -127,21 +127,21 @@ export default function ImportProductPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Import Product from URL</h1>
+    <div>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Import Product from URL</h1>
         <Link
           href="/admin/inventory"
-          className="text-soft-blue-600 hover:underline"
+          className="text-sm text-soft-blue-600 hover:underline sm:text-base"
         >
           ← Back to Inventory
         </Link>
       </div>
 
       {/* URL Input Section */}
-      <div className="mb-8 rounded-lg border border-border bg-card p-6">
-        <h2 className="mb-4 text-xl font-semibold">Step 1: Enter Product URL</h2>
-        <div className="flex gap-4">
+      <div className="mb-8 rounded-lg border border-border bg-card p-4 sm:p-6">
+        <h2 className="mb-4 text-lg font-semibold sm:text-xl">Step 1: Enter Product URL</h2>
+        <div className="flex flex-col gap-4 sm:flex-row">
           <input
             type="url"
             value={url}
@@ -153,7 +153,7 @@ export default function ImportProductPage() {
           <button
             onClick={handleScrape}
             disabled={loading || !url.trim()}
-            className="rounded-lg bg-soft-blue-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700 disabled:opacity-50"
+            className="w-full rounded-lg bg-soft-blue-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700 disabled:opacity-50 sm:w-auto"
           >
             {loading ? "Scraping..." : "Scrape Product"}
           </button>
@@ -171,8 +171,8 @@ export default function ImportProductPage() {
       {/* Product Form */}
       {scrapedData && (
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-xl font-semibold">Step 2: Review & Edit Product Details</h2>
+          <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+            <h2 className="mb-4 text-lg font-semibold sm:text-xl">Step 2: Review & Edit Product Details</h2>
 
             {/* Basic Info */}
             <div className="mb-6 space-y-4">
@@ -357,7 +357,7 @@ export default function ImportProductPage() {
             {/* Images */}
             <div className="mb-6">
               <label className="mb-2 block text-sm font-medium">Product Images</label>
-              <div className="mb-4 flex gap-4">
+              <div className="mb-4 flex flex-col gap-4 sm:flex-row">
                 <input
                   type="url"
                   placeholder="Add image URL"
@@ -377,7 +377,7 @@ export default function ImportProductPage() {
                     handleImageAdd(input.value);
                     input.value = "";
                   }}
-                  className="rounded-lg bg-grey-200 px-4 py-2 hover:bg-grey-300"
+                  className="w-full rounded-lg bg-grey-200 px-4 py-2 hover:bg-grey-300 sm:w-auto"
                 >
                   Add Image
                 </button>
@@ -409,16 +409,16 @@ export default function ImportProductPage() {
             </div>
 
             {/* Submit Button */}
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row">
               <button
                 type="submit"
-                className="rounded-lg bg-soft-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                className="w-full rounded-lg bg-soft-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700 sm:w-auto"
               >
                 Save Product
               </button>
               <Link
                 href="/admin/inventory"
-                className="rounded-lg border border-border bg-background px-6 py-3 font-semibold transition-colors hover:bg-grey-50"
+                className="w-full rounded-lg border border-border bg-background px-6 py-3 text-center font-semibold transition-colors hover:bg-grey-50 sm:w-auto"
               >
                 Cancel
               </Link>

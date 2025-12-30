@@ -94,11 +94,11 @@ export default function InventoryPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Inventory Management</h1>
         <Link
           href="/admin/inventory/new"
-          className="rounded-lg bg-soft-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700"
+          className="w-full rounded-lg bg-soft-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700 sm:w-auto"
         >
           + Add New Item
         </Link>
@@ -121,11 +121,11 @@ export default function InventoryPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-2">
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setFilter("all")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm ${
               filter === "all"
                 ? "bg-soft-blue-600 text-white"
                 : "bg-grey-100 text-grey-700 hover:bg-grey-200"
@@ -135,7 +135,7 @@ export default function InventoryPage() {
           </button>
           <button
             onClick={() => setFilter("low_stock")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm ${
               filter === "low_stock"
                 ? "bg-warning text-white"
                 : "bg-grey-100 text-grey-700 hover:bg-grey-200"
@@ -145,7 +145,7 @@ export default function InventoryPage() {
           </button>
           <button
             onClick={() => setFilter("out_of_stock")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm ${
               filter === "out_of_stock"
                 ? "bg-error text-white"
                 : "bg-grey-100 text-grey-700 hover:bg-grey-200"
@@ -159,27 +159,27 @@ export default function InventoryPage() {
           placeholder="Search by name or SKU..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="rounded-lg border border-border bg-background px-4 py-2 sm:w-64"
+          className="w-full rounded-lg border border-border bg-background px-4 py-2 sm:w-64"
         />
       </div>
 
       {/* Inventory Table */}
       {loading ? (
-        <div className="text-center py-12">
+        <div className="py-12 text-center">
           <p className="text-muted-foreground">Loading inventory...</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-grey-50">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Item</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">SKU</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Category</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Price</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Stock</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Actions</th>
+                <th className="px-2 py-3 text-left text-xs font-semibold sm:px-4 sm:text-sm">Item</th>
+                <th className="px-2 py-3 text-left text-xs font-semibold sm:px-4 sm:text-sm">SKU</th>
+                <th className="px-2 py-3 text-left text-xs font-semibold sm:px-4 sm:text-sm">Category</th>
+                <th className="px-2 py-3 text-left text-xs font-semibold sm:px-4 sm:text-sm">Price</th>
+                <th className="px-2 py-3 text-center text-xs font-semibold sm:px-4 sm:text-sm">Stock</th>
+                <th className="px-2 py-3 text-center text-xs font-semibold sm:px-4 sm:text-sm">Status</th>
+                <th className="px-2 py-3 text-center text-xs font-semibold sm:px-4 sm:text-sm">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -188,23 +188,23 @@ export default function InventoryPage() {
                 const isOutOfStock = item.quantity === 0;
                 return (
                   <tr key={item.id} className="hover:bg-grey-50">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{item.name}</div>
+                    <td className="px-2 py-3 sm:px-4">
+                      <div className="text-sm font-medium sm:text-base">{item.name}</div>
                       {item.brand && (
-                        <div className="text-sm text-muted-foreground">{item.brand}</div>
+                        <div className="text-xs text-muted-foreground sm:text-sm">{item.brand}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                    <td className="px-2 py-3 text-xs text-muted-foreground sm:px-4 sm:text-sm">
                       {item.sku}
                     </td>
-                    <td className="px-4 py-3 text-sm capitalize">{item.category}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-3 text-xs capitalize sm:px-4 sm:text-sm">{item.category}</td>
+                    <td className="px-2 py-3 text-xs sm:px-4 sm:text-sm">
                       {formatCurrency(item.price, item.currency)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="px-2 py-3 text-center sm:px-4">
+                      <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center sm:gap-2">
                         <span
-                          className={`font-semibold ${
+                          className={`text-xs font-semibold sm:text-sm ${
                             isOutOfStock
                               ? "text-error"
                               : isLowStock
@@ -219,30 +219,30 @@ export default function InventoryPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-2 py-3 text-center sm:px-4">
                       {isOutOfStock ? (
-                        <span className="rounded-full bg-error/10 px-2 py-1 text-xs font-medium text-error">
+                        <span className="rounded-full bg-error/10 px-1.5 py-0.5 text-[10px] font-medium text-error sm:px-2 sm:text-xs">
                           Out of Stock
                         </span>
                       ) : isLowStock ? (
-                        <span className="rounded-full bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
+                        <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning sm:px-2 sm:text-xs">
                           Low Stock
                         </span>
                       ) : (
-                        <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">
+                        <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success sm:px-2 sm:text-xs">
                           In Stock
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="px-2 py-3 sm:px-4">
+                      <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center sm:gap-2">
                         <Link
                           href={`/admin/inventory/${item.id}/edit`}
-                          className="text-soft-blue-600 hover:underline text-sm"
+                          className="text-[10px] text-soft-blue-600 hover:underline sm:text-sm"
                         >
                           Edit
                         </Link>
-                        <button className="text-error hover:underline text-sm">
+                        <button className="text-[10px] text-error hover:underline sm:text-sm">
                           Delete
                         </button>
                       </div>
