@@ -26,6 +26,7 @@ export const INVOICE_STATUS_LABELS: Record<string, string> = {
 // Navigation items
 export const DASHBOARD_NAV_ITEMS = [
   { label: "Overview", href: "/dashboard", icon: "overview" },
+  { label: "My Orders", href: "/dashboard/orders", icon: "orders" },
   { label: "My Solo Box", href: "/dashboard/box", icon: "box" },
   { label: "Tracking", href: "/dashboard/tracking", icon: "tracking" },
   { label: "Invoices", href: "/dashboard/invoices", icon: "invoices" },

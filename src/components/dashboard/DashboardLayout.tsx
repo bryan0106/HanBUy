@@ -79,6 +79,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 function getIcon(icon: string): string {
   const icons: Record<string, string> = {
     overview: "📊",
+    orders: "🛒",
     box: "📦",
     tracking: "📍",
     invoices: "🧾",
