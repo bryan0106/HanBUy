@@ -153,50 +153,72 @@ export function StoreLayout({ children }: StoreLayoutProps) {
       <MobileBottomNav />
 
       {/* Footer */}
-      <footer className="border-t border-border bg-grey-50 pb-16 md:pb-8">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-            <div>
-              <h3 className="mb-4 font-semibold text-grey-900">HanBuy</h3>
-              <p className="text-sm text-grey-600">
-                Korea-to-Philippines E-commerce and Consolidation Logistics
-                Platform
+      <footer className="border-t border-border bg-white pb-16 md:pb-8">
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+          {/* Mobile: 2-column grid, Desktop: 4-column */}
+          <div className="grid grid-cols-2 gap-6 sm:gap-8 md:grid-cols-4">
+            {/* HanBuy Brand - Full width on mobile */}
+            <div className="col-span-2 md:col-span-1">
+              <Link href="/store" className="inline-block">
+                <h3 className="mb-3 text-lg font-bold text-grey-900 sm:mb-4">HanBuy</h3>
+              </Link>
+              <p className="text-xs leading-relaxed text-grey-600 sm:text-sm">
+                Korea-to-Philippines E-commerce and Consolidation Logistics Platform
               </p>
             </div>
+            
+            {/* Shop Section */}
             <div>
-              <h4 className="mb-4 font-semibold text-grey-900">Shop</h4>
-              <ul className="space-y-2 text-sm text-grey-600">
+              <h4 className="mb-3 text-sm font-semibold text-grey-900 sm:mb-4">Shop</h4>
+              <ul className="space-y-2 text-xs text-grey-600 sm:text-sm">
                 <li>
-                  <Link href="/store/products" className="hover:text-grey-900">
+                  <Link href="/store/products" className="block transition-colors hover:text-grey-900">
                     All Products
                   </Link>
                 </li>
                 <li>
-                  <Link href="/store/categories" className="hover:text-grey-900">
-                    Categories
+                  <Link href="/store/products/onhand" className="block transition-colors hover:text-grey-900">
+                    Onhand Items
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/store/products/preorder" className="block transition-colors hover:text-grey-900">
+                    Pre-Order
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/store/how-it-works" className="block transition-colors hover:text-grey-900">
+                    How It Works
                   </Link>
                 </li>
               </ul>
             </div>
+            
+            {/* Account Section */}
             <div>
-              <h4 className="mb-4 font-semibold text-grey-900">Account</h4>
-              <ul className="space-y-2 text-sm text-grey-600">
+              <h4 className="mb-3 text-sm font-semibold text-grey-900 sm:mb-4">Account</h4>
+              <ul className="space-y-2 text-xs text-grey-600 sm:text-sm">
                 {isAuthenticated ? (
                   <>
                     <li>
-                      <Link href="/dashboard" className="hover:text-grey-900">
-                        Dashboard
+                      <Link href="/store/orders" className="block transition-colors hover:text-grey-900">
+                        My Orders
                       </Link>
                     </li>
                     <li>
-                      <Link href="/dashboard/box" className="hover:text-grey-900">
+                      <Link href="/dashboard/box" className="block transition-colors hover:text-grey-900">
                         My Box
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/store/account" className="block transition-colors hover:text-grey-900">
+                        Account
                       </Link>
                     </li>
                     <li>
                       <Link
                         href="/dashboard/invoices"
-                        className="hover:text-grey-900"
+                        className="block transition-colors hover:text-grey-900"
                       >
                         Invoices
                       </Link>
@@ -204,30 +226,47 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                   </>
                 ) : (
                   <li>
-                    <Link href="/auth/login" className="hover:text-grey-900">
+                    <Link href="/auth/login" className="block transition-colors hover:text-grey-900">
                       Login / Sign Up
                     </Link>
                   </li>
                 )}
               </ul>
             </div>
-            <div>
-              <h4 className="mb-4 font-semibold text-grey-900">Support</h4>
+            
+            {/* Support Section - Hidden on mobile, shown on desktop */}
+            <div className="hidden md:block">
+              <h4 className="mb-4 text-sm font-semibold text-grey-900">Support</h4>
               <ul className="space-y-2 text-sm text-grey-600">
                 <li>
-                  <Link href="/store/about" className="hover:text-grey-900">
+                  <Link href="/store/about" className="block transition-colors hover:text-grey-900">
                     About Us
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="hover:text-grey-900">
+                  <Link href="/contact" className="block transition-colors hover:text-grey-900">
                     Contact
                   </Link>
                 </li>
               </ul>
             </div>
           </div>
-          <div className="mt-8 border-t border-border pt-8 text-center text-sm text-grey-600">
+          
+          {/* Support Section for Mobile - Below main grid */}
+          <div className="mt-6 border-t border-border pt-6 md:hidden">
+            <h4 className="mb-3 text-sm font-semibold text-grey-900">Support</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <Link href="/store/about" className="text-xs text-grey-600 transition-colors hover:text-grey-900 sm:text-sm">
+                About Us
+              </Link>
+              <Link href="/contact" className="text-xs text-grey-600 transition-colors hover:text-grey-900 sm:text-sm">
+                Contact
+              </Link>
+            </div>
+          </div>
+          
+          {/* Copyright */}
+          <div className="mt-6 border-t border-border pt-6 text-center text-xs text-grey-600 sm:mt-8 sm:pt-8 sm:text-sm">
             <p>&copy; 2024 HanBuy. All rights reserved.</p>
           </div>
         </div>

@@ -29,11 +29,14 @@ function LoginForm() {
       if (isAdmin) {
         router.push("/admin");
       } else {
-        // Always redirect customers to store page (ignore redirectParam for customers)
-        router.push("/store");
+        // Redirect customers to redirectParam if provided, otherwise to store page
+        const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
+          ? redirectParam 
+          : "/store";
+        router.replace(redirectTo);
       }
     }
-  }, [isAuthenticated, user, isAdmin, router]);
+  }, [isAuthenticated, user, isAdmin, router, redirectParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

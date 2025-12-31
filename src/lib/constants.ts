@@ -30,6 +30,7 @@ export const DASHBOARD_NAV_ITEMS = [
   { label: "My Solo Box", href: "/dashboard/box", icon: "box" },
   { label: "Tracking", href: "/dashboard/tracking", icon: "tracking" },
   { label: "Invoices", href: "/dashboard/invoices", icon: "invoices" },
+  { label: "Notifications", href: "/dashboard/notifications", icon: "notifications" },
   { label: "Account", href: "/dashboard/account", icon: "account" },
   { label: "CBM Calculator", href: "/dashboard/cbm-calculator", icon: "calculator" },
   { label: "Shipping Calculator", href: "/dashboard/shipping-calculator", icon: "shipping" },

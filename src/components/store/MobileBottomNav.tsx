@@ -16,8 +16,8 @@ const navItems: NavItem[] = [
   { label: "Home", href: "/store", icon: "🏠" },
   { label: "Onhand", href: "/store/products/onhand", icon: "📦" },
   { label: "Pre-Order", href: "/store/products/preorder", icon: "📅" },
-  { label: "My Orders", href: "/dashboard/orders", icon: "🛒", requiresAuth: true },
-  { label: "Account", href: "/dashboard/account", icon: "👤", requiresAuth: true },
+  { label: "My Orders", href: "/store/orders", icon: "🛒", requiresAuth: true },
+  { label: "Account", href: "/store/account", icon: "👤", requiresAuth: true },
 ];
 
 export function MobileBottomNav() {
@@ -50,18 +50,13 @@ export function MobileBottomNav() {
           else if (item.label === "Pre-Order") {
             active = pathname === "/store/products/preorder" || pathname?.startsWith("/store/products/preorder");
           }
-          // My Orders - orders and box/receive routes
+          // My Orders - store orders routes
           else if (item.label === "My Orders") {
-            active = pathname?.startsWith("/dashboard/orders") || 
-                     pathname?.startsWith("/dashboard/box");
+            active = pathname?.startsWith("/store/orders");
           }
-          // Account - account page or dashboard but not orders/box
+          // Account - store account page
           else if (item.label === "Account") {
-            active = pathname === "/dashboard/account" ||
-                     (pathname === "/dashboard" || 
-                     (pathname?.startsWith("/dashboard/") && 
-                      !pathname?.startsWith("/dashboard/orders") && 
-                      !pathname?.startsWith("/dashboard/box")));
+            active = pathname === "/store/account";
           }
           // Default - exact match or starts with
           else {

@@ -50,7 +50,7 @@ export function NotificationButton() {
         message: "Your order ORD-2024-001 has been confirmed",
         read: false,
         createdAt: "2024-12-29T00:00:00Z",
-        link: "/dashboard/orders",
+        link: "/store/orders",
       },
       {
         id: "2",
@@ -58,7 +58,7 @@ export function NotificationButton() {
         message: "Payment for invoice INV-2024-001 has been received",
         read: false,
         createdAt: "2024-12-29T00:00:00Z",
-        link: "/dashboard/invoices",
+        link: "/store/orders",
       },
       {
         id: "3",
@@ -66,7 +66,7 @@ export function NotificationButton() {
         message: "Your order ORD-2024-002 is now in transit",
         read: true,
         createdAt: "2024-12-28T00:00:00Z",
-        link: "/dashboard/orders",
+        link: "/store/orders",
       },
     ];
     setNotifications(mockData);
@@ -132,7 +132,7 @@ export function NotificationButton() {
                     {unreadNotifications.map((notification) => (
                       <Link
                         key={notification.id}
-                        href={notification.link || "/dashboard"}
+                        href={notification.link || "/store/orders"}
                         onClick={() => {
                           markAsRead(notification.id);
                           setIsOpen(false);
@@ -168,7 +168,7 @@ export function NotificationButton() {
                     {readNotifications.map((notification) => (
                       <Link
                         key={notification.id}
-                        href={notification.link || "/dashboard"}
+                        href={notification.link || "/store/orders"}
                         onClick={() => setIsOpen(false)}
                         className="block px-4 py-3 hover:bg-grey-50"
                       >
@@ -192,9 +192,9 @@ export function NotificationButton() {
           {notifications.length > 0 && (
             <div className="border-t border-border px-4 py-2">
               <Link
-                href="/dashboard/orders"
+                href="/store/notifications"
                 onClick={() => setIsOpen(false)}
-                className="block text-center text-sm text-soft-blue-600 hover:text-soft-blue-700 font-medium"
+                className="block w-full text-center text-sm text-soft-blue-600 hover:text-soft-blue-700 font-medium"
               >
                 View All
               </Link>

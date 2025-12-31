@@ -83,6 +83,7 @@ function getIcon(icon: string): string {
     box: "📦",
     tracking: "📍",
     invoices: "🧾",
+    notifications: "🔔",
     account: "👤",
     calculator: "🧮",
     shipping: "🚢",
