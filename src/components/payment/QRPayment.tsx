@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/currency";
 
 interface QRPaymentProps {
-  amount: number;
+  amount: number; // Pre-identified amount (exact amount to pay)
   orderId: string;
+  paymentType?: "full" | "downpayment";
+  downpaymentAmount?: number;
+  balance?: number;
+  subtotal?: number; // Product subtotal
+  isf?: number; // International Service Fee
+  lsf?: number; // Local Service Fee
   onPaymentComplete?: () => void;
 }
 
@@ -17,19 +23,38 @@ const BANKS = [
   { code: "MAYA", name: "Maya", color: "bg-green-600" },
 ] as const;
 
-export function QRPayment({ amount, orderId, onPaymentComplete }: QRPaymentProps) {
+export function QRPayment({ 
+  amount, 
+  orderId, 
+  paymentType = "full",
+  downpaymentAmount,
+  balance,
+  subtotal,
+  isf,
+  lsf,
+  onPaymentComplete 
+}: QRPaymentProps) {
   const [selectedBank, setSelectedBank] = useState<string>("GCASH");
   const [qrCode, setQrCode] = useState<string>("");
 
+  // Generate QR code with pre-identified amount
   const generateQR = (bank: string) => {
-    // TODO: Generate actual QR code from backend
-    // For now, create a placeholder
+    // TODO: Generate actual QR code from backend API with pre-identified amount
+    // The QR code should contain the exact amount so customer can't modify it
+    // Format: Contains merchant info + exact amount encoded
+    const paymentAmount = paymentType === "downpayment" && downpaymentAmount 
+      ? downpaymentAmount 
+      : amount;
+    
+    // For now, create a placeholder with the pre-identified amount displayed
     setQrCode(`data:image/svg+xml;base64,${btoa(`
       <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="200" fill="white"/>
-        <text x="100" y="100" text-anchor="middle" font-size="12">QR Code</text>
-        <text x="100" y="120" text-anchor="middle" font-size="10">${bank}</text>
-        <text x="100" y="140" text-anchor="middle" font-size="10">${formatCurrency(amount, "PHP")}</text>
+        <text x="100" y="80" text-anchor="middle" font-size="14" font-weight="bold">QR Code</text>
+        <text x="100" y="100" text-anchor="middle" font-size="11">${bank}</text>
+        <text x="100" y="120" text-anchor="middle" font-size="10" font-weight="bold">Amount:</text>
+        <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="bold">${formatCurrency(paymentAmount, "PHP")}</text>
+        ${paymentType === "downpayment" ? `<text x="100" y="160" text-anchor="middle" font-size="8">Downpayment</text>` : ''}
       </svg>
     `)}`);
   };
@@ -39,11 +64,64 @@ export function QRPayment({ amount, orderId, onPaymentComplete }: QRPaymentProps
     generateQR(bank);
   };
 
+  useEffect(() => {
+    generateQR(selectedBank);
+  }, [selectedBank, amount, paymentType, downpaymentAmount]);
+
+  const paymentAmount = paymentType === "downpayment" && downpaymentAmount 
+    ? downpaymentAmount 
+    : amount;
+
   return (
     <div className="rounded-lg border border-border bg-card p-6">
       <h3 className="mb-4 text-xl font-semibold">Payment via QR Code</h3>
+      
+      {/* Payment Type Info */}
+      {paymentType === "downpayment" && (
+        <div className="mb-4 rounded-lg bg-info/10 p-3 text-sm">
+          <p className="font-semibold text-info">Downpayment Payment</p>
+          <p className="text-muted-foreground">
+            Downpayment: {formatCurrency(downpaymentAmount || 0, "PHP")}
+            {balance && (
+              <span className="ml-2">Balance: {formatCurrency(balance, "PHP")}</span>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Fee Breakdown */}
+      {(isf !== undefined || lsf !== undefined) && (
+        <div className="mb-4 rounded-lg border border-border bg-grey-50 p-4">
+          <h4 className="mb-3 font-semibold">Payment Breakdown</h4>
+          <div className="space-y-2 text-sm">
+            {subtotal !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal:</span>
+                <span className="font-medium">{formatCurrency(subtotal, "PHP")}</span>
+              </div>
+            )}
+            {isf !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ISF (International Service Fee):</span>
+                <span className="font-medium">{formatCurrency(isf, "PHP")}</span>
+              </div>
+            )}
+            {lsf !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">LSF (Local Service Fee):</span>
+                <span className="font-medium">{formatCurrency(lsf, "PHP")}</span>
+              </div>
+            )}
+            <div className="mt-3 flex justify-between border-t border-border pt-2">
+              <span className="font-semibold">Total Amount:</span>
+              <span className="text-lg font-bold">{formatCurrency(paymentAmount, "PHP")}</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <p className="mb-4 text-muted-foreground">
-        Select your payment method and scan the QR code
+        Select your payment method and scan the QR code. The amount is pre-identified in the QR code.
       </p>
 
       {/* Bank Selection */}
@@ -78,11 +156,16 @@ export function QRPayment({ amount, orderId, onPaymentComplete }: QRPaymentProps
               className="h-48 w-48"
             />
           </div>
-          <p className="text-sm font-semibold">
-            Amount: {formatCurrency(amount, "PHP")}
+          <p className="text-lg font-bold">
+            Amount: {formatCurrency(paymentAmount, "PHP")}
           </p>
-          <p className="text-xs text-muted-foreground">
-            Scan with {selectedBank} app to pay
+          {paymentType === "downpayment" && balance && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Balance: {formatCurrency(balance, "PHP")}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Scan with {selectedBank} app to pay (Amount is pre-identified)
           </p>
         </div>
       )}
@@ -94,8 +177,10 @@ export function QRPayment({ amount, orderId, onPaymentComplete }: QRPaymentProps
           <li>Open your {selectedBank} mobile app</li>
           <li>Tap "Scan QR" or "Pay QR"</li>
           <li>Scan the QR code above</li>
-          <li>Confirm the amount and complete payment</li>
+          <li>The amount ({formatCurrency(paymentAmount, "PHP")}) is pre-identified and cannot be changed</li>
+          <li>Confirm and complete payment</li>
           <li>Upload proof of payment after completing the transaction</li>
+          <li>Manila office admin will verify your payment</li>
         </ol>
       </div>
 

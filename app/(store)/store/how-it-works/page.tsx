@@ -5,30 +5,49 @@ export default function HowItWorksPage() {
         How It Works
       </h1>
 
-      {/* Solo Box Concept */}
+      {/* Box Type Options */}
       <section className="mb-16">
         <h2 className="mb-6 text-3xl font-bold text-foreground">
-          What is a Solo Box?
+          Choose Your Box Type
         </h2>
-        <div className="rounded-lg border border-border bg-card p-8">
-          <p className="mb-4 text-lg text-muted-foreground">
-            A Solo Box is your dedicated storage space at our Korea warehouse.
-            When you shop Korean products through HanBuy, all your items are
-            consolidated into your personal Solo Box. This allows you to:
-          </p>
-          <ul className="list-disc space-y-2 pl-6 text-muted-foreground">
-            <li>Shop from multiple Korean stores and consolidate into one shipment</li>
-            <li>Save on shipping costs by combining multiple items</li>
-            <li>Track all your items in one place</li>
-            <li>Ship when you're ready (no rush to ship individual items)</li>
-          </ul>
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-lg border-2 border-info/20 bg-card p-8">
+            <h3 className="mb-4 text-2xl font-semibold text-info">Solo Box</h3>
+            <p className="mb-4 text-muted-foreground">
+              Your items are shipped in a dedicated box exclusively for you. Perfect when you want complete control and faster delivery.
+            </p>
+            <ul className="mb-4 list-disc space-y-2 pl-6 text-muted-foreground">
+              <li>Your items only - no sharing</li>
+              <li>Faster processing and shipping</li>
+              <li>Full shipping fee applies</li>
+              <li>Best for urgent orders</li>
+            </ul>
+            <div className="rounded-lg bg-info/10 p-3">
+              <p className="text-sm font-semibold text-info">Shipping Fee: Full Rate</p>
+            </div>
+          </div>
+          <div className="rounded-lg border-2 border-warning/20 bg-card p-8">
+            <h3 className="mb-4 text-2xl font-semibold text-warning">Shared Box</h3>
+            <p className="mb-4 text-muted-foreground">
+              Your items are consolidated with other customers' orders or owner's personal items in one box. Save on shipping costs!
+            </p>
+            <ul className="mb-4 list-disc space-y-2 pl-6 text-muted-foreground">
+              <li>Cost-effective shipping option</li>
+              <li>Shared shipping costs</li>
+              <li>Reduced delivery fee</li>
+              <li>Best for budget-conscious shoppers</li>
+            </ul>
+            <div className="rounded-lg bg-warning/10 p-3">
+              <p className="text-sm font-semibold text-warning">Shipping Fee: Reduced Rate (Save up to 60%)</p>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Step by Step */}
       <section className="mb-16">
         <h2 className="mb-8 text-3xl font-bold text-foreground">
-          Step-by-Step Process
+          Complete Order Process
         </h2>
         <div className="space-y-8">
           <div className="flex gap-6">
@@ -36,11 +55,11 @@ export default function HowItWorksPage() {
               1
             </div>
             <div>
-              <h3 className="mb-2 text-2xl font-semibold">Shop & Add to Box</h3>
+              <h3 className="mb-2 text-2xl font-semibold">Shop & Checkout</h3>
               <p className="text-muted-foreground">
-                Browse our catalog of Korean products. When you find something you
-                like, click "Add to Solo Box". Your items will be stored in your
-                dedicated box at our Korea warehouse.
+                Browse our catalog of Korean products (onhand or preorder items). Add items to your cart and proceed to checkout. 
+                Choose your box type preference: <strong>Solo Box</strong> (full shipping fee) or <strong>Shared Box</strong> (reduced shipping fee).
+                Select payment method: Full payment or Downpayment.
               </p>
             </div>
           </div>
@@ -50,10 +69,11 @@ export default function HowItWorksPage() {
               2
             </div>
             <div>
-              <h3 className="mb-2 text-2xl font-semibold">Review Your Box</h3>
+              <h3 className="mb-2 text-2xl font-semibold">Pay via QR Code</h3>
               <p className="text-muted-foreground">
-                Visit your dashboard to see all items in your Solo Box. You can
-                view details, remove items, or add more products before shipping.
+                Pay securely using QR code scanning with your preferred payment method (GCash, GoTyme, Maya, BDO, or BPI). 
+                The amount is pre-identified in the QR code for security. Upload proof of payment after completing the transaction. 
+                Our Manila office admin will verify your payment.
               </p>
             </div>
           </div>
@@ -63,11 +83,10 @@ export default function HowItWorksPage() {
               3
             </div>
             <div>
-              <h3 className="mb-2 text-2xl font-semibold">Choose Shipping Method</h3>
+              <h3 className="mb-2 text-2xl font-semibold">Seller Fulfills Order</h3>
               <p className="text-muted-foreground">
-                When you're ready, choose between Sea Freight (cheaper, 7-14 days)
-                or Air Freight (faster, 3-5 days). We'll calculate shipping costs
-                based on your box's weight and dimensions.
+                Once payment is verified, the seller packs your items and ships them to our Manila office. 
+                Your items are tracked from Korea to Manila. You'll receive updates when items are packed and shipped.
               </p>
             </div>
           </div>
@@ -77,12 +96,15 @@ export default function HowItWorksPage() {
               4
             </div>
             <div>
-              <h3 className="mb-2 text-2xl font-semibold">Track Your Shipment</h3>
+              <h3 className="mb-2 text-2xl font-semibold">Manila Office Receives Items</h3>
               <p className="text-muted-foreground">
-                Once shipped, you'll receive a tracking ID. Use our tracking page
-                to see real-time updates: Departed Incheon → Arrived Manila Port →
-                Cleared Customs → At PH Hub → Out for Delivery → Delivered!
+                All items arrive at our Manila office location. Our admin team receives and inspects your items. 
+                Items are then consolidated based on your box type preference:
               </p>
+              <ul className="ml-4 mt-2 list-disc space-y-1 text-muted-foreground">
+                <li><strong>Solo Box:</strong> Your items are prepared in a dedicated box</li>
+                <li><strong>Shared Box:</strong> Your items are consolidated with other customers' orders or owner's personal items</li>
+              </ul>
             </div>
           </div>
 
@@ -91,40 +113,97 @@ export default function HowItWorksPage() {
               5
             </div>
             <div>
-              <h3 className="mb-2 text-2xl font-semibold">Receive & Enjoy</h3>
+              <h3 className="mb-2 text-2xl font-semibold">Shipment via Philippines Courier</h3>
               <p className="text-muted-foreground">
-                Your package will be delivered to your address in the Philippines.
-                Pay any remaining fees (customs, delivery) and enjoy your Korean
-                products!
+                Once your box is ready, it's dispatched via Philippines courier (J&T Express, LBC, 2GO, etc.) to your address. 
+                You'll receive a tracking number to monitor your shipment from Manila to your doorstep.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-soft-blue-100 text-xl font-bold text-soft-blue-600">
+              6
+            </div>
+            <div>
+              <h3 className="mb-2 text-2xl font-semibold">Track & Receive</h3>
+              <p className="text-muted-foreground">
+                Use the Philippines courier tracking number to monitor your shipment. Track it from Manila office → 
+                In Transit → Out for Delivery → Delivered to your address. Enjoy your Korean products!
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Shipping Options */}
+      {/* Payment & Delivery Info */}
       <section className="mb-16">
         <h2 className="mb-8 text-3xl font-bold text-foreground">
-          Shipping Options
+          Payment & Delivery Information
         </h2>
         <div className="grid gap-6 md:grid-cols-2">
           <div className="rounded-lg border border-border bg-card p-6">
-            <h3 className="mb-4 text-2xl font-semibold">Sea Freight</h3>
+            <h3 className="mb-4 text-2xl font-semibold">Payment Options</h3>
             <ul className="space-y-2 text-muted-foreground">
-              <li>• Delivery: 7-14 business days</li>
-              <li>• Cost: More affordable</li>
-              <li>• Best for: Large orders, non-urgent items</li>
-              <li>• Weight limit: Up to 30kg per box</li>
+              <li>• <strong>QR Code Payment:</strong> GCash, GoTyme, Maya, BDO, BPI</li>
+              <li>• <strong>Pre-identified Amount:</strong> Amount is encoded in QR code for security</li>
+              <li>• <strong>Payment Types:</strong> Full payment or Downpayment available</li>
+              <li>• <strong>Verification:</strong> Manila office admin verifies all payments</li>
             </ul>
           </div>
           <div className="rounded-lg border border-border bg-card p-6">
-            <h3 className="mb-4 text-2xl font-semibold">Air Freight</h3>
+            <h3 className="mb-4 text-2xl font-semibold">Delivery & Shipping</h3>
             <ul className="space-y-2 text-muted-foreground">
-              <li>• Delivery: 3-5 business days</li>
-              <li>• Cost: Higher shipping fee</li>
-              <li>• Best for: Urgent orders, smaller items</li>
-              <li>• Weight limit: Up to 10kg per box</li>
+              <li>• <strong>Manila Office:</strong> All items consolidated at our Manila location</li>
+              <li>• <strong>Philippines Courier:</strong> J&T Express, LBC, 2GO, and more</li>
+              <li>• <strong>Tracking:</strong> Real-time tracking from Manila to your address</li>
+              <li>• <strong>Box Types:</strong> Solo (full fee) or Shared (reduced fee)</li>
             </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="mb-16">
+        <h2 className="mb-8 text-3xl font-bold text-foreground">
+          Why Choose HanBuy?
+        </h2>
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-3 text-xl font-semibold">💰 Cost-Effective</h3>
+            <p className="text-muted-foreground">
+              Choose shared boxes to save up to 60% on shipping fees. Solo boxes available for faster delivery.
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-3 text-xl font-semibold">📦 Flexible Options</h3>
+            <p className="text-muted-foreground">
+              Shop onhand items (ready to ship) or preorder items (coming soon). Full payment or downpayment options.
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-3 text-xl font-semibold">🔒 Secure Payments</h3>
+            <p className="text-muted-foreground">
+              QR code payments with pre-identified amounts. Multiple payment options (GCash, GoTyme, Maya, BDO, BPI).
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-3 text-xl font-semibold">📍 Local Support</h3>
+            <p className="text-muted-foreground">
+              Items consolidated at our Manila office for better quality control and faster local delivery.
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-3 text-xl font-semibold">📱 Real-Time Tracking</h3>
+            <p className="text-muted-foreground">
+              Track your items from Korea to Manila, then from Manila office to your doorstep.
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-3 text-xl font-semibold">✅ Verified Quality</h3>
+            <p className="text-muted-foreground">
+              All items inspected at Manila office before final delivery to ensure quality and accuracy.
+            </p>
           </div>
         </div>
       </section>

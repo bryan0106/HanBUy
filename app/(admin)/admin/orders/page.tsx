@@ -13,8 +13,12 @@ interface Order {
   items: number;
   total: number;
   currency: "PHP" | "KRW";
-  status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
-  paymentStatus: "pending" | "paid" | "failed";
+  status: "pending" | "confirmed" | "processing" | "packed" | "in_transit_to_manila" | "received_at_manila" | "consolidated" | "shipped" | "delivered" | "cancelled";
+  paymentStatus: "pending" | "partial" | "paid" | "failed";
+  paymentType: "full" | "downpayment";
+  fulfillmentStatus?: "pending_packing" | "packed" | "in_transit_to_manila" | "received_at_manila" | "consolidated" | "ready_for_delivery" | "out_for_delivery" | "delivered";
+  boxId?: string;
+  phCourierTrackingNumber?: string;
   createdAt: Date;
 }
 
@@ -39,8 +43,10 @@ export default function OrdersPage() {
         items: 3,
         total: 3285,
         currency: "PHP",
-        status: "pending",
-        paymentStatus: "pending",
+        status: "received_at_manila",
+        paymentStatus: "paid",
+        paymentType: "full",
+        fulfillmentStatus: "received_at_manila",
         createdAt: new Date("2024-12-28"),
       },
       {
@@ -51,8 +57,11 @@ export default function OrdersPage() {
         items: 2,
         total: 1500,
         currency: "PHP",
-        status: "confirmed",
-        paymentStatus: "paid",
+        status: "consolidated",
+        paymentStatus: "partial",
+        paymentType: "downpayment",
+        fulfillmentStatus: "consolidated",
+        boxId: "box-2",
         createdAt: new Date("2024-12-27"),
       },
       {
@@ -65,6 +74,10 @@ export default function OrdersPage() {
         currency: "PHP",
         status: "shipped",
         paymentStatus: "paid",
+        paymentType: "full",
+        fulfillmentStatus: "out_for_delivery",
+        boxId: "box-2",
+        phCourierTrackingNumber: "LBC987654321",
         createdAt: new Date("2024-12-26"),
       },
     ];
@@ -81,6 +94,10 @@ export default function OrdersPage() {
     pending: "bg-warning/10 text-warning",
     confirmed: "bg-info/10 text-info",
     processing: "bg-soft-blue-50 text-soft-blue-700",
+    packed: "bg-info/10 text-info",
+    in_transit_to_manila: "bg-soft-blue-50 text-soft-blue-700",
+    received_at_manila: "bg-success/10 text-success",
+    consolidated: "bg-info/10 text-info",
     shipped: "bg-info/10 text-info",
     delivered: "bg-success/10 text-success",
     cancelled: "bg-error/10 text-error",
@@ -88,6 +105,7 @@ export default function OrdersPage() {
 
   const paymentColors: Record<string, string> = {
     pending: "bg-warning/10 text-warning",
+    partial: "bg-warning/10 text-warning",
     paid: "bg-success/10 text-success",
     failed: "bg-error/10 text-error",
   };
@@ -200,8 +218,9 @@ export default function OrdersPage() {
                 <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Total</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold">Payment</th>
+                <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
+                <th className="px-4 py-3 text-center text-sm font-semibold">Fulfillment</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold">Actions</th>
               </tr>
@@ -226,15 +245,11 @@ export default function OrdersPage() {
                   <td className="px-4 py-3">{order.items} items</td>
                   <td className="px-4 py-3 font-semibold">
                     {formatCurrency(order.total, order.currency)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
-                        statusColors[order.status] || "bg-grey-100 text-grey-700"
-                      }`}
-                    >
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </span>
+                    {order.paymentType === "downpayment" && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        (DP)
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
@@ -245,6 +260,43 @@ export default function OrdersPage() {
                       {order.paymentStatus.charAt(0).toUpperCase() +
                         order.paymentStatus.slice(1)}
                     </span>
+                    {order.paymentType === "downpayment" && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {order.paymentType}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span
+                      className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
+                        statusColors[order.status] || "bg-grey-100 text-grey-700"
+                      }`}
+                    >
+                      {order.status.replace(/_/g, " ").charAt(0).toUpperCase() + 
+                        order.status.replace(/_/g, " ").slice(1)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {order.fulfillmentStatus ? (
+                      <span
+                        className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
+                          order.fulfillmentStatus === "delivered"
+                            ? "bg-success/10 text-success"
+                            : order.fulfillmentStatus.includes("manila") || order.fulfillmentStatus === "consolidated"
+                            ? "bg-info/10 text-info"
+                            : "bg-soft-blue-50 text-soft-blue-700"
+                        }`}
+                      >
+                        {order.fulfillmentStatus.replace(/_/g, " ")}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                    {order.phCourierTrackingNumber && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {order.phCourierTrackingNumber}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">
                     {formatDate(order.createdAt)}
