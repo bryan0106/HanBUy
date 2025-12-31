@@ -24,18 +24,16 @@ function LoginForm() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      setLoading(false); // Reset loading when authenticated
       // If user is admin, redirect to admin dashboard
       if (isAdmin) {
         router.push("/admin");
-      } else if (redirectParam) {
-        // Use redirect parameter if provided
-        router.push(redirectParam);
       } else {
-        // Default to customer dashboard
-        router.push("/dashboard");
+        // Always redirect customers to store page (ignore redirectParam for customers)
+        router.push("/store");
       }
     }
-  }, [isAuthenticated, user, isAdmin, redirectParam, router]);
+  }, [isAuthenticated, user, isAdmin, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,15 +41,8 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const loggedInUser = await login(email, password);
-      // Redirect based on user role
-      if (loggedInUser.role === "admin") {
-        router.push("/admin");
-      } else if (redirectParam) {
-        router.push(redirectParam);
-      } else {
-        router.push("/dashboard");
-      }
+      await login(email, password);
+      // useEffect will handle redirect when user state updates
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid email or password");
       setLoading(false);
@@ -115,10 +106,10 @@ function LoginForm() {
         </form>
 
         <div className="mt-6 space-y-2 rounded-lg bg-grey-50 p-4 text-sm text-muted-foreground">
-          <p className="font-semibold text-foreground">Demo Accounts:</p>
-          <div className="space-y-2">
+          <p className="font-semibold text-foreground">Test Accounts:</p>
+          <div className="space-y-3">
             <div>
-              <p>
+              <p className="mb-1">
                 <strong>Admin:</strong> admin@hanbuy.com / admin
               </p>
               <button
@@ -127,14 +118,56 @@ function LoginForm() {
                   setEmail("admin@hanbuy.com");
                   setPassword("admin");
                 }}
-                className="mt-1 text-xs text-soft-blue-600 hover:underline"
+                className="text-xs text-soft-blue-600 hover:underline"
               >
                 Click to fill admin credentials
               </button>
             </div>
-            <p>
-              <strong>Customer:</strong> Use any email and password
-            </p>
+            <div>
+              <p className="mb-1">
+                <strong>Customer 1:</strong> customer1@test.com / test123
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("customer1@test.com");
+                  setPassword("test123");
+                }}
+                className="text-xs text-soft-blue-600 hover:underline"
+              >
+                Click to fill customer 1 credentials
+              </button>
+            </div>
+            <div>
+              <p className="mb-1">
+                <strong>Customer 2:</strong> customer2@test.com / test123
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("customer2@test.com");
+                  setPassword("test123");
+                }}
+                className="text-xs text-soft-blue-600 hover:underline"
+              >
+                Click to fill customer 2 credentials
+              </button>
+            </div>
+            <div>
+              <p className="mb-1">
+                <strong>Customer 3:</strong> customer3@test.com / test123
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("customer3@test.com");
+                  setPassword("test123");
+                }}
+                className="text-xs text-soft-blue-600 hover:underline"
+              >
+                Click to fill customer 3 credentials
+              </button>
+            </div>
           </div>
         </div>
         <div className="mt-4 text-center">

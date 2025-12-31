@@ -29,7 +29,7 @@ export function AccountDropdown() {
 
   const handleLogout = () => {
     logout();
-    router.push("/store");
+    router.push("/auth/login");
     setIsOpen(false);
   };
 

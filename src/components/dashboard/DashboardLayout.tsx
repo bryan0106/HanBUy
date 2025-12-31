@@ -17,7 +17,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleLogout = () => {
     logout();
-    router.push("/store");
+    router.push("/auth/login");
   };
 
   return (
@@ -83,6 +83,7 @@ function getIcon(icon: string): string {
     box: "📦",
     tracking: "📍",
     invoices: "🧾",
+    account: "👤",
     calculator: "🧮",
     shipping: "🚢",
     penalty: "⏰",

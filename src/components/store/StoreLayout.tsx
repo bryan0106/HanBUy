@@ -228,7 +228,7 @@ export function StoreLayout({ children }: StoreLayoutProps) {
             </div>
           </div>
           <div className="mt-8 border-t border-border pt-8 text-center text-sm text-grey-600">
-            <p>&copy; {new Date().getFullYear()} HanBuy. All rights reserved.</p>
+            <p>&copy; 2024 HanBuy. All rights reserved.</p>
           </div>
         </div>
       </footer>

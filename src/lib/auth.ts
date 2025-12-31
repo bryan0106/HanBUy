@@ -40,13 +40,15 @@ export const authService = {
 
   // Mock login (in real app, this would call API)
   login: async (email: string, password: string): Promise<User> => {
-    // Default admin account (email only)
-    if (email.toLowerCase() === "admin@hanbuy.com") {
-      if (password === "admin") {
+    const emailLower = email.toLowerCase();
+
+    // Admin account
+    if (emailLower === "admin@hanbuy.com") {
+      if (password === "admin" || password === "admin123") {
         const adminUser: User = {
-          id: "admin-1",
+          id: "user-test-admin",
           email: "admin@hanbuy.com",
-          name: "Admin",
+          name: "Admin User",
           role: "admin",
           isAuthenticated: true,
         };
@@ -60,19 +62,54 @@ export const authService = {
       }
     }
 
-    // Mock login - accept any other credentials for demo (regular customers)
-    const user: User = {
-      id: "user-1",
-      email,
-      name: email.split("@")[0],
-      role: "customer",
-      isAuthenticated: true,
-    };
-    mockUser = user;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("hanbuy_user", JSON.stringify(user));
+    // Test customer accounts
+    if (emailLower === "customer1@test.com" && password === "test123") {
+      const user: User = {
+        id: "user-test-customer-1",
+        email: "customer1@test.com",
+        name: "Maria Santos",
+        role: "customer",
+        isAuthenticated: true,
+      };
+      mockUser = user;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hanbuy_user", JSON.stringify(user));
+      }
+      return user;
     }
-    return user;
+
+    if (emailLower === "customer2@test.com" && password === "test123") {
+      const user: User = {
+        id: "user-test-customer-2",
+        email: "customer2@test.com",
+        name: "Juan Dela Cruz",
+        role: "customer",
+        isAuthenticated: true,
+      };
+      mockUser = user;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hanbuy_user", JSON.stringify(user));
+      }
+      return user;
+    }
+
+    if (emailLower === "customer3@test.com" && password === "test123") {
+      const user: User = {
+        id: "user-test-customer-3",
+        email: "customer3@test.com",
+        name: "Ana Garcia",
+        role: "customer",
+        isAuthenticated: true,
+      };
+      mockUser = user;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hanbuy_user", JSON.stringify(user));
+      }
+      return user;
+    }
+
+    // Default: reject invalid credentials (don't accept any email/password)
+    throw new Error("Invalid email or password. Please use test accounts.");
   },
 
   // Logout

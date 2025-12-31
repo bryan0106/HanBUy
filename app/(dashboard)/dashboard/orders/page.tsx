@@ -18,19 +18,30 @@ interface Order {
   phCourierTrackingNumber?: string;
 }
 
+interface CartItem {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  imageUrl?: string;
+  productType: "onhand" | "preorder";
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"orders" | "receive">("orders");
+  const [activeTab, setActiveTab] = useState<"cart" | "orders" | "receive">("cart");
 
   useEffect(() => {
-    loadOrders();
+    loadData();
   }, []);
 
-  const loadOrders = async () => {
+  const loadData = async () => {
     setLoading(true);
     // TODO: Fetch from API
-    const mockData: Order[] = [
+    const mockOrders: Order[] = [
       {
         id: "order-1",
         orderNumber: "ORD-2024-001",
@@ -55,7 +66,28 @@ export default function OrdersPage() {
         phCourierTrackingNumber: "LBC987654321",
       },
     ];
-    setOrders(mockData);
+    
+    const mockCart: CartItem[] = [
+      {
+        id: "cart-1",
+        productId: "prod-1",
+        productName: "COSRX Advanced Snail 96 Mucin Power Essence",
+        quantity: 2,
+        price: 25000,
+        productType: "onhand",
+      },
+      {
+        id: "cart-2",
+        productId: "prod-2",
+        productName: "Beauty of Joseon Relief Sun SPF50+",
+        quantity: 1,
+        price: 18000,
+        productType: "onhand",
+      },
+    ];
+    
+    setOrders(mockOrders);
+    setCartItems(mockCart);
     setLoading(false);
   };
 
@@ -74,29 +106,112 @@ export default function OrdersPage() {
         <h1 className="mb-4 text-xl font-bold text-foreground sm:text-2xl md:text-3xl">My Orders</h1>
         
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-border">
+        <div className="flex gap-2 border-b border-border overflow-x-auto">
+          <button
+            onClick={() => setActiveTab("cart")}
+            className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:text-base ${
+              activeTab === "cart"
+                ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Cart ({cartItems.length})
+          </button>
           <button
             onClick={() => setActiveTab("orders")}
-            className={`flex-1 px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:text-base ${
+            className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:text-base ${
               activeTab === "orders"
                 ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            All Orders
+            All Orders ({orders.length})
           </button>
           <button
             onClick={() => setActiveTab("receive")}
-            className={`flex-1 px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:text-base ${
+            className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors sm:px-4 sm:text-base ${
               activeTab === "receive"
                 ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Items to Receive
+            To Receive
           </button>
         </div>
       </div>
+
+      {/* Cart Tab */}
+      {activeTab === "cart" && (
+        <div>
+          {loading ? (
+            <div className="py-8 text-center sm:py-12">
+              <p className="text-muted-foreground">Loading cart...</p>
+            </div>
+          ) : cartItems.length === 0 ? (
+            <div className="rounded-lg border border-border bg-card p-12 text-center">
+              <div className="mb-4 text-6xl">🛒</div>
+              <h2 className="mb-2 text-xl font-semibold">Your cart is empty</h2>
+              <p className="mb-6 text-muted-foreground">
+                Add items to your cart to see them here
+              </p>
+              <Link
+                href="/store/products"
+                className="inline-block rounded-lg bg-soft-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700"
+              >
+                Browse Products
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {cartItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-border bg-card p-4"
+                >
+                  <div className="flex gap-4">
+                    <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground">{item.productName}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {item.productType === "preorder" ? "Pre-Order" : "Onhand"}
+                      </p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Qty:</span>
+                          <span className="font-medium">{item.quantity}</span>
+                        </div>
+                        <p className="text-lg font-bold text-soft-blue-600">
+                          {formatCurrency(item.price * item.quantity, "PHP")}
+                        </p>
+                      </div>
+                      <button className="mt-2 text-sm text-error hover:underline">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="rounded-lg border border-border bg-card p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="text-lg font-semibold">Total:</span>
+                  <span className="text-2xl font-bold text-soft-blue-600">
+                    {formatCurrency(
+                      cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+                      "PHP"
+                    )}
+                  </span>
+                </div>
+                <Link
+                  href="/store/checkout"
+                  className="block w-full rounded-lg bg-soft-blue-600 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                >
+                  Proceed to Checkout
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Orders Tab */}
       {activeTab === "orders" && (

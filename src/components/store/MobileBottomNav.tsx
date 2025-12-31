@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
   { label: "Onhand", href: "/store/products/onhand", icon: "📦" },
   { label: "Pre-Order", href: "/store/products/preorder", icon: "📅" },
   { label: "My Orders", href: "/dashboard/orders", icon: "🛒", requiresAuth: true },
-  { label: "Account", href: "/dashboard", icon: "👤", requiresAuth: true },
+  { label: "Account", href: "/dashboard/account", icon: "👤", requiresAuth: true },
 ];
 
 export function MobileBottomNav() {
@@ -55,12 +55,13 @@ export function MobileBottomNav() {
             active = pathname?.startsWith("/dashboard/orders") || 
                      pathname?.startsWith("/dashboard/box");
           }
-          // Account - main dashboard but not orders/box
+          // Account - account page or dashboard but not orders/box
           else if (item.label === "Account") {
-            active = pathname === "/dashboard" || 
+            active = pathname === "/dashboard/account" ||
+                     (pathname === "/dashboard" || 
                      (pathname?.startsWith("/dashboard/") && 
                       !pathname?.startsWith("/dashboard/orders") && 
-                      !pathname?.startsWith("/dashboard/box"));
+                      !pathname?.startsWith("/dashboard/box")));
           }
           // Default - exact match or starts with
           else {

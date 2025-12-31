@@ -32,7 +32,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = () => {
     logout();
-    router.push("/store");
+    router.push("/auth/login");
   };
 
   const handleNavClick = () => {
