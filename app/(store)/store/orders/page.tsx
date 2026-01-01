@@ -42,7 +42,15 @@ export default function StoreOrdersPage() {
   const loadCart = async () => {
     if (user?.id) {
       try {
+        console.log('=== LOADING CART ===');
+        console.log('User ID:', user.id);
+        console.log('User object:', user);
+        
         const cartItemsData = await cartService.getCartItems(user.id);
+        
+        console.log('=== CART ITEMS RECEIVED ===');
+        console.log('Cart items count:', cartItemsData?.length || 0);
+        console.log('Cart items data:', JSON.stringify(cartItemsData, null, 2));
         
         // Fetch product details for each cart item to get images
         const cartItemsWithImages = await Promise.all(

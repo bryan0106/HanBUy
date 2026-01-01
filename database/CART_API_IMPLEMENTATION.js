@@ -27,6 +27,8 @@ app.get('/api/cart', async (req, res) => {
   }
 
   try {
+    console.log('Fetching cart items for user_id:', user_id);
+    
     // Query cart items with product details (JOIN)
     const cartItems = await sql`
       SELECT 
@@ -49,6 +51,8 @@ app.get('/api/cart', async (req, res) => {
       ORDER BY ci.created_at DESC
     `;
 
+    console.log('Cart items found in database:', cartItems.length);
+    
     // Format response
     const formattedItems = cartItems.map(item => ({
       id: item.id,
@@ -72,6 +76,10 @@ app.get('/api/cart', async (req, res) => {
       }
     }));
 
+    console.log('Formatted cart items:', formattedItems.length);
+    console.log('Sending response with', formattedItems.length, 'items');
+    
+    // Return empty array if no items, otherwise return formatted items
     res.json(formattedItems);
 
   } catch (error) {

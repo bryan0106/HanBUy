@@ -269,19 +269,33 @@ export const cartService = {
       
       const data = await response.json();
       
+      // Log response for debugging
+      console.log('=== CART API RESPONSE ===');
+      console.log('User ID:', userId);
+      console.log('Response type:', typeof data);
+      console.log('Is array:', Array.isArray(data));
+      console.log('Response data:', JSON.stringify(data, null, 2));
+      
       // Handle different response formats
       let cartItems: CartItem[] = [];
       
       if (Array.isArray(data)) {
+        console.log('Cart items found in direct array:', data.length);
         cartItems = data;
       } else if (data && Array.isArray(data.data)) {
+        console.log('Cart items found in data.data:', data.data.length);
         cartItems = data.data;
       } else if (data && data.cartItems && Array.isArray(data.cartItems)) {
+        console.log('Cart items found in data.cartItems:', data.cartItems.length);
         cartItems = data.cartItems;
       } else if (data && data.items && Array.isArray(data.items)) {
+        console.log('Cart items found in data.items:', data.items.length);
         cartItems = data.items;
+      } else {
+        console.warn('No cart items found in response. Response keys:', Object.keys(data || {}));
       }
       
+      console.log('Final cart items count:', cartItems.length);
       return cartItems;
     } catch (error: any) {
       if (error.name === 'AbortError') {
