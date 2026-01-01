@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { cartService, productService, type CartItem } from "@/services/api";
+import { cartService, productService, orderService, type CartItem } from "@/services/api";
 
 interface Order {
   id: string;
@@ -92,33 +92,68 @@ export default function StoreOrdersPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // TODO: Fetch orders from API
-      const mockOrders: Order[] = [
-        {
-          id: "order-1",
-          orderNumber: "ORD-2024-001",
-          items: 3,
-          total: 3285,
-          currency: "PHP",
-          status: "received_at_manila",
-          paymentStatus: "paid",
-          createdAt: new Date("2024-12-28"),
-          boxId: "box-1",
-        },
-        {
-          id: "order-2",
-          orderNumber: "ORD-2024-002",
-          items: 2,
-          total: 1500,
-          currency: "PHP",
-          status: "shipped",
-          paymentStatus: "paid",
-          createdAt: new Date("2024-12-27"),
-          boxId: "box-2",
-          phCourierTrackingNumber: "LBC987654321",
-        },
-      ];
-      setOrders(mockOrders);
+      // Fetch orders from API
+      if (user?.id) {
+        try {
+          console.log('=== FETCHING ORDERS ===');
+          console.log('User ID:', user.id);
+          console.log('User object:', user);
+          
+          const ordersData = await orderService.getOrders({ user_id: user.id });
+          
+          console.log('=== ORDERS API RESPONSE ===');
+          console.log('Orders data type:', typeof ordersData);
+          console.log('Is array:', Array.isArray(ordersData));
+          console.log('Number of orders:', ordersData?.length || 0);
+          console.log('Full orders data:', JSON.stringify(ordersData, null, 2));
+          
+          if (!ordersData || ordersData.length === 0) {
+            console.warn('No orders returned from API');
+            setOrders([]);
+            return;
+          }
+          
+          // Map API response to Order interface
+          const mappedOrders: Order[] = ordersData.map((order: any) => {
+            console.log('Mapping order:', {
+              id: order.id,
+              order_number: order.order_number,
+              order_items_length: order.order_items?.length,
+              items_count: order.items_count,
+              total: order.total,
+              status: order.status
+            });
+            
+            return {
+              id: order.id,
+              orderNumber: order.order_number,
+              items: order.order_items?.length || order.items_count || 0,
+              total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
+              currency: order.currency,
+              status: order.status,
+              paymentStatus: order.payment_status,
+              createdAt: new Date(order.created_at),
+              boxId: order.box_id,
+              phCourierTrackingNumber: order.ph_courier_tracking_number,
+            };
+          });
+          
+          console.log('=== MAPPED ORDERS ===');
+          console.log('Mapped orders count:', mappedOrders.length);
+          console.log('Mapped orders:', JSON.stringify(mappedOrders, null, 2));
+          
+          setOrders(mappedOrders);
+        } catch (orderError: any) {
+          console.error("=== ERROR LOADING ORDERS ===");
+          console.error("Error:", orderError);
+          console.error("Error message:", orderError.message);
+          console.error("Error stack:", orderError.stack);
+          setOrders([]);
+        }
+      } else {
+        console.warn('No user ID available, cannot fetch orders');
+        console.log('User object:', user);
+      }
 
       // Fetch cart items from API
       await loadCart();

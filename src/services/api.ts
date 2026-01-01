@@ -801,3 +801,361 @@ export const userService = {
   },
 };
 
+// Order services
+export interface OrderItemRequest {
+  product_id: string;
+  product_name: string;
+  product_type: "onhand" | "preorder" | "kr_website";
+  quantity: number;
+  unit_price: number;
+  total: number;
+  image_url?: string;
+  preorder_release_date?: string | null;
+}
+
+export interface CreateOrderRequest {
+  user_id: string;
+  order_number: string;
+  subtotal: number;
+  isf: number;
+  lsf: number;
+  shipping_fee: number;
+  solo_shipping_fee?: number;
+  shared_shipping_fee?: number;
+  total: number;
+  currency: "PHP" | "KRW";
+  status: string;
+  payment_status: string;
+  payment_type: "full" | "downpayment";
+  payment_method?: {
+    type: "qr_code" | "bank_transfer" | "online";
+    bank: "BPI" | "BDO" | "GCASH" | "GOTYME" | "MAYA";
+  };
+  downpayment_amount?: number | null;
+  balance?: number | null;
+  qr_code?: string;
+  box_type_preference: "solo" | "shared";
+  shipping_address: {
+    street: string;
+    city: string;
+    province: string;
+    zipCode: string;
+    country: string;
+  };
+  order_items: OrderItemRequest[];
+}
+
+export interface OrderResponse {
+  id: string;
+  user_id: string;
+  order_number: string;
+  subtotal: number;
+  isf: number;
+  lsf: number;
+  shipping_fee: number;
+  solo_shipping_fee?: number | null;
+  shared_shipping_fee?: number | null;
+  total: number;
+  currency: "PHP" | "KRW";
+  status: string;
+  payment_status: string;
+  payment_type: "full" | "downpayment";
+  payment_method?: any;
+  downpayment_amount?: number | null;
+  balance?: number | null;
+  qr_code?: string;
+  box_type_preference: "solo" | "shared";
+  shipping_address: {
+    street: string;
+    city: string;
+    province: string;
+    zipCode: string;
+    country: string;
+  };
+  fulfillment_status?: string;
+  box_id?: string;
+  ph_courier_tracking_number?: string;
+  ph_courier_name?: string;
+  created_at: string;
+  updated_at: string;
+  paid_at?: string;
+  order_items: Array<{
+    id: string;
+    product_id: string;
+    product_name: string;
+    product_type: "onhand" | "preorder" | "kr_website";
+    quantity: number;
+    unit_price: number;
+    total: number;
+    image_url?: string;
+    preorder_release_date?: string | null;
+  }>;
+}
+
+export const orderService = {
+  /**
+   * Get a specific order by ID
+   * @param orderId - Order UUID
+   * @returns Order details with items
+   */
+  getOrder: async (orderId: string): Promise<OrderResponse> => {
+    const url = `${API_BASE_URL}/orders/${orderId}`;
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Order not found');
+        }
+        throw new Error(`Order API returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.order) {
+        return data.order;
+      } else if (data.id) {
+        return data;
+      }
+      
+      throw new Error('Invalid order response format');
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error("Request timeout: Order API did not respond in time");
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error("Network error: Could not connect to Order API");
+      } else {
+        console.error("Error fetching order:", error);
+        throw error;
+      }
+    }
+  },
+
+  /**
+   * Get orders with optional filters
+   * @param filters - Optional filters (user_id, status, payment_status)
+   * @returns Array of orders
+   */
+  getOrders: async (filters?: {
+    user_id?: string;
+    status?: string;
+    payment_status?: string;
+  }): Promise<OrderResponse[]> => {
+    const params = new URLSearchParams();
+    
+    if (filters?.user_id) {
+      params.append('user_id', filters.user_id);
+    }
+    if (filters?.status) {
+      params.append('status', filters.status);
+    }
+    if (filters?.payment_status) {
+      params.append('payment_status', filters.payment_status);
+    }
+    
+    const url = `${API_BASE_URL}/orders${params.toString() ? `?${params.toString()}` : ''}`;
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Order API returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Log the response for debugging
+      console.log('Orders API response:', JSON.stringify(data, null, 2));
+      
+      if (data.success && Array.isArray(data.orders)) {
+        console.log('Found orders in data.orders:', data.orders.length);
+        return data.orders;
+      } else if (Array.isArray(data)) {
+        console.log('Response is direct array:', data.length);
+        return data;
+      } else if (data.success && Array.isArray(data.data)) {
+        console.log('Found orders in data.data:', data.data.length);
+        return data.data;
+      }
+      
+      console.error('Invalid orders response format:', {
+        hasSuccess: 'success' in data,
+        successValue: data.success,
+        hasOrders: 'orders' in data,
+        hasData: 'data' in data,
+        isArray: Array.isArray(data),
+        responseKeys: Object.keys(data),
+        fullResponse: JSON.stringify(data, null, 2)
+      });
+      
+      throw new Error(
+        `Invalid orders response format. ` +
+        `Expected {success: true, orders: [...]} or [...]. ` +
+        `Got: success=${data.success}, hasOrders=${!!data.orders}, hasData=${!!data.data}, isArray=${Array.isArray(data)}. ` +
+        `Response keys: ${Object.keys(data).join(', ')}`
+      );
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error("Request timeout: Order API did not respond in time");
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error("Network error: Could not connect to Order API");
+      } else {
+        console.error("Error fetching orders:", error);
+        throw error;
+      }
+    }
+  },
+
+  /**
+   * Create a new order
+   * @param orderData - Order creation data
+   * @returns Created order
+   */
+  createOrder: async (orderData: CreateOrderRequest): Promise<OrderResponse> => {
+    const url = `${API_BASE_URL}/orders`;
+    
+    // Validate UUIDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(orderData.user_id)) {
+      throw new Error(`Invalid user_id format. Expected UUID, got: ${orderData.user_id}`);
+    }
+    
+    for (const item of orderData.order_items) {
+      if (!uuidRegex.test(item.product_id)) {
+        throw new Error(`Invalid product_id format. Expected UUID, got: ${item.product_id}`);
+      }
+    }
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds for order creation
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        let errorMessage = `Order API returned ${response.status} ${response.statusText}`;
+        let errorDetails = '';
+        
+        try {
+          const errorData = await response.json();
+          console.error('Order creation error response:', JSON.stringify(errorData, null, 2));
+          
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+          
+          // Collect additional error details
+          if (errorData.details) {
+            errorDetails = ` Details: ${JSON.stringify(errorData.details)}`;
+          }
+          if (errorData.validation) {
+            errorDetails += ` Validation errors: ${JSON.stringify(errorData.validation)}`;
+          }
+        } catch (e) {
+          // Try to get response text if JSON parsing fails
+          try {
+            const text = await response.text();
+            errorDetails = ` Response body: ${text.substring(0, 200)}`;
+            console.error('Order creation error (non-JSON):', text);
+          } catch (textError) {
+            console.error('Could not read error response body');
+          }
+        }
+        
+        throw new Error(`${errorMessage}${errorDetails}`);
+      }
+      
+      const data = await response.json();
+      
+      // Log the full response for debugging
+      console.log('Order creation response:', JSON.stringify(data, null, 2));
+      
+      // Handle different response formats
+      if (data.success && data.order) {
+        // Format: {success: true, order: {...}}
+        console.log('Order found in data.order');
+        return data.order;
+      } else if (data.success && data.data) {
+        // Format: {success: true, data: {...}}
+        // Check if data.data is the order object or if it contains an order
+        if (data.data.id || data.data.order_id || data.data.order_number) {
+          console.log('Order found in data.data');
+          return data.data;
+        } else if (data.data.order) {
+          console.log('Order found in data.data.order');
+          return data.data.order;
+        } else {
+          console.log('data.data exists but does not appear to be an order object');
+          // Still return it, might be the order
+          return data.data;
+        }
+      } else if (data.id) {
+        // Format: {id: ..., ...} (direct order object)
+        console.log('Order found as direct object with id');
+        return data;
+      }
+      
+      // Provide detailed error message
+      const errorDetails = {
+        hasSuccess: 'success' in data,
+        successValue: data.success,
+        hasOrder: 'order' in data,
+        hasData: 'data' in data,
+        hasId: 'id' in data,
+        responseKeys: Object.keys(data),
+        fullResponse: JSON.stringify(data, null, 2)
+      };
+      
+      console.error('Invalid order creation response format:', errorDetails);
+      throw new Error(
+        `Invalid order creation response format. ` +
+        `Expected {success: true, order: {...}} or {success: true, data: {...}} or {id: ...}. ` +
+        `Got: success=${data.success}, hasOrder=${!!data.order}, hasData=${!!data.data}, hasId=${!!data.id}. ` +
+        `Response keys: ${Object.keys(data).join(', ')}. ` +
+        `Full response: ${JSON.stringify(data)}`
+      );
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error("Request timeout: Order API did not respond in time");
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error("Network error: Could not connect to Order API");
+      } else {
+        console.error("Error creating order:", error);
+        throw error;
+      }
+    }
+  },
+};
+

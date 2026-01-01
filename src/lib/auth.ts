@@ -10,6 +10,14 @@ export interface User {
   clientLevel?: "solobox" | "box_sharing" | "kr_to_kr" | "international";
   approvalStatus?: "pending" | "approved" | "rejected";
   isAuthenticated: boolean;
+  phone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    province?: string;
+    zipCode?: string;
+    country?: string;
+  };
 }
 
 // Authentication state (stored in localStorage)

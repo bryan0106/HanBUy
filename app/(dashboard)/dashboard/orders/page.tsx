@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
+import { orderService } from "@/services/api";
 
 interface Order {
   id: string;
@@ -40,57 +41,61 @@ export default function OrdersPage() {
 
   const loadData = async () => {
     setLoading(true);
-    // TODO: Fetch from API
-    const mockOrders: Order[] = [
-      {
-        id: "order-1",
-        orderNumber: "ORD-2024-001",
-        items: 3,
-        total: 3285,
-        currency: "PHP",
-        status: "received_at_manila",
-        paymentStatus: "paid",
-        createdAt: new Date("2024-12-28"),
-        boxId: "box-1",
-      },
-      {
-        id: "order-2",
-        orderNumber: "ORD-2024-002",
-        items: 2,
-        total: 1500,
-        currency: "PHP",
-        status: "shipped",
-        paymentStatus: "paid",
-        createdAt: new Date("2024-12-27"),
-        boxId: "box-2",
-        phCourierTrackingNumber: "LBC987654321",
-      },
-    ];
-    
-    const mockCart: CartItem[] = [
-      {
-        id: "cart-1",
-        productId: "550e8400-e29b-41d4-a716-446655440010",
-        productName: "COSRX Advanced Snail 96 Mucin Power Essence",
-        quantity: 2,
-        price: 25000,
-        imageUrl: "https://www.lookfantastic.com/images?url=https://static.thcdn.com/productimg/original/11401174-1325238016812216.jpg&format=webp&auto=avif&width=985&height=985&fit=cover&dpr=2",
-        productType: "onhand",
-      },
-      {
-        id: "cart-2",
-        productId: "550e8400-e29b-41d4-a716-446655440011",
-        productName: "Beauty of Joseon Relief Sun SPF50+",
-        quantity: 1,
-        price: 18000,
-        imageUrl: "https://tse3.mm.bing.net/th/id/OIP._2Hg_yZs7nF3_uMRIuW99AHaHa?pid=Api&P=0&h=220",
-        productType: "onhand",
-      },
-    ];
-    
-    setOrders(mockOrders);
-    setCartItems(mockCart);
-    setLoading(false);
+    try {
+      // Fetch orders from API
+      // Note: Dashboard might need user context or admin access
+      // For now, fetch all orders (admin) or user-specific orders
+      try {
+        const ordersData = await orderService.getOrders();
+        
+        // Map API response to Order interface
+        const mappedOrders: Order[] = ordersData.map((order) => ({
+          id: order.id,
+          orderNumber: order.order_number,
+          items: order.order_items?.length || 0,
+          total: order.total,
+          currency: order.currency,
+          status: order.status,
+          paymentStatus: order.payment_status,
+          createdAt: new Date(order.created_at),
+          boxId: order.box_id,
+          phCourierTrackingNumber: order.ph_courier_tracking_number,
+        }));
+        
+        setOrders(mappedOrders);
+      } catch (orderError) {
+        console.error("Error loading orders:", orderError);
+        setOrders([]);
+      }
+      
+      // Cart items - using mock for now since dashboard might not have user context
+      const mockCart: CartItem[] = [
+        {
+          id: "cart-1",
+          productId: "550e8400-e29b-41d4-a716-446655440010",
+          productName: "COSRX Advanced Snail 96 Mucin Power Essence",
+          quantity: 2,
+          price: 25000,
+          imageUrl: "https://www.lookfantastic.com/images?url=https://static.thcdn.com/productimg/original/11401174-1325238016812216.jpg&format=webp&auto=avif&width=985&height=985&fit=cover&dpr=2",
+          productType: "onhand",
+        },
+        {
+          id: "cart-2",
+          productId: "550e8400-e29b-41d4-a716-446655440011",
+          productName: "Beauty of Joseon Relief Sun SPF50+",
+          quantity: 1,
+          price: 18000,
+          imageUrl: "https://tse3.mm.bing.net/th/id/OIP._2Hg_yZs7nF3_uMRIuW99AHaHa?pid=Api&P=0&h=220",
+          productType: "onhand",
+        },
+      ];
+      
+      setCartItems(mockCart);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const statusColors: Record<string, string> = {
