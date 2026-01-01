@@ -161,6 +161,8 @@ app.post('/api/cart', async (req, res) => {
 
     let cartItem;
 
+    let isNewItem = false;
+    
     if (existingItem && existingItem.length > 0) {
       // Update existing item quantity
       const existing = existingItem[0];
@@ -196,6 +198,7 @@ app.post('/api/cart', async (req, res) => {
       `;
 
       cartItem = updated[0];
+      isNewItem = false; // This is an update
     } else {
       // Create new cart item
       const newItem = await sql`
@@ -241,6 +244,7 @@ app.post('/api/cart', async (req, res) => {
       `;
 
       cartItem = created[0];
+      isNewItem = true; // This is a new item
     }
 
     // Format response
@@ -266,7 +270,9 @@ app.post('/api/cart', async (req, res) => {
       }
     };
 
-    res.status(201).json(response);
+    // Return 201 Created for new items, 200 OK for updates
+    const statusCode = isNewItem ? 201 : 200;
+    res.status(statusCode).json(response);
 
   } catch (error) {
     console.error('Error adding to cart:', error);
