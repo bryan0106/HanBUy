@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { cartService, type CartItem } from "@/services/api";
 
 interface Order {
   id: string;
@@ -20,18 +21,8 @@ interface Order {
   phCourierTrackingNumber?: string;
 }
 
-interface CartItem {
-  id: string;
-  productId: string;
-  productName: string;
-  quantity: number;
-  price: number;
-  imageUrl?: string;
-  productType: "onhand" | "preorder";
-}
-
 export default function StoreOrdersPage() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -46,59 +37,58 @@ export default function StoreOrdersPage() {
     if (!authLoading && isAuthenticated) {
       loadData();
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, router, user]);
+
+  const loadCart = async () => {
+    if (user?.id) {
+      try {
+        const cartItemsData = await cartService.getCartItems(user.id);
+        setCartItems(cartItemsData);
+      } catch (cartError) {
+        console.error("Error loading cart:", cartError);
+        setCartItems([]);
+      }
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
-    // TODO: Fetch from API
-    const mockOrders: Order[] = [
-      {
-        id: "order-1",
-        orderNumber: "ORD-2024-001",
-        items: 3,
-        total: 3285,
-        currency: "PHP",
-        status: "received_at_manila",
-        paymentStatus: "paid",
-        createdAt: new Date("2024-12-28"),
-        boxId: "box-1",
-      },
-      {
-        id: "order-2",
-        orderNumber: "ORD-2024-002",
-        items: 2,
-        total: 1500,
-        currency: "PHP",
-        status: "shipped",
-        paymentStatus: "paid",
-        createdAt: new Date("2024-12-27"),
-        boxId: "box-2",
-        phCourierTrackingNumber: "LBC987654321",
-      },
-    ];
-    
-    const mockCart: CartItem[] = [
-      {
-        id: "cart-1",
-        productId: "prod-1",
-        productName: "COSRX Advanced Snail 96 Mucin Power Essence",
-        quantity: 2,
-        price: 25000,
-        productType: "onhand",
-      },
-      {
-        id: "cart-2",
-        productId: "prod-2",
-        productName: "Beauty of Joseon Relief Sun SPF50+",
-        quantity: 1,
-        price: 18000,
-        productType: "onhand",
-      },
-    ];
-    
-    setOrders(mockOrders);
-    setCartItems(mockCart);
-    setLoading(false);
+    try {
+      // TODO: Fetch orders from API
+      const mockOrders: Order[] = [
+        {
+          id: "order-1",
+          orderNumber: "ORD-2024-001",
+          items: 3,
+          total: 3285,
+          currency: "PHP",
+          status: "received_at_manila",
+          paymentStatus: "paid",
+          createdAt: new Date("2024-12-28"),
+          boxId: "box-1",
+        },
+        {
+          id: "order-2",
+          orderNumber: "ORD-2024-002",
+          items: 2,
+          total: 1500,
+          currency: "PHP",
+          status: "shipped",
+          paymentStatus: "paid",
+          createdAt: new Date("2024-12-27"),
+          boxId: "box-2",
+          phCourierTrackingNumber: "LBC987654321",
+        },
+      ];
+      setOrders(mockOrders);
+
+      // Fetch cart items from API
+      await loadCart();
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const statusColors: Record<string, string> = {
@@ -193,12 +183,26 @@ export default function StoreOrdersPage() {
                   className="rounded-lg border border-border bg-card p-4"
                 >
                   <div className="flex gap-4">
-                    <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
+                    <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200">
+                      {item.image_url && (
+                        <img 
+                          src={item.image_url} 
+                          alt={item.product_name}
+                          className="h-full w-full rounded-lg object-cover"
+                        />
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground">{item.productName}</h3>
+                      <h3 className="font-semibold text-foreground">{item.product_name}</h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {item.productType === "preorder" ? "Pre-Order" : "Onhand"}
+                        {item.product_type === "preorder" ? "Pre-Order" : 
+                         item.product_type === "kr_website" ? "KR Website" : "Onhand"}
                       </p>
+                      {item.box_type_preference && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Box: {item.box_type_preference}
+                        </p>
+                      )}
                       <div className="mt-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">Qty:</span>

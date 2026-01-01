@@ -13,7 +13,8 @@ Development: http://localhost:3001/api
 ## Authentication Endpoints
 
 ### POST `/api/auth/login`
-**Description:** User login
+**Description:** User login with email and password authentication
+
 **Request Body:**
 ```json
 {
@@ -21,20 +22,66 @@ Development: http://localhost:3001/api
   "password": "password123"
 }
 ```
-**Response:**
+
+**Backend Implementation Requirements:**
+1. **Password Verification**: Verify password using bcrypt.compare() against stored password_hash
+2. **Approval Status Check**: 
+   - Reject non-approved users (approval_status != 'approved') UNLESS role is 'admin'
+   - Admin users can login regardless of approval_status
+   - Return 403 Forbidden for non-approved non-admin users
+3. **Response Format**: Return user data WITHOUT password_hash field
+
+**Success Response (200 OK):**
 ```json
 {
+  "success": true,
   "user": {
-    "id": "user-1",
+    "id": "550e8400-e29b-41d4-a716-446655440001",
     "email": "user@example.com",
     "name": "John Doe",
+    "phone": "+63 912 345 6789",
     "role": "customer" | "admin" | "solobox_client",
-    "clientLevel": "solobox" | "box_sharing" | "kr_to_kr" | "international",
-    "approvalStatus": "pending" | "approved" | "rejected"
+    "client_level": "solobox" | "box_sharing" | "kr_to_kr" | "international",
+    "approval_status": "pending" | "approved" | "rejected",
+    "address": {
+      "street": "123 Main St",
+      "city": "Manila",
+      "province": "Metro Manila",
+      "zipCode": "1000",
+      "country": "Philippines"
+    },
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
   },
   "token": "jwt_token_here"
 }
 ```
+
+**Error Responses:**
+- **401 Unauthorized**: Invalid email or password
+  ```json
+  {
+    "success": false,
+    "error": "Invalid email or password",
+    "message": "Invalid email or password"
+  }
+  ```
+- **403 Forbidden**: Account not approved (non-admin users only)
+  ```json
+  {
+    "success": false,
+    "error": "Account not approved",
+    "message": "Your account is pending approval. Please wait for admin approval."
+  }
+  ```
+- **404 Not Found**: User not found
+  ```json
+  {
+    "success": false,
+    "error": "User not found",
+    "message": "No account found with this email"
+  }
+  ```
 
 ### POST `/api/auth/logout`
 **Description:** User logout

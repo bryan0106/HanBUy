@@ -2,20 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { productService, boxTypeService, type BoxType } from "@/services/api";
+import { productService, boxTypeService, cartService, type BoxType } from "@/services/api";
 import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { isAuthenticated, user } = useAuth();
   const productId = params.id as string;
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [boxTypes, setBoxTypes] = useState<BoxType[]>([]);
   const [boxTypesLoading, setBoxTypesLoading] = useState(true);
+  const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartSuccess, setCartSuccess] = useState(false);
 
   useEffect(() => {
     loadProduct();
@@ -32,7 +37,7 @@ export default function ProductDetailPage() {
   const loadBoxTypes = async () => {
     setBoxTypesLoading(true);
     try {
-      const types = await boxTypeService.getBoxTypes("http://localhost:5173/api/box-type");
+      const types = await boxTypeService.getBoxTypes();
       setBoxTypes(types);
     } catch (error) {
       console.warn("Failed to fetch box types from API, using defaults:", error);
@@ -66,13 +71,75 @@ export default function ProductDetailPage() {
   const shippingEstimate = "7-14 days (Sea) / 3-5 days (Air)";
 
   const handleBoxTypeSelect = (boxType: "SOLO" | "SHARED") => {
+    setBoxTypePreference(boxType.toLowerCase() as "solo" | "shared");
+  };
+
+  const handleAddToCart = async () => {
+    if (!isAuthenticated || !user) {
+      router.push("/auth/login?redirect=/store/products/" + productId);
+      return;
+    }
+
+    if (!product) return;
+
+    // Validate product ID is a UUID (backend requirement)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(product.id)) {
+      console.error("Product ID is not a valid UUID:", product.id);
+      alert("This product cannot be added to cart. Please refresh the page and try again.");
+      return;
+    }
+
+    // Validate user ID is a UUID
+    if (!uuidRegex.test(user.id)) {
+      console.error("User ID is not a valid UUID:", user.id);
+      alert("Invalid user session. Please log in again.");
+      return;
+    }
+
+    setAddingToCart(true);
+    setCartSuccess(false);
+
+    try {
+      await cartService.addToCart({
+        user_id: user.id,
+        product_id: product.id,
+        quantity: quantity,
+        box_type_preference: boxTypePreference,
+      });
+
+      setCartSuccess(true);
+      setTimeout(() => setCartSuccess(false), 3000);
+    } catch (error: any) {
+      console.error("Error adding to cart:", error);
+      const errorMessage = error?.message || "Failed to add item to cart. Please try again.";
+      
+      // Show more specific error messages
+      if (errorMessage.includes("uuid") || errorMessage.includes("UUID")) {
+        alert("Invalid product ID format. Please refresh the page and try again.");
+      } else if (errorMessage.includes("404") || errorMessage.includes("not found")) {
+        alert("Product not found. Please refresh the page and try again.");
+      } else {
+        alert(errorMessage);
+      }
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = () => {
+    if (!isAuthenticated || !user) {
+      router.push("/auth/login?redirect=/store/products/" + productId);
+      return;
+    }
+
     // Store order data in sessionStorage for payment page
     const orderData = {
       productId: product.id,
       name: product.name,
       price: product.price,
       quantity: quantity,
-      boxTypePreference: boxType.toLowerCase() as "solo" | "shared",
+      boxTypePreference: boxTypePreference,
     };
     
     sessionStorage.setItem("temp_order", JSON.stringify(orderData));
@@ -174,56 +241,89 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Box Type Selection Buttons */}
-          <div className="flex flex-col gap-4 sm:flex-row">
-            {boxTypesLoading ? (
-              <div className="flex flex-1 items-center justify-center py-4">
-                <p className="text-sm text-muted-foreground">Loading box types...</p>
-              </div>
-            ) : (
-              <>
-                {boxTypes.length > 0 ? (
-                  boxTypes.map((boxType) => {
-                    const isSolo = boxType.code === "SOLO" || boxType.code === "solo";
-                    const isShared = boxType.code === "SHARED" || boxType.code === "shared";
-                    
-                    if (isSolo || isShared) {
-                      return (
-                        <Button
-                          key={boxType.code}
-                          onClick={() => handleBoxTypeSelect(isSolo ? "SOLO" : "SHARED")}
-                          className={isSolo ? "flex-1" : "flex-1"}
-                          variant={isSolo ? "default" : "outline"}
-                          size="lg"
-                        >
-                          {boxType.name || boxType.code}
-                        </Button>
-                      );
-                    }
-                    return null;
-                  })
-                ) : (
-                  <>
-                    {/* Fallback: Show default buttons if API fails or returns no data */}
-                    <Button
-                      onClick={() => handleBoxTypeSelect("SOLO")}
-                      className="flex-1"
-                      size="lg"
-                    >
-                      SOLO
-                    </Button>
-                    <Button
-                      onClick={() => handleBoxTypeSelect("SHARED")}
-                      variant="outline"
-                      className="flex-1"
-                      size="lg"
-                    >
-                      SHARED
-                    </Button>
-                  </>
-                )}
-              </>
-            )}
+          {/* Box Type Selection */}
+          <div className="mb-6">
+            <label className="mb-2 block font-semibold">Box Type</label>
+            <div className="flex gap-2">
+              {boxTypesLoading ? (
+                <div className="flex flex-1 items-center justify-center py-4">
+                  <p className="text-sm text-muted-foreground">Loading box types...</p>
+                </div>
+              ) : (
+                <>
+                  {boxTypes.length > 0 ? (
+                    boxTypes.map((boxType) => {
+                      const isSolo = boxType.code === "SOLO" || boxType.code === "solo";
+                      const isShared = boxType.code === "SHARED" || boxType.code === "shared";
+                      
+                      if (isSolo || isShared) {
+                        const isSelected = (isSolo && boxTypePreference === "solo") || 
+                                         (isShared && boxTypePreference === "shared");
+                        return (
+                          <button
+                            key={boxType.code}
+                            onClick={() => handleBoxTypeSelect(isSolo ? "SOLO" : "SHARED")}
+                            className={`flex-1 rounded-lg border-2 p-3 text-sm font-semibold transition-colors ${
+                              isSelected
+                                ? "border-soft-blue-600 bg-soft-blue-50 text-soft-blue-700"
+                                : "border-border bg-background hover:bg-grey-50"
+                            }`}
+                          >
+                            {boxType.name || boxType.code}
+                          </button>
+                        );
+                      }
+                      return null;
+                    })
+                  ) : (
+                    <>
+                      {/* Fallback: Show default buttons if API fails or returns no data */}
+                      <button
+                        onClick={() => handleBoxTypeSelect("SOLO")}
+                        className={`flex-1 rounded-lg border-2 p-3 text-sm font-semibold transition-colors ${
+                          boxTypePreference === "solo"
+                            ? "border-soft-blue-600 bg-soft-blue-50 text-soft-blue-700"
+                            : "border-border bg-background hover:bg-grey-50"
+                        }`}
+                      >
+                        SOLO
+                      </button>
+                      <button
+                        onClick={() => handleBoxTypeSelect("SHARED")}
+                        className={`flex-1 rounded-lg border-2 p-3 text-sm font-semibold transition-colors ${
+                          boxTypePreference === "shared"
+                            ? "border-soft-blue-600 bg-soft-blue-50 text-soft-blue-700"
+                            : "border-border bg-background hover:bg-grey-50"
+                        }`}
+                      >
+                        SHARED
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              onClick={handleAddToCart}
+              disabled={addingToCart || product.stock === 0}
+              variant="outline"
+              className="flex-1"
+              size="lg"
+            >
+              {addingToCart ? "Adding..." : cartSuccess ? "✓ Added to Cart" : "Add to Cart"}
+            </Button>
+            <Button
+              onClick={handleBuyNow}
+              disabled={product.stock === 0}
+              className="flex-1"
+              size="lg"
+            >
+              Buy Now
+            </Button>
           </div>
         </div>
       </div>

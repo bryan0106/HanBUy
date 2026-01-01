@@ -1,4 +1,6 @@
-// Authentication utilities (mock for frontend-only)
+// Authentication utilities - Now uses backend API
+
+import { authService as apiAuthService, type LoginResponse } from "@/services/api";
 
 export interface User {
   id: string;
@@ -10,18 +12,22 @@ export interface User {
   isAuthenticated: boolean;
 }
 
-// Mock authentication state (in real app, this would come from session/cookies)
-let mockUser: User | null = null;
+// Authentication state (stored in localStorage)
+let currentUser: User | null = null;
 
 export const authService = {
   // Check if user is authenticated
   isAuthenticated: (): boolean => {
     if (typeof window === "undefined") return false;
-    // Check localStorage for mock auth
+    // Check localStorage for auth
     const stored = localStorage.getItem("hanbuy_user");
     if (stored) {
-      mockUser = JSON.parse(stored);
-      return mockUser?.isAuthenticated || false;
+      try {
+        currentUser = JSON.parse(stored);
+        return currentUser?.isAuthenticated || false;
+      } catch {
+        return false;
+      }
     }
     return false;
   },
@@ -29,94 +35,55 @@ export const authService = {
   // Get current user
   getCurrentUser: (): User | null => {
     if (typeof window === "undefined") return null;
-    if (mockUser) return mockUser;
+    if (currentUser) return currentUser;
     const stored = localStorage.getItem("hanbuy_user");
     if (stored) {
-      mockUser = JSON.parse(stored);
-      return mockUser;
+      try {
+        currentUser = JSON.parse(stored);
+        return currentUser;
+      } catch {
+        return null;
+      }
     }
     return null;
   },
 
-  // Mock login (in real app, this would call API)
+  // Login with backend API
   login: async (email: string, password: string): Promise<User> => {
-    const emailLower = email.toLowerCase();
-
-    // Admin account
-    if (emailLower === "admin@hanbuy.com") {
-      if (password === "admin" || password === "admin123") {
-        const adminUser: User = {
-          id: "user-test-admin",
-          email: "admin@hanbuy.com",
-          name: "Admin User",
-          role: "admin",
-          isAuthenticated: true,
-        };
-        mockUser = adminUser;
-        if (typeof window !== "undefined") {
-          localStorage.setItem("hanbuy_user", JSON.stringify(adminUser));
-        }
-        return adminUser;
-      } else {
-        throw new Error("Invalid password for admin account");
+    try {
+      // Call backend API
+      const response: LoginResponse = await apiAuthService.login(email, password);
+      
+      // Store user in localStorage
+      const user = response.user;
+      currentUser = user;
+      
+      // Store token if provided
+      if (response.token) {
+        localStorage.setItem("hanbuy_token", response.token);
       }
-    }
-
-    // Test customer accounts
-    if (emailLower === "customer1@test.com" && password === "test123") {
-      const user: User = {
-        id: "user-test-customer-1",
-        email: "customer1@test.com",
-        name: "Maria Santos",
-        role: "customer",
-        isAuthenticated: true,
-      };
-      mockUser = user;
+      
+      // Store user data
       if (typeof window !== "undefined") {
         localStorage.setItem("hanbuy_user", JSON.stringify(user));
       }
+      
       return user;
-    }
-
-    if (emailLower === "customer2@test.com" && password === "test123") {
-      const user: User = {
-        id: "user-test-customer-2",
-        email: "customer2@test.com",
-        name: "Juan Dela Cruz",
-        role: "customer",
-        isAuthenticated: true,
-      };
-      mockUser = user;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("hanbuy_user", JSON.stringify(user));
+    } catch (error: any) {
+      // Re-throw error with user-friendly message
+      if (error.message) {
+        throw error;
       }
-      return user;
+      throw new Error("Login failed. Please check your credentials and try again.");
     }
-
-    if (emailLower === "customer3@test.com" && password === "test123") {
-      const user: User = {
-        id: "user-test-customer-3",
-        email: "customer3@test.com",
-        name: "Ana Garcia",
-        role: "customer",
-        isAuthenticated: true,
-      };
-      mockUser = user;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("hanbuy_user", JSON.stringify(user));
-      }
-      return user;
-    }
-
-    // Default: reject invalid credentials (don't accept any email/password)
-    throw new Error("Invalid email or password. Please use test accounts.");
   },
 
   // Logout
   logout: (): void => {
-    mockUser = null;
+    currentUser = null;
     if (typeof window !== "undefined") {
       localStorage.removeItem("hanbuy_user");
+      localStorage.removeItem("hanbuy_token");
     }
   },
 

@@ -43,7 +43,7 @@ function PaymentPageContent() {
     try {
       // Fetch bank types from Express.js API
       try {
-        const banks = await bankService.getBankTypes("http://localhost:5173/api/bank-type");
+        const banks = await bankService.getBankTypes();
         setBankTypes(banks);
       } catch (bankError) {
         console.warn("Failed to fetch bank types from API, using defaults:", bankError);
