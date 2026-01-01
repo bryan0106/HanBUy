@@ -70,18 +70,20 @@ export default function OrdersPage() {
     const mockCart: CartItem[] = [
       {
         id: "cart-1",
-        productId: "prod-1",
+        productId: "550e8400-e29b-41d4-a716-446655440010",
         productName: "COSRX Advanced Snail 96 Mucin Power Essence",
         quantity: 2,
         price: 25000,
+        imageUrl: "https://www.lookfantastic.com/images?url=https://static.thcdn.com/productimg/original/11401174-1325238016812216.jpg&format=webp&auto=avif&width=985&height=985&fit=cover&dpr=2",
         productType: "onhand",
       },
       {
         id: "cart-2",
-        productId: "prod-2",
+        productId: "550e8400-e29b-41d4-a716-446655440011",
         productName: "Beauty of Joseon Relief Sun SPF50+",
         quantity: 1,
         price: 18000,
+        imageUrl: "https://tse3.mm.bing.net/th/id/OIP._2Hg_yZs7nF3_uMRIuW99AHaHa?pid=Api&P=0&h=220",
         productType: "onhand",
       },
     ];
@@ -169,7 +171,18 @@ export default function OrdersPage() {
                   className="rounded-lg border border-border bg-card p-4"
                 >
                   <div className="flex gap-4">
-                    <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.productName}
+                        className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                        }}
+                      />
+                    ) : (
+                      <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-foreground">{item.productName}</h3>
                       <p className="text-xs text-muted-foreground mt-1">

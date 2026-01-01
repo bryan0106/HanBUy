@@ -86,7 +86,7 @@ export default function ProductDetailPage() {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(product.id)) {
       console.error("Product ID is not a valid UUID:", product.id);
-      alert("This product cannot be added to cart. Please refresh the page and try again.");
+      alert("This product cannot be added to cart. Product ID format is invalid.");
       return;
     }
 
@@ -153,15 +153,45 @@ export default function ProductDetailPage() {
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Product Images */}
         <div>
-          <div className="mb-4 aspect-square w-full rounded-lg bg-grey-200"></div>
-          <div className="grid grid-cols-4 gap-2">
-            {product.images.slice(0, 4).map((img, idx) => (
-              <div
-                key={idx}
-                className="aspect-square rounded-lg bg-grey-200"
-              ></div>
-            ))}
-          </div>
+          {product.images && product.images.length > 0 ? (
+            <>
+              <img
+                src={product.images[0]}
+                alt={product.name}
+                className="mb-4 aspect-square w-full rounded-lg object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                }}
+              />
+              {product.images.length > 1 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {product.images.slice(1, 5).map((img, idx) => (
+                    <img
+                      key={idx}
+                      src={img}
+                      alt={`${product.name} ${idx + 2}`}
+                      className="aspect-square rounded-lg object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-4 aspect-square w-full rounded-lg bg-grey-200"></div>
+              <div className="grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4].map((idx) => (
+                  <div
+                    key={idx}
+                    className="aspect-square rounded-lg bg-grey-200"
+                  ></div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Product Info */}

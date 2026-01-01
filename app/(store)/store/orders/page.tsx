@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { cartService, type CartItem } from "@/services/api";
+import { cartService, productService, type CartItem } from "@/services/api";
 
 interface Order {
   id: string;
@@ -43,7 +43,45 @@ export default function StoreOrdersPage() {
     if (user?.id) {
       try {
         const cartItemsData = await cartService.getCartItems(user.id);
-        setCartItems(cartItemsData);
+        
+        // Fetch product details for each cart item to get images
+        const cartItemsWithImages = await Promise.all(
+          cartItemsData.map(async (item) => {
+            // If image_url or product.images already exists, use it
+            if (item.image_url || (item.product && item.product.images && item.product.images.length > 0)) {
+              return item;
+            }
+            
+            // Otherwise, fetch product details to get the image
+            try {
+              const product = await productService.getProduct(item.product_id);
+              if (product && product.images && product.images.length > 0) {
+                return {
+                  ...item,
+                  image_url: product.images[0],
+                  product: item.product ? {
+                    ...item.product,
+                    id: item.product.id || product.id,
+                    images: product.images,
+                  } : {
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    currency: product.currency,
+                    images: product.images,
+                    stock: product.stock,
+                  },
+                };
+              }
+            } catch (error) {
+              console.error(`Error fetching product ${item.product_id}:`, error);
+            }
+            
+            return item;
+          })
+        );
+        
+        setCartItems(cartItemsWithImages);
       } catch (cartError) {
         console.error("Error loading cart:", cartError);
         setCartItems([]);
@@ -183,15 +221,18 @@ export default function StoreOrdersPage() {
                   className="rounded-lg border border-border bg-card p-4"
                 >
                   <div className="flex gap-4">
-                    <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200">
-                      {item.image_url && (
-                        <img 
-                          src={item.image_url} 
-                          alt={item.product_name}
-                          className="h-full w-full rounded-lg object-cover"
-                        />
-                      )}
-                    </div>
+                    {item.image_url || (item.product && item.product.images && item.product.images.length > 0) ? (
+                      <img
+                        src={item.image_url || (item.product?.images?.[0] || '')}
+                        alt={item.product_name}
+                        className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                        }}
+                      />
+                    ) : (
+                      <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-foreground">{item.product_name}</h3>
                       <p className="text-xs text-muted-foreground mt-1">

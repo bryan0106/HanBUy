@@ -27,7 +27,7 @@ export default function ManilaReceivingPage() {
           {
             id: "item-1",
             orderItemId: "oi-1",
-            productId: "prod-1",
+            productId: "550e8400-e29b-41d4-a716-446655440010",
             productName: "COSRX Snail Essence",
             quantity: 2,
             receivedQuantity: 2,

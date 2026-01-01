@@ -24,8 +24,14 @@ export const boxService = {
 };
 
 // Product services
+// TEMPORARY: Using mock data directly for testing (skip API calls)
 export const productService = {
   getProducts: async (category?: string): Promise<Product[]> => {
+    // TEMPORARY: Use mock data directly instead of API
+    console.log("📦 Using mock data for products (temporary for testing)");
+    return mockServices.getProducts(category);
+    
+    /* ORIGINAL API CODE (commented out for now):
     try {
       const url = category 
         ? `${API_BASE_URL}/products?category=${category}`
@@ -56,9 +62,15 @@ export const productService = {
       console.warn("Error fetching products from API, using mock data:", error);
       return mockServices.getProducts(category);
     }
+    */
   },
   
   getProduct: async (id: string): Promise<Product | null> => {
+    // TEMPORARY: Use mock data directly instead of API
+    console.log("📦 Using mock data for product (temporary for testing)");
+    return mockServices.getProduct(id);
+    
+    /* ORIGINAL API CODE (commented out for now):
     try {
       const response = await fetch(`${API_BASE_URL}/products/${id}`, {
         headers: {
@@ -85,6 +97,7 @@ export const productService = {
       console.warn("Error fetching product from API, using mock data:", error);
       return mockServices.getProduct(id);
     }
+    */
   },
 };
 
@@ -247,8 +260,8 @@ export const cartService = {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        if (response.status === 404) {
-          // Empty cart - return empty array
+        if (response.status === 404 || response.status === 400) {
+          // Empty cart or invalid request - return empty array
           return [];
         }
         throw new Error(`Cart API returned ${response.status}: ${response.statusText}`);

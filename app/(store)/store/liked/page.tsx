@@ -22,19 +22,21 @@ export default function LikedItemsPage() {
   const mockItems: LikedItem[] = [
     {
       id: "liked-1",
-      productId: "prod-1",
+      productId: "550e8400-e29b-41d4-a716-446655440010",
       name: "COSRX Advanced Snail 96 Mucin Power Essence",
       price: 25000,
       currency: "KRW",
+      imageUrl: "https://www.lookfantastic.com/images?url=https://static.thcdn.com/productimg/original/11401174-1325238016812216.jpg&format=webp&auto=avif&width=985&height=985&fit=cover&dpr=2",
       status: "onhand",
       likedAt: new Date("2024-12-28"),
     },
     {
       id: "liked-2",
-      productId: "prod-2",
+      productId: "550e8400-e29b-41d4-a716-446655440012",
       name: "Laneige Water Bank Hyaluronic Cream",
       price: 35000,
       currency: "KRW",
+      imageUrl: "https://image-optimizer-th.production.sephora-asia.net/images/product_images/zoom_1_Product_8809803572255-Laneige-Water-Bank-Blue-Hyaluronic-Cream-Moisturizer-50ml_6b1e0066b28e5faf9de7d801a9f753e077b9eeea_1702890332.png",
       status: "preorder",
       likedAt: new Date("2024-12-27"),
     },

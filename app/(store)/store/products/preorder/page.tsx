@@ -47,7 +47,7 @@ export default function PreorderProductsPage() {
         description: "Exclusive pre-order item",
         price: 50000,
         currency: "KRW",
-        images: [],
+        images: ["https://tse3.mm.bing.net/th/id/OIP.fBce0nBeC1DZohHVUx6XhwAAAA?pid=Api&P=0&h=220"],
         category: "skincare",
         brand: "K-Beauty",
         quantity: 50,
@@ -385,7 +385,18 @@ export default function PreorderProductsPage() {
                         className="rounded-lg border border-border bg-card p-3 sm:p-4"
                       >
                         <div className="flex gap-4">
-                          <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200 sm:h-24 sm:w-24"></div>
+                          {product.images && product.images.length > 0 ? (
+                            <img
+                              src={product.images[0]}
+                              alt={product.name}
+                              className="h-20 w-20 shrink-0 rounded-lg object-cover sm:h-24 sm:w-24"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                              }}
+                            />
+                          ) : (
+                            <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200 sm:h-24 sm:w-24"></div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <h3 className="mb-1 font-semibold sm:mb-2">{product.name}</h3>
                             {product.brand && (
@@ -425,7 +436,18 @@ export default function PreorderProductsPage() {
                         key={product.id}
                         className="rounded-lg border border-border bg-card p-4 sm:p-6"
                       >
-                        <div className="mb-4 aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-64"></div>
+                        {product.images && product.images.length > 0 ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="mb-4 aspect-video w-full rounded-lg object-cover sm:aspect-square sm:h-64"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                            }}
+                          />
+                        ) : (
+                          <div className="mb-4 aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-64"></div>
+                        )}
                         <h3 className="mb-2 text-lg font-semibold sm:text-xl">{product.name}</h3>
                         {product.brand && (
                           <p className="mb-2 text-sm text-muted-foreground">
@@ -471,7 +493,18 @@ export default function PreorderProductsPage() {
                         key={product.id}
                         className="rounded-lg border border-border bg-card p-3 sm:p-4"
                       >
-                        <div className="mb-3 aspect-square w-full rounded-lg bg-grey-200 sm:mb-4"></div>
+                        {product.images && product.images.length > 0 ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="mb-3 aspect-square w-full rounded-lg object-cover sm:mb-4"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                            }}
+                          />
+                        ) : (
+                          <div className="mb-3 aspect-square w-full rounded-lg bg-grey-200 sm:mb-4"></div>
+                        )}
                         <h3 className="mb-1 font-semibold sm:mb-2">{product.name}</h3>
                         {product.brand && (
                           <p className="mb-1 text-xs text-muted-foreground sm:text-sm">

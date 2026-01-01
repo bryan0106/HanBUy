@@ -351,7 +351,18 @@ export default function OnhandProductsPage() {
                         href={`/store/products/${product.id}`}
                         className="group flex gap-4 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
                       >
-                        <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200 sm:h-24 sm:w-24"></div>
+                        {product.images && product.images.length > 0 ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="h-20 w-20 shrink-0 rounded-lg object-cover sm:h-24 sm:w-24"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                            }}
+                          />
+                        ) : (
+                          <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200 sm:h-24 sm:w-24"></div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <h3 className="mb-1 font-semibold group-hover:text-soft-blue-600 sm:mb-2">
                             {product.name}
@@ -389,7 +400,18 @@ export default function OnhandProductsPage() {
                         href={`/store/products/${product.id}`}
                         className="group block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-lg sm:p-6"
                       >
-                        <div className="mb-4 aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-64"></div>
+                        {product.images && product.images.length > 0 ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="mb-4 aspect-video w-full rounded-lg object-cover sm:aspect-square sm:h-64"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                            }}
+                          />
+                        ) : (
+                          <div className="mb-4 aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-64"></div>
+                        )}
                         <h3 className="mb-2 text-lg font-semibold group-hover:text-soft-blue-600 sm:text-xl">
                           {product.name}
                         </h3>
@@ -425,7 +447,18 @@ export default function OnhandProductsPage() {
                         href={`/store/products/${product.id}`}
                         className="group rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
                       >
-                        <div className="mb-3 aspect-square w-full rounded-lg bg-grey-200 sm:mb-4"></div>
+                        {product.images && product.images.length > 0 ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="mb-3 aspect-square w-full rounded-lg object-cover sm:mb-4"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                            }}
+                          />
+                        ) : (
+                          <div className="mb-3 aspect-square w-full rounded-lg bg-grey-200 sm:mb-4"></div>
+                        )}
                         <h3 className="mb-1 font-semibold group-hover:text-soft-blue-600 sm:mb-2">
                           {product.name}
                         </h3>
