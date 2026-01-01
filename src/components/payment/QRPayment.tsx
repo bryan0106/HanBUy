@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/currency";
+import type { BankType } from "@/services/api";
 
 interface QRPaymentProps {
   amount: number; // Pre-identified amount (exact amount to pay)
@@ -13,15 +14,16 @@ interface QRPaymentProps {
   isf?: number; // International Service Fee
   lsf?: number; // Local Service Fee
   onPaymentComplete?: () => void;
+  bankTypes?: BankType[]; // Optional bank types from API
 }
 
-const BANKS = [
+const DEFAULT_BANKS: BankType[] = [
   { code: "BPI", name: "BPI", color: "bg-red-600" },
   { code: "BDO", name: "BDO", color: "bg-blue-600" },
   { code: "GCASH", name: "GCash", color: "bg-blue-500" },
   { code: "GOTYME", name: "GoTyme", color: "bg-purple-600" },
   { code: "MAYA", name: "Maya", color: "bg-green-600" },
-] as const;
+];
 
 export function QRPayment({ 
   amount, 
@@ -32,9 +34,12 @@ export function QRPayment({
   subtotal,
   isf,
   lsf,
-  onPaymentComplete 
+  onPaymentComplete,
+  bankTypes 
 }: QRPaymentProps) {
-  const [selectedBank, setSelectedBank] = useState<string>("GCASH");
+  // Use provided bank types or fall back to defaults
+  const banks = bankTypes && bankTypes.length > 0 ? bankTypes : DEFAULT_BANKS;
+  const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.code || "GCASH");
   const [qrCode, setQrCode] = useState<string>("");
 
   // Generate QR code with pre-identified amount
@@ -46,17 +51,24 @@ export function QRPayment({
       ? downpaymentAmount 
       : amount;
     
-    // For now, create a placeholder with the pre-identified amount displayed
-    setQrCode(`data:image/svg+xml;base64,${btoa(`
+    // Format currency for display (without encoding issues)
+    const amountText = formatCurrency(paymentAmount, "PHP");
+    
+    // Create SVG with proper encoding - use encodeURIComponent instead of btoa for Unicode support
+    const svgContent = `
       <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="200" fill="white"/>
         <text x="100" y="80" text-anchor="middle" font-size="14" font-weight="bold">QR Code</text>
         <text x="100" y="100" text-anchor="middle" font-size="11">${bank}</text>
         <text x="100" y="120" text-anchor="middle" font-size="10" font-weight="bold">Amount:</text>
-        <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="bold">${formatCurrency(paymentAmount, "PHP")}</text>
+        <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="bold">${amountText}</text>
         ${paymentType === "downpayment" ? `<text x="100" y="160" text-anchor="middle" font-size="8">Downpayment</text>` : ''}
       </svg>
-    `)}`);
+    `.trim();
+    
+    // Use encodeURIComponent for proper Unicode handling, then create data URI
+    const encodedSvg = encodeURIComponent(svgContent);
+    setQrCode(`data:image/svg+xml;charset=utf-8,${encodedSvg}`);
   };
 
   const handleBankSelect = (bank: string) => {
@@ -67,6 +79,13 @@ export function QRPayment({
   useEffect(() => {
     generateQR(selectedBank);
   }, [selectedBank, amount, paymentType, downpaymentAmount]);
+
+  // Update selected bank when bank types change
+  useEffect(() => {
+    if (banks.length > 0 && !banks.find(b => b.code === selectedBank)) {
+      setSelectedBank(banks[0].code);
+    }
+  }, [banks, selectedBank]);
 
   const paymentAmount = paymentType === "downpayment" && downpaymentAmount 
     ? downpaymentAmount 
@@ -130,7 +149,7 @@ export function QRPayment({
           Select Payment Method
         </label>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {BANKS.map((bank) => (
+          {banks.map((bank) => (
             <button
               key={bank.code}
               onClick={() => handleBankSelect(bank.code)}

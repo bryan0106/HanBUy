@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { productService } from "@/services/api";
+import { useParams, useRouter } from "next/navigation";
+import { productService, boxTypeService, type BoxType } from "@/services/api";
 import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
 import { Button } from "@/components/ui/button";
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const productId = params.id as string;
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [boxTypes, setBoxTypes] = useState<BoxType[]>([]);
+  const [boxTypesLoading, setBoxTypesLoading] = useState(true);
 
   useEffect(() => {
     loadProduct();
+    loadBoxTypes();
   }, [productId]);
 
   const loadProduct = async () => {
@@ -23,6 +27,23 @@ export default function ProductDetailPage() {
     const data = await productService.getProduct(productId);
     setProduct(data);
     setLoading(false);
+  };
+
+  const loadBoxTypes = async () => {
+    setBoxTypesLoading(true);
+    try {
+      const types = await boxTypeService.getBoxTypes("http://localhost:5173/api/box-type");
+      setBoxTypes(types);
+    } catch (error) {
+      console.warn("Failed to fetch box types from API, using defaults:", error);
+      // Fallback to default box types
+      setBoxTypes([
+        { code: "SOLO", name: "SOLO", description: "Solo Box" },
+        { code: "SHARED", name: "SHARED", description: "Shared Box" },
+      ]);
+    } finally {
+      setBoxTypesLoading(false);
+    }
   };
 
   if (loading) {
@@ -44,12 +65,20 @@ export default function ProductDetailPage() {
   const priceInPHP = product.price * 0.042; // Mock conversion
   const shippingEstimate = "7-14 days (Sea) / 3-5 days (Air)";
 
-  const handleAddToBox = () => {
-    alert(`Added ${quantity} x ${product.name} to your Solo Box!`);
-  };
-
-  const handleBuyNow = () => {
-    alert("Buy Now feature coming soon!");
+  const handleBoxTypeSelect = (boxType: "SOLO" | "SHARED") => {
+    // Store order data in sessionStorage for payment page
+    const orderData = {
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: quantity,
+      boxTypePreference: boxType.toLowerCase() as "solo" | "shared",
+    };
+    
+    sessionStorage.setItem("temp_order", JSON.stringify(orderData));
+    
+    // Navigate to payment page
+    router.push(`/store/payment?orderId=temp-order-${Date.now()}`);
   };
 
   return (
@@ -145,23 +174,56 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Box Type Selection Buttons */}
           <div className="flex flex-col gap-4 sm:flex-row">
-            <Button
-              onClick={handleAddToBox}
-              className="flex-1"
-              size="lg"
-            >
-              Add to Solo Box
-            </Button>
-            <Button
-              onClick={handleBuyNow}
-              variant="outline"
-              className="flex-1"
-              size="lg"
-            >
-              Buy Now
-            </Button>
+            {boxTypesLoading ? (
+              <div className="flex flex-1 items-center justify-center py-4">
+                <p className="text-sm text-muted-foreground">Loading box types...</p>
+              </div>
+            ) : (
+              <>
+                {boxTypes.length > 0 ? (
+                  boxTypes.map((boxType) => {
+                    const isSolo = boxType.code === "SOLO" || boxType.code === "solo";
+                    const isShared = boxType.code === "SHARED" || boxType.code === "shared";
+                    
+                    if (isSolo || isShared) {
+                      return (
+                        <Button
+                          key={boxType.code}
+                          onClick={() => handleBoxTypeSelect(isSolo ? "SOLO" : "SHARED")}
+                          className={isSolo ? "flex-1" : "flex-1"}
+                          variant={isSolo ? "default" : "outline"}
+                          size="lg"
+                        >
+                          {boxType.name || boxType.code}
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })
+                ) : (
+                  <>
+                    {/* Fallback: Show default buttons if API fails or returns no data */}
+                    <Button
+                      onClick={() => handleBoxTypeSelect("SOLO")}
+                      className="flex-1"
+                      size="lg"
+                    >
+                      SOLO
+                    </Button>
+                    <Button
+                      onClick={() => handleBoxTypeSelect("SHARED")}
+                      variant="outline"
+                      className="flex-1"
+                      size="lg"
+                    >
+                      SHARED
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
