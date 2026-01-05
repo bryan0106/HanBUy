@@ -527,32 +527,47 @@ async function mockLogin(email: string, password: string): Promise<LoginResponse
   
   // Normalize email for comparison
   const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPassword = password.trim();
+  
+  console.log("🔐 Mock login attempt:", { 
+    normalizedEmail, 
+    passwordLength: normalizedPassword.length,
+    adminEmail: testAccounts.admin.email.toLowerCase()
+  });
   
   // Check admin account (accept both "admin" and "admin123" for compatibility)
-  if (normalizedEmail === testAccounts.admin.email.toLowerCase() && 
-      (password === "admin" || password === testAccounts.admin.password)) {
-    const adminUser = testUsers.find(u => u.id === testAccounts.admin.userId);
-    if (adminUser) {
-      console.log("✅ Mock login successful (Admin) - Using localhost mock data");
-      return {
-        user: {
-          id: adminUser.id,
-          email: adminUser.email,
-          name: adminUser.name,
-          role: "admin",
-          approvalStatus: "approved",
-          isAuthenticated: true,
-          phone: adminUser.phone,
-          address: adminUser.address,
-        },
-        token: "mock-jwt-token-admin",
-      };
+  if (normalizedEmail === testAccounts.admin.email.toLowerCase()) {
+    if (normalizedPassword === "admin" || normalizedPassword === testAccounts.admin.password) {
+      const adminUser = testUsers.find(u => u.id === testAccounts.admin.userId);
+      if (adminUser) {
+        console.log("✅ Mock login successful (Admin) - Using localhost mock data");
+        return {
+          user: {
+            id: adminUser.id,
+            email: adminUser.email,
+            name: adminUser.name,
+            role: "admin",
+            approvalStatus: "approved",
+            isAuthenticated: true,
+            phone: adminUser.phone,
+            address: adminUser.address,
+          },
+          token: "mock-jwt-token-admin",
+        };
+      } else {
+        console.error("❌ Admin user not found in testUsers");
+      }
+    } else {
+      console.log("❌ Admin password mismatch:", { 
+        provided: normalizedPassword, 
+        expected: ["admin", testAccounts.admin.password] 
+      });
     }
   }
   
   // Check customer accounts
   const customerAccount = testAccounts.customers.find(
-    acc => acc.email.toLowerCase() === normalizedEmail && acc.password === password
+    acc => acc.email.toLowerCase() === normalizedEmail && acc.password === normalizedPassword
   );
   
   if (customerAccount) {
@@ -572,10 +587,15 @@ async function mockLogin(email: string, password: string): Promise<LoginResponse
         },
         token: "mock-jwt-token-customer",
       };
+    } else {
+      console.error(`❌ Customer user not found for account: ${customerAccount.email}`);
     }
+  } else {
+    console.log("❌ No matching customer account found");
   }
   
   // Invalid credentials
+  console.error("❌ Login failed - Invalid email or password");
   throw new Error("Invalid email or password");
 }
 

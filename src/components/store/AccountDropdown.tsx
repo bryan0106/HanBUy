@@ -63,20 +63,20 @@ export function AccountDropdown() {
           </div>
           <div className="py-2">
             <Link
-              href="/dashboard"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
-            >
-              <span>📊</span>
-              <span>Dashboard</span>
-            </Link>
-            <Link
-              href="/dashboard/orders"
+              href="/store/orders"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
             >
               <span>🛒</span>
-              <span>My Orders & Receive</span>
+              <span>My Orders</span>
+            </Link>
+            <Link
+              href="/store/box-tracking"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
+            >
+              <span>📦</span>
+              <span>Box Tracking</span>
             </Link>
             <Link
               href="/store/liked"
@@ -87,21 +87,29 @@ export function AccountDropdown() {
               <span>Liked Items</span>
             </Link>
             <Link
-              href="/dashboard/invoices"
+              href="/store/notifications"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
             >
-              <span>🧾</span>
-              <span>Invoices</span>
+              <span>🔔</span>
+              <span>Notifications</span>
             </Link>
             <div className="my-1 border-t border-border" />
             <Link
-              href="/dashboard"
+              href="/store/account"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
             >
               <span>⚙️</span>
               <span>Account Settings</span>
+            </Link>
+            <Link
+              href="/dashboard"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
+            >
+              <span>📊</span>
+              <span>Dashboard</span>
             </Link>
             <button
               onClick={handleLogout}

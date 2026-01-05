@@ -28,11 +28,19 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
+      console.log("🔐 useAuth: Attempting login...");
       const loggedInUser = await authService.login(email, password);
+      console.log("✅ useAuth: Login successful, setting user:", loggedInUser);
       setUser(loggedInUser);
       setLoading(false);
+      
+      // Force a re-check of auth state
+      const currentUser = authService.getCurrentUser();
+      console.log("🔍 useAuth: Current user after login:", currentUser);
+      
       return loggedInUser;
     } catch (error) {
+      console.error("❌ useAuth: Login failed:", error);
       setLoading(false);
       throw error;
     }

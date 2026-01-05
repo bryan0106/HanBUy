@@ -27,7 +27,9 @@ export default function StoreOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"cart" | "orders" | "receive">("cart");
+  const [activeTab, setActiveTab] = useState<"cart" | "orders" | "receive" | "rate">("cart");
+  const [orderDetails, setOrderDetails] = useState<Record<string, any>>({});
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -172,6 +174,30 @@ export default function StoreOrdersPage() {
     }
   };
 
+  const loadOrderDetails = async (orderId: string) => {
+    if (orderDetails[orderId]) return; // Already loaded
+    
+    setLoadingOrderDetails(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const orderDetail = await orderService.getOrder(orderId);
+      setOrderDetails(prev => ({ ...prev, [orderId]: orderDetail }));
+    } catch (error) {
+      console.error(`Error loading order ${orderId}:`, error);
+    } finally {
+      setLoadingOrderDetails(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  // Load order details when Rate tab is active
+  useEffect(() => {
+    if (activeTab === "rate") {
+      const deliveredOrders = orders.filter(o => o.status === "delivered");
+      deliveredOrders.forEach(order => {
+        loadOrderDetails(order.id);
+      });
+    }
+  }, [activeTab, orders]);
+
   const statusColors: Record<string, string> = {
     pending: "bg-warning/10 text-warning",
     confirmed: "bg-info/10 text-info",
@@ -201,10 +227,10 @@ export default function StoreOrdersPage() {
         <h1 className="mb-4 text-2xl font-bold text-foreground sm:text-3xl">My Orders</h1>
         
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-border overflow-x-auto">
+        <div className="flex gap-1 border-b border-border overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:gap-2">
           <button
             onClick={() => setActiveTab("cart")}
-            className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors sm:text-base ${
+            className={`shrink-0 px-2 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
               activeTab === "cart"
                 ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
                 : "text-muted-foreground hover:text-foreground"
@@ -214,23 +240,33 @@ export default function StoreOrdersPage() {
           </button>
           <button
             onClick={() => setActiveTab("orders")}
-            className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors sm:text-base ${
+            className={`shrink-0 px-2 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
               activeTab === "orders"
                 ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            All Orders ({orders.length})
+            Orders ({orders.length})
           </button>
           <button
             onClick={() => setActiveTab("receive")}
-            className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors sm:text-base ${
+            className={`shrink-0 px-2 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
               activeTab === "receive"
                 ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             To Receive
+          </button>
+          <button
+            onClick={() => setActiveTab("rate")}
+            className={`shrink-0 px-2 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
+              activeTab === "rate"
+                ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Rate
           </button>
         </div>
       </div>
@@ -392,7 +428,7 @@ export default function StoreOrdersPage() {
       {activeTab === "receive" && (
         <div>
           <Link
-            href="/dashboard/box"
+            href="/store/box-tracking"
             className="block rounded-lg border border-border bg-card p-6 text-center transition-shadow hover:shadow-lg"
           >
             <div className="mb-4 text-6xl">📬</div>
@@ -447,6 +483,155 @@ export default function StoreOrdersPage() {
                   ))}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Rate Tab */}
+      {activeTab === "rate" && (
+        <div>
+          {loading ? (
+            <div className="py-12 text-center">
+              <p className="text-muted-foreground">Loading orders...</p>
+            </div>
+          ) : (
+            <>
+              {orders.filter(o => o.status === "delivered").length === 0 ? (
+                <div className="rounded-lg border border-border bg-card p-8 sm:p-12 text-center">
+                  <div className="mb-4 text-6xl">⭐</div>
+                  <h2 className="mb-2 text-xl font-semibold">No orders to rate yet</h2>
+                  <p className="mb-6 text-muted-foreground">
+                    Rate products from your delivered orders
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4 sm:space-y-6">
+                  <p className="text-sm text-muted-foreground px-1">
+                    Rate products from your delivered orders to help other customers
+                  </p>
+                  {orders
+                    .filter(o => o.status === "delivered")
+                    .map((order) => {
+                      const orderDetail = orderDetails[order.id];
+                      const isLoading = loadingOrderDetails[order.id];
+                      const orderItems = orderDetail?.order_items || [];
+
+                      return (
+                        <div
+                          key={order.id}
+                          className="rounded-lg border border-border bg-card p-4 sm:p-6"
+                        >
+                          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <h3 className="font-semibold text-foreground text-base sm:text-lg">
+                                {order.orderNumber}
+                              </h3>
+                              <p className="text-xs sm:text-sm text-muted-foreground">
+                                Delivered on {formatDate(order.createdAt)}
+                              </p>
+                            </div>
+                            <span className="self-start rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success sm:px-3">
+                              Delivered
+                            </span>
+                          </div>
+                          <div className="space-y-3 sm:space-y-4">
+                            <p className="text-sm font-medium text-grey-700">
+                              Rate your products:
+                            </p>
+                            {isLoading ? (
+                              <div className="py-4 text-center">
+                                <p className="text-sm text-muted-foreground">Loading products...</p>
+                              </div>
+                            ) : orderItems.length === 0 ? (
+                              <div className="py-4 text-center">
+                                <p className="text-sm text-muted-foreground">No products found in this order</p>
+                              </div>
+                            ) : (
+                              orderItems.map((item: any) => {
+                                const productId = item.product_id || item.product?.id;
+                                const productName = item.product_name || item.product?.name || "Product";
+                                const imageUrl = item.image_url || item.product?.images?.[0] || item.product?.image_url;
+                                
+                                return (
+                                  <div
+                                    key={item.id || item.order_item_id}
+                                    className="flex flex-col gap-3 rounded-lg border border-border bg-white p-3 sm:flex-row sm:items-start sm:gap-4 sm:p-4"
+                                  >
+                                    {/* Product Image */}
+                                    <div className="flex-shrink-0">
+                                      {imageUrl ? (
+                                        <img
+                                          src={imageUrl}
+                                          alt={productName}
+                                          className="h-20 w-20 rounded-lg object-cover sm:h-24 sm:w-24"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                          }}
+                                        />
+                                      ) : (
+                                        <div className="h-20 w-20 rounded-lg bg-grey-200 sm:h-24 sm:w-24"></div>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Product Info and Rating */}
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="mb-1 font-medium text-grey-900 text-sm sm:text-base">
+                                        {productName}
+                                      </h4>
+                                      {item.quantity && (
+                                        <p className="mb-2 text-xs text-grey-600 sm:text-sm">
+                                          Quantity: {item.quantity}
+                                        </p>
+                                      )}
+                                      <p className="mb-3 text-xs text-grey-600 sm:text-sm">
+                                        How would you rate this product?
+                                      </p>
+                                      
+                                      {/* Rating Stars and Review Link */}
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                        <div className="flex items-center gap-1">
+                                          {[1, 2, 3, 4, 5].map((rating) => (
+                                            <button
+                                              key={rating}
+                                              type="button"
+                                              className="focus:outline-none"
+                                              onClick={() => {
+                                                if (productId) {
+                                                  router.push(`/store/products/${productId}?rate=true`);
+                                                }
+                                              }}
+                                            >
+                                              <svg
+                                                className="h-5 w-5 transition-colors text-grey-300 hover:text-yellow-400 sm:h-6 sm:w-6"
+                                                fill="currentColor"
+                                                viewBox="0 0 20 20"
+                                              >
+                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                              </svg>
+                                            </button>
+                                          ))}
+                                        </div>
+                                        {productId && (
+                                          <Link
+                                            href={`/store/products/${productId}?rate=true`}
+                                            className="text-xs font-medium text-soft-blue-600 hover:text-soft-blue-700 hover:underline sm:text-sm"
+                                          >
+                                            Write Review →
+                                          </Link>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

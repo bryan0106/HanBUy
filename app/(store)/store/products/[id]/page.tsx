@@ -35,6 +35,13 @@ export default function ProductDetailPage() {
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   // Slider ref (mobile only)
   const sliderRef = useRef<HTMLDivElement>(null);
+  // Review tab state
+  const [activeReviewTab, setActiveReviewTab] = useState<"reviews" | "write">("reviews");
+  // Write review form state
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   // Box size pricing (PHP) - Define before use in useEffect
   const boxSizePricing = {
@@ -926,80 +933,251 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        {reviewsLoading ? (
-          <div className="text-center py-8">
-            <p className="text-grey-600">Loading reviews...</p>
+        {/* Tabs */}
+        <div className="mb-6 border-b border-border">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setActiveReviewTab("reviews")}
+              className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
+                activeReviewTab === "reviews"
+                  ? "border-soft-blue-600 text-soft-blue-600"
+                  : "border-transparent text-grey-600 hover:text-grey-900"
+              }`}
+            >
+              Reviews ({reviews.length})
+            </button>
+            <button
+              onClick={() => setActiveReviewTab("write")}
+              className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
+                activeReviewTab === "write"
+                  ? "border-soft-blue-600 text-soft-blue-600"
+                  : "border-transparent text-grey-600 hover:text-grey-900"
+              }`}
+            >
+              Write a Review
+            </button>
           </div>
-        ) : reviews.length === 0 ? (
-          <div className="rounded-lg border border-border bg-grey-50 p-8 text-center">
-            <p className="text-grey-600">No reviews yet. Be the first to review this product!</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {reviews.map((review) => (
-              <div
-                key={review.id}
-                className="rounded-lg border border-border bg-white p-6 shadow-sm"
-              >
-                <div className="mb-4 flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-soft-blue-100 text-lg font-bold text-soft-blue-600">
-                      {review.userName.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-grey-900">{review.userName}</h3>
-                        {review.verifiedPurchase && (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                            ✓ Verified Purchase
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <svg
-                              key={i}
-                              className={`h-4 w-4 ${
-                                i < review.rating ? "text-yellow-400" : "text-grey-300"
-                              }`}
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          ))}
+        </div>
+
+        {/* Reviews Tab Content */}
+        {activeReviewTab === "reviews" && (
+          <>
+            {reviewsLoading ? (
+              <div className="text-center py-8">
+                <p className="text-grey-600">Loading reviews...</p>
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="rounded-lg border border-border bg-grey-50 p-8 text-center">
+                <p className="mb-4 text-grey-600">No reviews yet. Be the first to review this product!</p>
+                <button
+                  onClick={() => setActiveReviewTab("write")}
+                  className="rounded-lg bg-soft-blue-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                >
+                  Write First Review
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {reviews.map((review) => (
+                  <div
+                    key={review.id}
+                    className="rounded-lg border border-border bg-white p-6 shadow-sm"
+                  >
+                    <div className="mb-4 flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-soft-blue-100 text-lg font-bold text-soft-blue-600">
+                          {review.userName.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-sm text-grey-600">
-                          {new Date(review.createdAt).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
-                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-grey-900">{review.userName}</h3>
+                            {review.verifiedPurchase && (
+                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                ✓ Verified Purchase
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="flex items-center">
+                              {[...Array(5)].map((_, i) => (
+                                <svg
+                                  key={i}
+                                  className={`h-4 w-4 ${
+                                    i < review.rating ? "text-yellow-400" : "text-grey-300"
+                                  }`}
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                              ))}
+                            </div>
+                            <span className="text-sm text-grey-600">
+                              {new Date(review.createdAt).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        </div>
                       </div>
+                    </div>
+                    {review.title && (
+                      <h4 className="mb-2 font-semibold text-grey-900">{review.title}</h4>
+                    )}
+                    <p className="mb-4 text-grey-700 leading-relaxed">{review.comment}</p>
+                    <div className="flex items-center gap-4">
+                      <button className="flex items-center gap-1 text-sm text-grey-600 hover:text-soft-blue-600">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+                          />
+                        </svg>
+                        Helpful ({review.helpfulCount})
+                      </button>
                     </div>
                   </div>
-                </div>
-                {review.title && (
-                  <h4 className="mb-2 font-semibold text-grey-900">{review.title}</h4>
-                )}
-                <p className="mb-4 text-grey-700 leading-relaxed">{review.comment}</p>
-                <div className="flex items-center gap-4">
-                  <button className="flex items-center gap-1 text-sm text-grey-600 hover:text-soft-blue-600">
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                      />
-                    </svg>
-                    Helpful ({review.helpfulCount})
-                  </button>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
+          </>
+        )}
+
+        {/* Write Review Tab Content */}
+        {activeReviewTab === "write" && (
+          <div className="rounded-lg border border-border bg-white p-6 shadow-sm">
+            {!isAuthenticated ? (
+              <div className="text-center py-8">
+                <p className="mb-4 text-grey-600">Please log in to write a review.</p>
+                <Link
+                  href={`/auth/login?redirect=/store/products/${productId}`}
+                  className="inline-block rounded-lg bg-soft-blue-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                >
+                  Login to Review
+                </Link>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!product || !user) return;
+
+                  setSubmittingReview(true);
+                  // Simulate API call
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                  
+                  // In a real app, you would submit to an API here
+                  // For now, we'll just show a success message
+                  alert("Thank you for your review! (This is a demo - review not saved)");
+                  
+                  // Reset form
+                  setReviewRating(5);
+                  setReviewTitle("");
+                  setReviewComment("");
+                  setSubmittingReview(false);
+                  setActiveReviewTab("reviews");
+                }}
+                className="space-y-6"
+              >
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-grey-900">
+                    Rating *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((rating) => (
+                      <button
+                        key={rating}
+                        type="button"
+                        onClick={() => setReviewRating(rating)}
+                        className="focus:outline-none"
+                      >
+                        <svg
+                          className={`h-8 w-8 transition-colors ${
+                            rating <= reviewRating
+                              ? "text-yellow-400"
+                              : "text-grey-300"
+                          }`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      </button>
+                    ))}
+                    <span className="ml-2 text-sm text-grey-600">
+                      {reviewRating === 5
+                        ? "Excellent"
+                        : reviewRating === 4
+                        ? "Very Good"
+                        : reviewRating === 3
+                        ? "Good"
+                        : reviewRating === 2
+                        ? "Fair"
+                        : "Poor"}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="review-title" className="mb-2 block text-sm font-semibold text-grey-900">
+                    Review Title (Optional)
+                  </label>
+                  <input
+                    id="review-title"
+                    type="text"
+                    value={reviewTitle}
+                    onChange={(e) => setReviewTitle(e.target.value)}
+                    placeholder="Summarize your review"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-grey-500 focus:border-soft-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="review-comment" className="mb-2 block text-sm font-semibold text-grey-900">
+                    Your Review *
+                  </label>
+                  <textarea
+                    id="review-comment"
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Share your experience with this product..."
+                    rows={6}
+                    required
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-grey-500 focus:border-soft-blue-600 focus:outline-none resize-none"
+                  />
+                  <p className="mt-1 text-xs text-grey-500">
+                    Minimum 10 characters required
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <Button
+                    type="submit"
+                    disabled={submittingReview || reviewComment.length < 10}
+                    className="flex-1"
+                    size="lg"
+                  >
+                    {submittingReview ? "Submitting..." : "Submit Review"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setReviewRating(5);
+                      setReviewTitle("");
+                      setReviewComment("");
+                    }}
+                    size="lg"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         )}
       </div>

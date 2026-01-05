@@ -45,10 +45,14 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      console.log("Attempting login with:", { email, passwordLength: password.length });
+      const result = await login(email, password);
+      console.log("Login successful:", result);
       // useEffect will handle redirect when user state updates
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid email or password");
+      console.error("Login error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Invalid email or password";
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -117,13 +121,13 @@ function LoginForm() {
           <div className="space-y-3">
             <div>
               <p className="mb-1">
-                <strong>Admin:</strong> admin@hanbuy.com / admin
+                <strong>Admin:</strong> admin@hanbuy.com / admin (or admin123)
               </p>
               <button
                 type="button"
                 onClick={() => {
                   setEmail("admin@hanbuy.com");
-                  setPassword("admin");
+                  setPassword("admin123");
                 }}
                 disabled={loading}
                 className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
