@@ -89,10 +89,10 @@ export default function OnhandProductsPage() {
       <div className="mb-4 flex items-center justify-between gap-2 lg:hidden">
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-grey-50"
+          className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-grey-800 transition-colors hover:bg-grey-50 hover:border-soft-blue-300"
         >
           <svg
-            className="h-5 w-5"
+            className="h-5 w-5 text-grey-700"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -106,14 +106,14 @@ export default function OnhandProductsPage() {
           </svg>
           Filters
         </button>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-white p-1">
           <button
             onClick={() => setViewType("list")}
             className={cn(
-              "rounded-lg p-2 transition-colors",
+              "rounded-lg p-2 transition-all",
               viewType === "list"
-                ? "bg-soft-blue-100 text-soft-blue-700"
-                : "text-grey-600 hover:bg-grey-50"
+                ? "bg-soft-blue-600 text-white shadow-sm"
+                : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="List View"
           >
@@ -134,10 +134,10 @@ export default function OnhandProductsPage() {
           <button
             onClick={() => setViewType("single")}
             className={cn(
-              "rounded-lg p-2 transition-colors",
+              "rounded-lg p-2 transition-all",
               viewType === "single"
-                ? "bg-soft-blue-100 text-soft-blue-700"
-                : "text-grey-600 hover:bg-grey-50"
+                ? "bg-soft-blue-600 text-white shadow-sm"
+                : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="Single Column View"
           >
@@ -158,10 +158,10 @@ export default function OnhandProductsPage() {
           <button
             onClick={() => setViewType("grid")}
             className={cn(
-              "rounded-lg p-2 transition-colors",
+              "rounded-lg p-2 transition-all",
               viewType === "grid"
-                ? "bg-soft-blue-100 text-soft-blue-700"
-                : "text-grey-600 hover:bg-grey-50"
+                ? "bg-soft-blue-600 text-white shadow-sm"
+                : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="Grid View"
           >

@@ -8,9 +8,22 @@ if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   console.log("🔗 Backend API URL:", API_BASE_URL);
 }
 
+/**
+ * Check if running on localhost
+ */
+function isLocalhost(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    API_BASE_URL.includes("localhost")
+  );
+}
+
 import { mockServices } from "@/lib/mockData";
 import type { Product, Box, Invoice, TrackingEvent } from "@/types";
 import type { User } from "@/lib/auth";
+import { testAccounts, testUsers, testOrders } from "@/lib/testData";
 
 // Box services
 export const boxService = {
@@ -244,6 +257,11 @@ export const cartService = {
    * @returns Array of cart items with product details
    */
   getCartItems: async (userId: string): Promise<CartItem[]> => {
+    // Use mock data if running on localhost
+    if (isLocalhost()) {
+      return mockGetCartItems(userId);
+    }
+    
     const url = `${API_BASE_URL}/cart?user_id=${userId}`;
     
     try {
@@ -493,6 +511,211 @@ export interface ApiUser {
   updated_at?: string;
 }
 
+/**
+ * Mock login function for localhost development
+ * Validates credentials against test accounts and returns user data
+ */
+async function mockLogin(email: string, password: string): Promise<LoginResponse> {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Normalize email for comparison
+  const normalizedEmail = email.trim().toLowerCase();
+  
+  // Check admin account (accept both "admin" and "admin123" for compatibility)
+  if (normalizedEmail === testAccounts.admin.email.toLowerCase() && 
+      (password === "admin" || password === testAccounts.admin.password)) {
+    const adminUser = testUsers.find(u => u.id === testAccounts.admin.userId);
+    if (adminUser) {
+      console.log("✅ Mock login successful (Admin) - Using localhost mock data");
+      return {
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          name: adminUser.name,
+          role: "admin",
+          approvalStatus: "approved",
+          isAuthenticated: true,
+          phone: adminUser.phone,
+          address: adminUser.address,
+        },
+        token: "mock-jwt-token-admin",
+      };
+    }
+  }
+  
+  // Check customer accounts
+  const customerAccount = testAccounts.customers.find(
+    acc => acc.email.toLowerCase() === normalizedEmail && acc.password === password
+  );
+  
+  if (customerAccount) {
+    const customerUser = testUsers.find(u => u.id === customerAccount.userId);
+    if (customerUser) {
+      console.log(`✅ Mock login successful (Customer: ${customerUser.name}) - Using localhost mock data`);
+      return {
+        user: {
+          id: customerUser.id,
+          email: customerUser.email,
+          name: customerUser.name,
+          role: "customer",
+          approvalStatus: "approved",
+          isAuthenticated: true,
+          phone: customerUser.phone,
+          address: customerUser.address,
+        },
+        token: "mock-jwt-token-customer",
+      };
+    }
+  }
+  
+  // Invalid credentials
+  throw new Error("Invalid email or password");
+}
+
+/**
+ * Mock getOrders function for localhost development
+ */
+async function mockGetOrders(filters?: {
+  user_id?: string;
+  status?: string;
+  payment_status?: string;
+}): Promise<OrderResponse[]> {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 300));
+  
+  console.log("✅ Mock getOrders - Using localhost mock data", { filters });
+  
+  // Filter orders by user_id if provided
+  let filteredOrders = testOrders;
+  if (filters?.user_id) {
+    filteredOrders = testOrders.filter(order => order.userId === filters.user_id);
+  }
+  
+  // Filter by status if provided
+  if (filters?.status) {
+    filteredOrders = filteredOrders.filter(order => order.status === filters.status);
+  }
+  
+  // Filter by payment_status if provided
+  if (filters?.payment_status) {
+    filteredOrders = filteredOrders.filter(order => order.paymentStatus === filters.payment_status);
+  }
+  
+  // Convert test orders to OrderResponse format
+  return filteredOrders.map(order => ({
+    id: order.id,
+    user_id: order.userId,
+    order_number: order.orderNumber,
+    subtotal: order.subtotal,
+    isf: order.isf,
+    lsf: order.lsf,
+    shipping_fee: order.shippingFee,
+    solo_shipping_fee: order.soloShippingFee,
+    shared_shipping_fee: order.sharedShippingFee,
+    total: order.total,
+    currency: order.currency,
+    status: order.status,
+    payment_status: order.paymentStatus,
+    payment_type: order.paymentType,
+    payment_method: order.paymentMethod,
+    downpayment_amount: order.paymentType === "downpayment" ? order.total * 0.5 : null,
+    balance: order.paymentType === "downpayment" ? order.total * 0.5 : null,
+    qr_code: order.paymentMethod?.qrCode,
+    box_type_preference: order.boxTypePreference,
+    shipping_address: order.shippingAddress,
+    fulfillment_status: order.fulfillmentStatus,
+    box_id: order.boxId,
+    ph_courier_tracking_number: order.phCourierTrackingNumber,
+    ph_courier_name: order.phCourierName,
+    created_at: order.createdAt.toISOString(),
+    updated_at: order.updatedAt.toISOString(),
+    paid_at: order.paidAt?.toISOString(),
+    order_items: order.items.map(item => ({
+      id: item.id,
+      product_id: item.productId,
+      product_name: item.productName,
+      product_type: item.productType,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      total: item.total,
+      image_url: item.imageUrl,
+      preorder_release_date: item.preorderReleaseDate?.toISOString() || null,
+    })),
+  }));
+}
+
+/**
+ * Mock getOrder function for localhost development
+ */
+async function mockGetOrder(orderId: string): Promise<OrderResponse> {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 300));
+  
+  console.log("✅ Mock getOrder - Using localhost mock data", { orderId });
+  
+  const order = testOrders.find(o => o.id === orderId);
+  if (!order) {
+    throw new Error("Order not found");
+  }
+  
+  // Convert test order to OrderResponse format
+  return {
+    id: order.id,
+    user_id: order.userId,
+    order_number: order.orderNumber,
+    subtotal: order.subtotal,
+    isf: order.isf,
+    lsf: order.lsf,
+    shipping_fee: order.shippingFee,
+    solo_shipping_fee: order.soloShippingFee,
+    shared_shipping_fee: order.sharedShippingFee,
+    total: order.total,
+    currency: order.currency,
+    status: order.status,
+    payment_status: order.paymentStatus,
+    payment_type: order.paymentType,
+    payment_method: order.paymentMethod,
+    downpayment_amount: order.paymentType === "downpayment" ? order.total * 0.5 : null,
+    balance: order.paymentType === "downpayment" ? order.total * 0.5 : null,
+    qr_code: order.paymentMethod?.qrCode,
+    box_type_preference: order.boxTypePreference,
+    shipping_address: order.shippingAddress,
+    fulfillment_status: order.fulfillmentStatus,
+    box_id: order.boxId,
+    ph_courier_tracking_number: order.phCourierTrackingNumber,
+    ph_courier_name: order.phCourierName,
+    created_at: order.createdAt.toISOString(),
+    updated_at: order.updatedAt.toISOString(),
+    paid_at: order.paidAt?.toISOString(),
+    order_items: order.items.map(item => ({
+      id: item.id,
+      product_id: item.productId,
+      product_name: item.productName,
+      product_type: item.productType,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      total: item.total,
+      image_url: item.imageUrl,
+      preorder_release_date: item.preorderReleaseDate?.toISOString() || null,
+    })),
+  };
+}
+
+/**
+ * Mock getCartItems function for localhost development
+ */
+async function mockGetCartItems(userId: string): Promise<CartItem[]> {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 200));
+  
+  console.log("✅ Mock getCartItems - Using localhost mock data", { userId });
+  
+  // Return empty cart for now (can be extended with test cart data)
+  // In a real scenario, you might want to add test cart items
+  return [];
+}
+
 export const authService = {
   /**
    * Login with email and password
@@ -510,6 +733,11 @@ export const authService = {
    *   - "Account not approved. Please wait for admin approval." (403)
    */
   login: async (email: string, password: string): Promise<LoginResponse> => {
+    // Use mock data if running on localhost
+    if (isLocalhost()) {
+      return mockLogin(email, password);
+    }
+    
     const url = `${API_BASE_URL}/auth/login`;
     
     try {
@@ -604,11 +832,25 @@ export const authService = {
       };
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Login request timed out");
-        throw new Error("Request timeout: Login service did not respond in time");
+        console.warn("Login request timed out after 10 seconds");
+        throw new Error("Request timeout: Login service did not respond in time. Please check if the backend server is running.");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("Login request failed - network error");
-        throw new Error("Network error: Could not connect to login service");
+        // Log detailed error info to console for debugging
+        console.error("❌ Login request failed - network error", {
+          attemptedUrl: url,
+          apiBaseUrl: API_BASE_URL,
+          errorType: error.name,
+          errorMessage: error.message,
+          suggestion: "Check if backend server is running and API URL is correct"
+        });
+        
+        // User-friendly error message
+        const isLocalhost = API_BASE_URL.includes('localhost');
+        const errorMessage = isLocalhost
+          ? `Network error: Could not connect to login service. Make sure the backend server is running at ${API_BASE_URL}`
+          : `Network error: Could not connect to login service. The backend API at ${API_BASE_URL} may be unavailable.`;
+        
+        throw new Error(errorMessage);
       } else {
         console.error("Error during login:", error);
         throw error;
@@ -913,6 +1155,11 @@ export const orderService = {
    * @returns Order details with items
    */
   getOrder: async (orderId: string): Promise<OrderResponse> => {
+    // Use mock data if running on localhost
+    if (isLocalhost()) {
+      return mockGetOrder(orderId);
+    }
+    
     const url = `${API_BASE_URL}/orders/${orderId}`;
     
     try {
@@ -966,6 +1213,11 @@ export const orderService = {
     status?: string;
     payment_status?: string;
   }): Promise<OrderResponse[]> => {
+    // Use mock data if running on localhost
+    if (isLocalhost()) {
+      return mockGetOrders(filters);
+    }
+    
     const params = new URLSearchParams();
     
     if (filters?.user_id) {

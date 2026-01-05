@@ -88,10 +88,10 @@ function ProductsContent() {
       <div className="mb-4 flex items-center justify-between gap-2 lg:hidden">
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-grey-50"
+          className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-grey-800 transition-colors hover:bg-grey-50 hover:border-soft-blue-300"
         >
           <svg
-            className="h-5 w-5"
+            className="h-5 w-5 text-grey-700"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -111,10 +111,10 @@ function ProductsContent() {
           <button
             onClick={() => setViewType("list")}
             className={cn(
-              "rounded p-1.5 transition-colors",
+              "rounded-lg p-2 transition-all",
               viewType === "list"
-                ? "bg-soft-blue-600 text-white"
-                : "text-grey-600 hover:bg-grey-50"
+                ? "bg-soft-blue-600 text-white shadow-sm"
+                : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="List view"
           >
@@ -129,10 +129,10 @@ function ProductsContent() {
           <button
             onClick={() => setViewType("single")}
             className={cn(
-              "rounded p-1.5 transition-colors",
+              "rounded-lg p-2 transition-all",
               viewType === "single"
-                ? "bg-soft-blue-600 text-white"
-                : "text-grey-600 hover:bg-grey-50"
+                ? "bg-soft-blue-600 text-white shadow-sm"
+                : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="Single column view"
           >
@@ -147,10 +147,10 @@ function ProductsContent() {
           <button
             onClick={() => setViewType("grid")}
             className={cn(
-              "rounded p-1.5 transition-colors",
+              "rounded-lg p-2 transition-all",
               viewType === "grid"
-                ? "bg-soft-blue-600 text-white"
-                : "text-grey-600 hover:bg-grey-50"
+                ? "bg-soft-blue-600 text-white shadow-sm"
+                : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="Grid view"
           >

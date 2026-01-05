@@ -71,7 +71,7 @@ export function MobileBottomNav() {
                 "relative flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors",
                 active
                   ? "text-soft-blue-600"
-                  : "text-grey-600"
+                  : "text-grey-700"
               )}
             >
               <span className={cn(
@@ -80,7 +80,10 @@ export function MobileBottomNav() {
               )}>
                 {item.icon}
               </span>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className={cn(
+                "text-[10px] font-semibold",
+                active ? "text-soft-blue-600" : "text-grey-700"
+              )}>{item.label}</span>
               {active && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-soft-blue-600" />
               )}

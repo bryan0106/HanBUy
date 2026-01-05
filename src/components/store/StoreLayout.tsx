@@ -55,11 +55,11 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
-                className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2 text-sm transition-colors focus:border-soft-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-grey-500 transition-colors focus:border-soft-blue-600 focus:outline-none"
               />
               <button
                 type="submit"
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-400 hover:text-grey-600"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-500 hover:text-soft-blue-600"
                 aria-label="Search"
               >
                 <svg
@@ -88,10 +88,10 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "text-sm font-medium transition-colors",
+                    "text-sm font-semibold transition-colors",
                     isActive
                       ? "text-soft-blue-600"
-                      : "text-grey-600 hover:text-grey-900"
+                      : "text-grey-700 hover:text-soft-blue-600"
                   )}
                 >
                   {item.label}
@@ -132,7 +132,7 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                           "block rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                           isActive
                             ? "bg-soft-blue-50 text-soft-blue-600"
-                            : "text-grey-600 hover:bg-grey-50"
+                            : "text-grey-700 hover:bg-grey-50 hover:text-grey-900"
                         )}
                       >
                         {item.label}
@@ -162,7 +162,7 @@ export function StoreLayout({ children }: StoreLayoutProps) {
               <Link href="/store" className="inline-block">
                 <h3 className="mb-3 text-lg font-bold text-grey-900 sm:mb-4">HanBuy</h3>
               </Link>
-              <p className="text-xs leading-relaxed text-grey-600 sm:text-sm">
+              <p className="text-xs leading-relaxed text-grey-700 sm:text-sm">
                 Korea-to-Philippines E-commerce and Consolidation Logistics Platform
               </p>
             </div>
@@ -170,24 +170,24 @@ export function StoreLayout({ children }: StoreLayoutProps) {
             {/* Shop Section */}
             <div>
               <h4 className="mb-3 text-sm font-semibold text-grey-900 sm:mb-4">Shop</h4>
-              <ul className="space-y-2 text-xs text-grey-600 sm:text-sm">
+              <ul className="space-y-2 text-xs text-grey-700 sm:text-sm">
                 <li>
-                  <Link href="/store/products" className="block transition-colors hover:text-grey-900">
+                  <Link href="/store/products" className="block font-medium transition-colors hover:text-soft-blue-600">
                     All Products
                   </Link>
                 </li>
                 <li>
-                  <Link href="/store/products/onhand" className="block transition-colors hover:text-grey-900">
+                  <Link href="/store/products/onhand" className="block font-medium transition-colors hover:text-soft-blue-600">
                     Onhand Items
                   </Link>
                 </li>
                 <li>
-                  <Link href="/store/products/preorder" className="block transition-colors hover:text-grey-900">
+                  <Link href="/store/products/preorder" className="block font-medium transition-colors hover:text-soft-blue-600">
                     Pre-Order
                   </Link>
                 </li>
                 <li>
-                  <Link href="/store/how-it-works" className="block transition-colors hover:text-grey-900">
+                  <Link href="/store/how-it-works" className="block font-medium transition-colors hover:text-soft-blue-600">
                     How It Works
                   </Link>
                 </li>
@@ -197,28 +197,28 @@ export function StoreLayout({ children }: StoreLayoutProps) {
             {/* Account Section */}
             <div>
               <h4 className="mb-3 text-sm font-semibold text-grey-900 sm:mb-4">Account</h4>
-              <ul className="space-y-2 text-xs text-grey-600 sm:text-sm">
+              <ul className="space-y-2 text-xs text-grey-700 sm:text-sm">
                 {isAuthenticated ? (
                   <>
                     <li>
-                      <Link href="/store/orders" className="block transition-colors hover:text-grey-900">
+                      <Link href="/store/orders" className="block font-medium transition-colors hover:text-soft-blue-600">
                         My Orders
                       </Link>
                     </li>
                     <li>
-                      <Link href="/dashboard/box" className="block transition-colors hover:text-grey-900">
+                      <Link href="/dashboard/box" className="block font-medium transition-colors hover:text-soft-blue-600">
                         My Box
                       </Link>
                     </li>
                     <li>
-                      <Link href="/store/account" className="block transition-colors hover:text-grey-900">
+                      <Link href="/store/account" className="block font-medium transition-colors hover:text-soft-blue-600">
                         Account
                       </Link>
                     </li>
                     <li>
                       <Link
                         href="/dashboard/invoices"
-                        className="block transition-colors hover:text-grey-900"
+                        className="block font-medium transition-colors hover:text-soft-blue-600"
                       >
                         Invoices
                       </Link>
@@ -226,7 +226,7 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                   </>
                 ) : (
                   <li>
-                    <Link href="/auth/login" className="block transition-colors hover:text-grey-900">
+                    <Link href="/auth/login" className="block font-medium transition-colors hover:text-soft-blue-600">
                       Login / Sign Up
                     </Link>
                   </li>
@@ -237,14 +237,14 @@ export function StoreLayout({ children }: StoreLayoutProps) {
             {/* Support Section - Hidden on mobile, shown on desktop */}
             <div className="hidden md:block">
               <h4 className="mb-4 text-sm font-semibold text-grey-900">Support</h4>
-              <ul className="space-y-2 text-sm text-grey-600">
+              <ul className="space-y-2 text-sm text-grey-700">
                 <li>
-                  <Link href="/store/about" className="block transition-colors hover:text-grey-900">
+                  <Link href="/store/about" className="block font-medium transition-colors hover:text-soft-blue-600">
                     About Us
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="block transition-colors hover:text-grey-900">
+                  <Link href="/contact" className="block font-medium transition-colors hover:text-soft-blue-600">
                     Contact
                   </Link>
                 </li>
@@ -256,18 +256,18 @@ export function StoreLayout({ children }: StoreLayoutProps) {
           <div className="mt-6 border-t border-border pt-6 md:hidden">
             <h4 className="mb-3 text-sm font-semibold text-grey-900">Support</h4>
             <div className="grid grid-cols-2 gap-4">
-              <Link href="/store/about" className="text-xs text-grey-600 transition-colors hover:text-grey-900 sm:text-sm">
+              <Link href="/store/about" className="text-xs font-medium text-grey-700 transition-colors hover:text-soft-blue-600 sm:text-sm">
                 About Us
               </Link>
-              <Link href="/contact" className="text-xs text-grey-600 transition-colors hover:text-grey-900 sm:text-sm">
+              <Link href="/contact" className="text-xs font-medium text-grey-700 transition-colors hover:text-soft-blue-600 sm:text-sm">
                 Contact
               </Link>
             </div>
           </div>
           
           {/* Copyright */}
-          <div className="mt-6 border-t border-border pt-6 text-center text-xs text-grey-600 sm:mt-8 sm:pt-8 sm:text-sm">
-            <p>&copy; 2024 HanBuy. All rights reserved.</p>
+          <div className="mt-6 border-t border-border pt-6 text-center text-xs text-grey-700 sm:mt-8 sm:pt-8 sm:text-sm">
+            <p className="font-medium">&copy; 2024 HanBuy. All rights reserved.</p>
           </div>
         </div>
       </footer>

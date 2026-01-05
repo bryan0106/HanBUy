@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
+import { Spinner } from "@/components/ui/spinner";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -73,7 +74,8 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-soft-blue-500"
+              disabled={loading}
+              className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-soft-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="your@email.com"
             />
           </div>
@@ -88,7 +90,8 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-soft-blue-500"
+              disabled={loading}
+              className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-soft-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="••••••••"
             />
           </div>
@@ -102,8 +105,9 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-soft-blue-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700 disabled:opacity-50"
+            className="w-full rounded-lg bg-soft-blue-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
+            {loading && <Spinner size="sm" className="text-white" />}
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
@@ -121,7 +125,8 @@ function LoginForm() {
                   setEmail("admin@hanbuy.com");
                   setPassword("admin");
                 }}
-                className="text-xs text-soft-blue-600 hover:underline"
+                disabled={loading}
+                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Click to fill admin credentials
               </button>
@@ -136,7 +141,8 @@ function LoginForm() {
                   setEmail("customer1@test.com");
                   setPassword("test123");
                 }}
-                className="text-xs text-soft-blue-600 hover:underline"
+                disabled={loading}
+                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Click to fill customer 1 credentials
               </button>
@@ -151,7 +157,8 @@ function LoginForm() {
                   setEmail("customer2@test.com");
                   setPassword("test123");
                 }}
-                className="text-xs text-soft-blue-600 hover:underline"
+                disabled={loading}
+                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Click to fill customer 2 credentials
               </button>
@@ -166,7 +173,8 @@ function LoginForm() {
                   setEmail("customer3@test.com");
                   setPassword("test123");
                 }}
-                className="text-xs text-soft-blue-600 hover:underline"
+                disabled={loading}
+                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Click to fill customer 3 credentials
               </button>

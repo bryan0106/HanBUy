@@ -36,7 +36,7 @@
   --secondary: var(--grey-100);
   --secondary-foreground: var(--grey-900);
   --muted: var(--grey-100);
-  --muted-foreground: var(--grey-600);
+  --muted-foreground: var(--grey-700);
   --accent: var(--soft-blue-100);
   --accent-foreground: var(--soft-blue-900);
   --border: var(--grey-200);
@@ -117,9 +117,25 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Improve text readability */
+p, span, div {
+  color: var(--foreground);
+}
+
+/* Ensure links have good contrast */
+a {
+  color: var(--soft-blue-600);
+  font-weight: 500;
+}
+
+a:hover {
+  color: var(--soft-blue-700);
 }
 
 /* Hide scrollbar but keep functionality */
