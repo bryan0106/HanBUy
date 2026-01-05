@@ -97,6 +97,17 @@ export interface InvoiceItem {
   total: number;
 }
 
+export interface ProductVariation {
+  id: string;
+  name: string; // e.g., "Size: Large", "Color: Red"
+  type: "size" | "color" | "other";
+  value: string; // e.g., "Large", "Red"
+  priceModifier?: number; // Additional price for this variation (can be negative)
+  stock: number;
+  sku?: string;
+  imageUrl?: string; // Optional image for this specific variation
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -116,6 +127,7 @@ export interface Product {
   };
   seoTitle?: string;
   seoDescription?: string;
+  variations?: ProductVariation[]; // Optional variations (size, color, etc.)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -127,5 +139,20 @@ export interface Category {
   description?: string;
   imageUrl?: string;
   parentId?: string;
+}
+
+export interface ProductReview {
+  id: string;
+  productId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  rating: number; // 1-5
+  title?: string;
+  comment: string;
+  verifiedPurchase: boolean;
+  helpfulCount: number;
+  createdAt: Date;
+  updatedAt?: Date;
 }
 

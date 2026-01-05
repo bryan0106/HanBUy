@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { productService, boxTypeService, cartService, type BoxType } from "@/services/api";
 import { formatCurrency } from "@/lib/currency";
-import type { Product } from "@/types";
+import type { Product, ProductVariation, ProductReview } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import Link from "next/link";
+import { getProductReviews, getAverageRating } from "@/lib/mockData";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -16,6 +18,9 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
   const [boxTypes, setBoxTypes] = useState<BoxType[]>([]);
   const [boxTypesLoading, setBoxTypesLoading] = useState(true);
   const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
@@ -23,6 +28,35 @@ export default function ProductDetailPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
+  // Variation states
+  const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
+  // Swipe states for mobile
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  // Slider ref (mobile only)
+  const sliderRef = useRef<HTMLDivElement>(null);
+
+  // Box size pricing (PHP) - Define before use in useEffect
+  const boxSizePricing = {
+    small: {
+      solo: { base: 1500, perKg: 50, perCbm: 1000 },
+      shared: { base: 800, perKg: 30, perCbm: 600 },
+      maxWeight: 5, // kg
+      maxVolume: 0.1, // CBM
+    },
+    medium: {
+      solo: { base: 2300, perKg: 80, perCbm: 2000 },
+      shared: { base: 1500, perKg: 50, perCbm: 1200 },
+      maxWeight: 15, // kg
+      maxVolume: 0.3, // CBM
+    },
+    large: {
+      solo: { base: 3500, perKg: 120, perCbm: 3000 },
+      shared: { base: 2200, perKg: 70, perCbm: 1800 },
+      maxWeight: 30, // kg
+      maxVolume: 0.6, // CBM
+    },
+  };
 
   useEffect(() => {
     loadProduct();
@@ -33,6 +67,35 @@ export default function ProductDetailPage() {
     setLoading(true);
     const data = await productService.getProduct(productId);
     setProduct(data);
+    
+    // Load reviews for this product
+    if (data) {
+      const productReviews = getProductReviews(data.id);
+      setReviews(productReviews);
+      
+      // Load related products - mix of same category and popular products
+      const allProducts = await productService.getProducts();
+      
+      // Get products from same category
+      const sameCategoryProducts = allProducts
+        .filter((p) => p.id !== data.id && p.category === data.category)
+        .slice(0, 2);
+      
+      // Get popular products from other categories (high stock or different categories)
+      const otherCategoryProducts = allProducts
+        .filter((p) => p.id !== data.id && p.category !== data.category)
+        .sort((a, b) => (b.stock || 0) - (a.stock || 0)) // Sort by stock (popularity indicator)
+        .slice(0, 6);
+      
+      // Mix and shuffle recommendations
+      const mixed = [...sameCategoryProducts, ...otherCategoryProducts]
+        .sort(() => Math.random() - 0.5) // Shuffle
+        .slice(0, 8); // Get 8 products
+      
+      setRelatedProducts(mixed);
+    }
+    
+    setReviewsLoading(false);
     setLoading(false);
   };
 
@@ -53,7 +116,23 @@ export default function ProductDetailPage() {
     }
   };
 
-  // Auto-select appropriate box size based on product weight/dimensions
+    // Auto-select first variation if available
+  useEffect(() => {
+    if (product && product.variations && product.variations.length > 0) {
+      const initialVariations: Record<string, string> = {};
+      ["size", "color", "other"].forEach((type) => {
+        const firstOfType = product.variations?.find((v) => v.type === type && v.stock > 0);
+        if (firstOfType) {
+          initialVariations[type] = firstOfType.id;
+        }
+      });
+      if (Object.keys(initialVariations).length > 0) {
+        setSelectedVariations(initialVariations);
+      }
+    }
+  }, [product]);
+
+    // Auto-select appropriate box size based on product weight/dimensions
   useEffect(() => {
     if (product) {
       const totalWeight = product.weight * quantity;
@@ -87,30 +166,93 @@ export default function ProductDetailPage() {
     );
   }
 
-  const priceInPHP = product.price * 0.042; // Mock conversion
+  // Calculate price with variations
+  const calculatePrice = () => {
+    let basePrice = product.price;
+    if (product.variations && product.variations.length > 0) {
+      Object.values(selectedVariations).forEach((variationId) => {
+        const variation = product.variations?.find((v) => v.id === variationId);
+        if (variation && variation.priceModifier) {
+          basePrice += variation.priceModifier;
+        }
+      });
+    }
+    return basePrice;
+  };
+
+  const currentPrice = calculatePrice();
+  const priceInPHP = currentPrice * 0.042; // Mock conversion
   const shippingEstimate = "7-14 days (Sea) / 3-5 days (Air)";
   
-  // Box size pricing (PHP)
-  const boxSizePricing = {
-    small: {
-      solo: { base: 1500, perKg: 50, perCbm: 1000 },
-      shared: { base: 800, perKg: 30, perCbm: 600 },
-      maxWeight: 5, // kg
-      maxVolume: 0.1, // CBM
-    },
-    medium: {
-      solo: { base: 2300, perKg: 80, perCbm: 2000 },
-      shared: { base: 1500, perKg: 50, perCbm: 1200 },
-      maxWeight: 15, // kg
-      maxVolume: 0.3, // CBM
-    },
-    large: {
-      solo: { base: 3500, perKg: 120, perCbm: 3000 },
-      shared: { base: 2200, perKg: 70, perCbm: 1800 },
-      maxWeight: 30, // kg
-      maxVolume: 0.6, // CBM
-    },
+  // Get available stock for selected variations
+  const getAvailableStock = () => {
+    if (!product.variations || product.variations.length === 0) {
+      return product.stock;
+    }
+    
+    // If variations are selected, find the specific variation
+    const selectedVariationIds = Object.values(selectedVariations);
+    if (selectedVariationIds.length > 0) {
+      // For now, use the first selected variation's stock
+      // In a more complex system, you'd track stock per combination
+      const firstSelectedId = selectedVariationIds[0];
+      const selectedVariation = product.variations?.find(
+        (v) => v.id === firstSelectedId
+      );
+      if (selectedVariation) {
+        return selectedVariation.stock;
+      }
+    }
+    
+    // If no variation selected, return minimum stock from all variations
+    const minStock = Math.min(...product.variations.map((v) => v.stock));
+    return minStock;
   };
+
+  const availableStock = getAvailableStock();
+  
+  // Check if all required variation types are selected
+  const hasRequiredVariations = () => {
+    if (!product.variations || product.variations.length === 0) {
+      return true;
+    }
+    
+    // Get unique variation types
+    const variationTypes = [...new Set(product.variations.map((v) => v.type))];
+    
+    // Check if at least one variation of each type is selected
+    return variationTypes.every((type) => selectedVariations[type] !== undefined);
+  };
+  
+  const canAddToCart = hasRequiredVariations() && availableStock > 0;
+
+  // Swipe handlers for mobile image navigation
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && product.images && selectedImageIndex < product.images.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1);
+    }
+    if (isRightSwipe && selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1);
+    }
+  };
+
   
   // Calculate shipping fee based on box size and type
   const calculateShippingFee = () => {
@@ -160,11 +302,26 @@ export default function ProductDetailPage() {
     setCartSuccess(false);
 
     try {
+      // Prepare variation data
+      const variationData: Record<string, string> = {};
+      if (product.variations && Object.keys(selectedVariations).length > 0) {
+        Object.entries(selectedVariations).forEach(([type, variationId]) => {
+          const variation = product.variations?.find((v) => v.id === variationId);
+          if (variation) {
+            variationData[type] = variation.value;
+          }
+        });
+      }
+
       await cartService.addToCart({
         user_id: user.id,
         product_id: product.id,
         quantity: quantity,
         box_type_preference: boxTypePreference,
+        variations: Object.keys(variationData).length > 0 ? variationData : undefined,
+        selected_variation_ids: Object.values(selectedVariations).length > 0 
+          ? Object.values(selectedVariations) 
+          : undefined,
       });
 
       setCartSuccess(true);
@@ -192,13 +349,28 @@ export default function ProductDetailPage() {
       return;
     }
 
+    // Prepare variation data
+    const variationData: Record<string, string> = {};
+    if (product.variations && Object.keys(selectedVariations).length > 0) {
+      Object.entries(selectedVariations).forEach(([type, variationId]) => {
+        const variation = product.variations?.find((v) => v.id === variationId);
+        if (variation) {
+          variationData[type] = variation.value;
+        }
+      });
+    }
+
     // Store order data in sessionStorage for payment page
     const orderData = {
       productId: product.id,
       name: product.name,
-      price: product.price,
+      price: currentPrice,
       quantity: quantity,
       boxTypePreference: boxTypePreference,
+      variations: Object.keys(variationData).length > 0 ? variationData : undefined,
+      selectedVariationIds: Object.values(selectedVariations).length > 0 
+        ? Object.values(selectedVariations) 
+        : undefined,
     };
     
     sessionStorage.setItem("temp_order", JSON.stringify(orderData));
@@ -214,21 +386,42 @@ export default function ProductDetailPage() {
         <div>
           {product.images && product.images.length > 0 ? (
             <div className="space-y-4">
-              {/* Main Image */}
-              <div className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-white">
+              {/* Main Image - Swipeable on Mobile */}
+              <div 
+                className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-white md:cursor-default"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+              >
                 <img
                   src={product.images[selectedImageIndex]}
                   alt={`${product.name} - Image ${selectedImageIndex + 1}`}
-                  className="h-full w-full object-cover transition-opacity duration-300"
+                  className="h-full w-full object-cover transition-opacity duration-300 select-none touch-none"
+                  draggable={false}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = '/placeholder-product.png';
                   }}
                 />
+                {/* Image Indicator Dots - Mobile Only */}
+                {product.images.length > 1 && (
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 md:hidden">
+                    {product.images.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={`h-2 w-2 rounded-full transition-all ${
+                          selectedImageIndex === idx
+                            ? "bg-white w-6"
+                            : "bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
               
-              {/* Thumbnail Gallery */}
+              {/* Thumbnail Gallery - Hidden on Mobile, Visible on Desktop */}
               {product.images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="hidden md:flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                   {product.images.map((img, idx) => (
                     <button
                       key={idx}
@@ -286,7 +479,12 @@ export default function ProductDetailPage() {
               {formatCurrency(priceInPHP, "PHP")}
             </p>
             <p className="text-sm font-medium text-grey-600">
-              {formatCurrency(product.price, "KRW")}
+              {formatCurrency(currentPrice, "KRW")}
+              {currentPrice !== product.price && (
+                <span className="ml-2 text-xs line-through text-grey-400">
+                  {formatCurrency(product.price, "KRW")}
+                </span>
+              )}
             </p>
           </div>
 
@@ -321,10 +519,86 @@ export default function ProductDetailPage() {
             <div>
               <h3 className="mb-2 text-base font-semibold text-grey-900">Stock</h3>
               <p className="text-grey-700 font-semibold">
-                {product.stock > 0 ? `${product.stock} available` : "Out of stock"}
+                {availableStock > 0 ? `${availableStock} available` : "Out of stock"}
               </p>
             </div>
           </div>
+
+          {/* Product Variations */}
+          {product.variations && product.variations.length > 0 && (
+            <div className="mb-6 space-y-4">
+              {/* Group variations by type */}
+              {["size", "color", "other"].map((variationType) => {
+                const variationsOfType = product.variations?.filter(
+                  (v) => v.type === variationType
+                ) || [];
+                
+                if (variationsOfType.length === 0) return null;
+                
+                return (
+                  <div key={variationType}>
+                    <label className="mb-3 block text-base font-bold text-grey-900 capitalize">
+                      {variationType === "other" ? "Options" : variationType}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {variationsOfType.map((variation) => {
+                        const isSelected = selectedVariations[variationType] === variation.id;
+                        const isOutOfStock = variation.stock === 0;
+                        
+                        return (
+                          <button
+                            key={variation.id}
+                            onClick={() => {
+                              if (!isOutOfStock) {
+                                setSelectedVariations((prev) => ({
+                                  ...prev,
+                                  [variationType]: variation.id,
+                                }));
+                                // Update image if variation has specific image
+                                if (variation.imageUrl && product.images.includes(variation.imageUrl)) {
+                                  const imageIndex = product.images.indexOf(variation.imageUrl);
+                                  setSelectedImageIndex(imageIndex);
+                                }
+                              }
+                            }}
+                            disabled={isOutOfStock}
+                            className={`rounded-lg border-2 px-4 py-2 text-sm font-semibold transition-all ${
+                              isSelected
+                                ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-md"
+                                : isOutOfStock
+                                ? "border-grey-200 bg-grey-50 text-grey-400 cursor-not-allowed opacity-50"
+                                : "border-border bg-white text-grey-900 hover:border-soft-blue-300 hover:bg-soft-blue-50"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {variation.type === "color" && (
+                                <div
+                                  className="h-5 w-5 rounded-full border-2 border-grey-300"
+                                  style={{
+                                    backgroundColor: variation.value.toLowerCase(),
+                                  }}
+                                />
+                              )}
+                              <span>{variation.value}</span>
+                              {variation.priceModifier && variation.priceModifier !== 0 && (
+                                <span className="text-xs">
+                                  ({variation.priceModifier > 0 ? "+" : ""}
+                                  {formatCurrency(variation.priceModifier * 0.042, "PHP")})
+                                </span>
+                              )}
+                            </div>
+                            {isOutOfStock && (
+                              <span className="block text-[10px] mt-1">Out of stock</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Quantity Selector */}
           <div className="mb-6">
@@ -339,7 +613,7 @@ export default function ProductDetailPage() {
               <span className="text-xl font-bold text-grey-900 min-w-[2rem] text-center">{quantity}</span>
               <button
                 onClick={() =>
-                  setQuantity(Math.min(product.stock, quantity + 1))
+                  setQuantity(Math.min(availableStock, quantity + 1))
                 }
                 className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-grey-300 bg-white text-grey-700 font-bold transition-colors hover:border-soft-blue-600 hover:bg-soft-blue-50 hover:text-soft-blue-700"
               >
@@ -592,9 +866,14 @@ export default function ProductDetailPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row">
+            {product.variations && product.variations.length > 0 && !hasRequiredVariations() && (
+              <p className="mb-2 text-sm text-soft-blue-600 font-medium">
+                Please select all required options (size, color, etc.)
+              </p>
+            )}
             <Button
               onClick={handleAddToCart}
-              disabled={addingToCart || product.stock === 0}
+              disabled={addingToCart || !canAddToCart}
               variant="outline"
               className="flex-1"
               size="lg"
@@ -603,7 +882,7 @@ export default function ProductDetailPage() {
             </Button>
             <Button
               onClick={handleBuyNow}
-              disabled={product.stock === 0}
+              disabled={!canAddToCart}
               className="flex-1"
               size="lg"
             >
@@ -612,6 +891,299 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Customer Reviews Section */}
+      <div className="mt-12 border-t border-border pt-8">
+        <div className="mb-6">
+          <h2 className="mb-2 text-2xl font-bold text-grey-900">Customer Reviews</h2>
+          {product && reviews.length > 0 && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center">
+                  {[...Array(5)].map((_, i) => (
+                    <svg
+                      key={i}
+                      className={`h-5 w-5 ${
+                        i < Math.round(getAverageRating(product.id))
+                          ? "text-yellow-400"
+                          : "text-grey-300"
+                      }`}
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+                <span className="text-lg font-semibold text-grey-900">
+                  {getAverageRating(product.id).toFixed(1)}
+                </span>
+              </div>
+              <span className="text-grey-600">
+                Based on {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {reviewsLoading ? (
+          <div className="text-center py-8">
+            <p className="text-grey-600">Loading reviews...</p>
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="rounded-lg border border-border bg-grey-50 p-8 text-center">
+            <p className="text-grey-600">No reviews yet. Be the first to review this product!</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {reviews.map((review) => (
+              <div
+                key={review.id}
+                className="rounded-lg border border-border bg-white p-6 shadow-sm"
+              >
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-soft-blue-100 text-lg font-bold text-soft-blue-600">
+                      {review.userName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-grey-900">{review.userName}</h3>
+                        {review.verifiedPurchase && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            ✓ Verified Purchase
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="flex items-center">
+                          {[...Array(5)].map((_, i) => (
+                            <svg
+                              key={i}
+                              className={`h-4 w-4 ${
+                                i < review.rating ? "text-yellow-400" : "text-grey-300"
+                              }`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          ))}
+                        </div>
+                        <span className="text-sm text-grey-600">
+                          {new Date(review.createdAt).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {review.title && (
+                  <h4 className="mb-2 font-semibold text-grey-900">{review.title}</h4>
+                )}
+                <p className="mb-4 text-grey-700 leading-relaxed">{review.comment}</p>
+                <div className="flex items-center gap-4">
+                  <button className="flex items-center gap-1 text-sm text-grey-600 hover:text-soft-blue-600">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+                      />
+                    </svg>
+                    Helpful ({review.helpfulCount})
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* You May Also Like Section */}
+      {relatedProducts.length > 0 && (
+        <div className="mt-12 border-t border-border pt-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="mb-2 text-2xl font-bold text-grey-900">You May Also Like</h2>
+              <p className="text-sm text-grey-600">Recommended products for you</p>
+            </div>
+            <Link
+              href="/store/products"
+              className="hidden text-sm font-semibold text-soft-blue-600 hover:text-soft-blue-700 sm:block"
+            >
+              View All →
+            </Link>
+          </div>
+          {/* Mobile: Horizontal Slider, Desktop: Grid */}
+          <div className="relative">
+            {/* Mobile Slider Container */}
+            <div 
+              ref={sliderRef}
+              className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory scroll-smooth -mx-4 px-4 sm:hidden"
+            >
+              {relatedProducts.map((relatedProduct) => {
+                const relatedPriceInPHP = relatedProduct.price * 0.042;
+                const mainImage = relatedProduct.images && relatedProduct.images.length > 0 
+                  ? relatedProduct.images[0] 
+                  : "/placeholder-product.png";
+
+                return (
+                  <Link
+                    key={relatedProduct.id}
+                    href={`/store/products/${relatedProduct.id}`}
+                    className="group flex-shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-white transition-all hover:shadow-lg hover:border-soft-blue-300 w-[calc(50vw-1.5rem)]"
+                  >
+                    <div className="relative aspect-square w-full overflow-hidden bg-grey-100">
+                      <img
+                        src={mainImage}
+                        alt={relatedProduct.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder-product.png";
+                        }}
+                      />
+                      {relatedProduct.stock > 0 && relatedProduct.stock < 10 && (
+                        <div className="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-semibold text-white">
+                          Low Stock
+                        </div>
+                      )}
+                      {relatedProduct.stock === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                          <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white">
+                            Out of Stock
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      {relatedProduct.brand && (
+                        <p className="mb-1 text-xs font-medium text-grey-600 uppercase">
+                          {relatedProduct.brand}
+                        </p>
+                      )}
+                      <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-grey-900 group-hover:text-soft-blue-600 transition-colors">
+                        {relatedProduct.name}
+                      </h3>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-base font-bold text-soft-blue-600">
+                            {formatCurrency(relatedPriceInPHP, "PHP")}
+                          </p>
+                          <p className="text-xs text-grey-500">
+                            {formatCurrency(relatedProduct.price, "KRW")}
+                          </p>
+                        </div>
+                        {relatedProduct.stock > 0 && (
+                          <div className="flex items-center gap-1 text-xs text-green-600">
+                            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span>In Stock</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Category Badge */}
+                      <div className="mt-2">
+                        <span className="inline-block rounded-full bg-grey-100 px-2 py-0.5 text-xs font-medium text-grey-700 capitalize">
+                          {relatedProduct.category}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Desktop Grid Container */}
+            <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {relatedProducts.map((relatedProduct) => {
+                const relatedPriceInPHP = relatedProduct.price * 0.042;
+                const mainImage = relatedProduct.images && relatedProduct.images.length > 0 
+                  ? relatedProduct.images[0] 
+                  : "/placeholder-product.png";
+
+                return (
+                  <Link
+                    key={relatedProduct.id}
+                    href={`/store/products/${relatedProduct.id}`}
+                    className="group overflow-hidden rounded-xl border border-border bg-white transition-all hover:shadow-lg hover:border-soft-blue-300"
+                  >
+                    <div className="relative aspect-square w-full overflow-hidden bg-grey-100">
+                      <img
+                        src={mainImage}
+                        alt={relatedProduct.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder-product.png";
+                        }}
+                      />
+                      {relatedProduct.stock > 0 && relatedProduct.stock < 10 && (
+                        <div className="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-semibold text-white">
+                          Low Stock
+                        </div>
+                      )}
+                      {relatedProduct.stock === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                          <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white">
+                            Out of Stock
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      {relatedProduct.brand && (
+                        <p className="mb-1 text-xs font-medium text-grey-600 uppercase">
+                          {relatedProduct.brand}
+                        </p>
+                      )}
+                      <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-grey-900 group-hover:text-soft-blue-600 transition-colors">
+                        {relatedProduct.name}
+                      </h3>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-base font-bold text-soft-blue-600">
+                            {formatCurrency(relatedPriceInPHP, "PHP")}
+                          </p>
+                          <p className="text-xs text-grey-500">
+                            {formatCurrency(relatedProduct.price, "KRW")}
+                          </p>
+                        </div>
+                        {relatedProduct.stock > 0 && (
+                          <div className="flex items-center gap-1 text-xs text-green-600">
+                            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span>In Stock</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Category Badge */}
+                      <div className="mt-2">
+                        <span className="inline-block rounded-full bg-grey-100 px-2 py-0.5 text-xs font-medium text-grey-700 capitalize">
+                          {relatedProduct.category}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

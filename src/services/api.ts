@@ -248,6 +248,12 @@ export interface AddToCartRequest {
   product_id: string;
   quantity: number;
   box_type_preference?: "solo" | "shared";
+  variations?: {
+    size?: string;
+    color?: string;
+    [key: string]: string | undefined;
+  };
+  selected_variation_ids?: string[]; // Array of selected variation IDs
 }
 
 export const cartService = {

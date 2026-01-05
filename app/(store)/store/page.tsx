@@ -5,7 +5,6 @@ import Link from "next/link";
 import { productService } from "@/services/api";
 import { formatCurrency } from "@/lib/currency";
 import { categories } from "@/lib/mockData";
-import { WelcomeModal } from "@/components/store/WelcomeModal";
 import type { Product } from "@/types";
 
 export default function HomePage() {
@@ -480,9 +479,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* Welcome Modal */}
-      <WelcomeModal />
     </div>
   );
 }
