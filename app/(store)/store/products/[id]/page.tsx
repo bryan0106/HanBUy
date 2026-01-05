@@ -274,44 +274,44 @@ export default function ProductDetailPage() {
         {/* Product Info */}
         <div>
           {product.brand && (
-            <p className="mb-2 text-sm font-medium text-muted-foreground">
+            <p className="mb-2 text-sm font-semibold text-grey-700">
               {product.brand}
             </p>
           )}
-          <h1 className="mb-4 text-4xl font-bold text-foreground">
+          <h1 className="mb-4 text-4xl font-bold text-grey-900">
             {product.name}
           </h1>
           <div className="mb-6">
             <p className="text-3xl font-bold text-soft-blue-600">
               {formatCurrency(priceInPHP, "PHP")}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm font-medium text-grey-600">
               {formatCurrency(product.price, "KRW")}
             </p>
           </div>
 
           <div className="mb-6 space-y-4">
             <div>
-              <h3 className="mb-2 font-semibold">Description</h3>
-              <p className="text-muted-foreground">{product.description}</p>
+              <h3 className="mb-2 text-base font-semibold text-grey-900">Description</h3>
+              <p className="text-grey-700 leading-relaxed">{product.description}</p>
             </div>
 
             <div>
-              <h3 className="mb-2 font-semibold">Shipping Estimate</h3>
-              <p className="text-muted-foreground">
+              <h3 className="mb-2 text-base font-semibold text-grey-900">Shipping Estimate</h3>
+              <p className="text-grey-700 font-medium">
                 {shippingEstimate} from Korea to Philippines
               </p>
             </div>
 
             <div>
-              <h3 className="mb-2 font-semibold">Weight</h3>
-              <p className="text-muted-foreground">{product.weight} kg</p>
+              <h3 className="mb-2 text-base font-semibold text-grey-900">Weight</h3>
+              <p className="text-grey-700 font-medium">{product.weight} kg</p>
             </div>
 
             {product.dimensions && (
               <div>
-                <h3 className="mb-2 font-semibold">Dimensions</h3>
-                <p className="text-muted-foreground">
+                <h3 className="mb-2 text-base font-semibold text-grey-900">Dimensions</h3>
+                <p className="text-grey-700 font-medium">
                   {product.dimensions.length}cm × {product.dimensions.width}cm ×{" "}
                   {product.dimensions.height}cm
                 </p>
@@ -319,8 +319,8 @@ export default function ProductDetailPage() {
             )}
 
             <div>
-              <h3 className="mb-2 font-semibold">Stock</h3>
-              <p className="text-muted-foreground">
+              <h3 className="mb-2 text-base font-semibold text-grey-900">Stock</h3>
+              <p className="text-grey-700 font-semibold">
                 {product.stock > 0 ? `${product.stock} available` : "Out of stock"}
               </p>
             </div>
@@ -328,20 +328,20 @@ export default function ProductDetailPage() {
 
           {/* Quantity Selector */}
           <div className="mb-6">
-            <label className="mb-2 block font-semibold">Quantity</label>
+            <label className="mb-2 block text-base font-semibold text-grey-900">Quantity</label>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-border"
+                className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-grey-300 bg-white text-grey-700 font-bold transition-colors hover:border-soft-blue-600 hover:bg-soft-blue-50 hover:text-soft-blue-700"
               >
                 -
               </button>
-              <span className="text-lg font-semibold">{quantity}</span>
+              <span className="text-xl font-bold text-grey-900 min-w-[2rem] text-center">{quantity}</span>
               <button
                 onClick={() =>
                   setQuantity(Math.min(product.stock, quantity + 1))
                 }
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-border"
+                className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-grey-300 bg-white text-grey-700 font-bold transition-colors hover:border-soft-blue-600 hover:bg-soft-blue-50 hover:text-soft-blue-700"
               >
                 +
               </button>
@@ -352,7 +352,7 @@ export default function ProductDetailPage() {
           <div className="mb-6 space-y-4">
             {/* Box Type Selection */}
             <div>
-              <label className="mb-3 block text-sm font-semibold text-grey-800">Box Type</label>
+              <label className="mb-3 block text-base font-bold text-grey-900">Box Type</label>
               <div className="flex gap-3">
                 {boxTypesLoading ? (
                   <div className="flex flex-1 items-center justify-center py-4">
@@ -372,10 +372,10 @@ export default function ProductDetailPage() {
                             <button
                               key={boxType.code}
                               onClick={() => handleBoxTypeSelect(isSolo ? "SOLO" : "SHARED")}
-                              className={`flex-1 rounded-xl border-2 p-4 text-sm font-semibold transition-all ${
+                              className={`flex-1 rounded-xl border-2 p-4 text-sm font-bold transition-all ${
                                 isSelected
                                   ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-md"
-                                  : "border-border bg-white text-grey-700 hover:border-soft-blue-300 hover:bg-soft-blue-50"
+                                  : "border-border bg-white text-grey-900 hover:border-soft-blue-300 hover:bg-soft-blue-50"
                               }`}
                             >
                               <div className="flex items-center justify-center gap-2">
@@ -437,7 +437,7 @@ export default function ProductDetailPage() {
 
             {/* Box Size Selection */}
             <div>
-              <label className="mb-3 block text-sm font-semibold text-grey-800">Box Size</label>
+              <label className="mb-3 block text-base font-bold text-grey-900">Box Size</label>
               <div className="grid grid-cols-3 gap-3">
                 {(["small", "medium", "large"] as const).map((size) => {
                   const sizeInfo = boxSizePricing[size];
@@ -495,28 +495,28 @@ export default function ProductDetailPage() {
                       
                       {/* Icon */}
                       <div className={`mb-2 flex justify-center ${
-                        isSelected ? "text-soft-blue-600" : canFit ? "text-grey-600" : "text-grey-400"
+                        isSelected ? "text-soft-blue-600" : canFit ? "text-grey-700" : "text-grey-400"
                       }`}>
                         {sizeIcons[size]}
                       </div>
                       
                       {/* Size Label */}
                       <div className={`mb-1 text-xs font-bold uppercase ${
-                        isSelected ? "text-soft-blue-700" : canFit ? "text-grey-800" : "text-grey-400"
+                        isSelected ? "text-soft-blue-700" : canFit ? "text-grey-900" : "text-grey-500"
                       }`}>
                         {size}
                       </div>
                       
                       {/* Price */}
-                      <div className={`mb-2 text-sm font-bold ${
-                        isSelected ? "text-soft-blue-700" : canFit ? "text-grey-900" : "text-grey-400"
+                      <div className={`mb-2 text-base font-bold ${
+                        isSelected ? "text-soft-blue-700" : canFit ? "text-grey-900" : "text-grey-500"
                       }`}>
                         {formatCurrency(pricing.base, "PHP")}
                       </div>
                       
                       {/* Capacity Info */}
-                      <div className={`text-[10px] leading-tight ${
-                        canFit ? "text-grey-600" : "text-grey-400"
+                      <div className={`text-xs leading-tight font-medium ${
+                        canFit ? "text-grey-700" : "text-grey-500"
                       }`}>
                         <div className="flex items-center justify-center gap-1 mb-0.5">
                           <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
@@ -552,35 +552,35 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Price Summary */}
-            <div className="rounded-xl border-2 border-soft-blue-200 bg-gradient-to-br from-soft-blue-50 to-white p-5 shadow-sm">
-              <div className="mb-3 flex items-center gap-2">
+            <div className="rounded-xl border-2 border-soft-blue-200 bg-white p-5 shadow-md">
+              <div className="mb-4 flex items-center gap-2">
                 <svg className="h-5 w-5 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
                 </svg>
-                <h3 className="text-sm font-bold text-grey-800">Price Summary</h3>
+                <h3 className="text-base font-bold text-grey-900">Price Summary</h3>
               </div>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-grey-700">
+                  <div className="flex items-center gap-2 text-grey-800 font-medium">
                     <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
                     </svg>
                     <span>Subtotal ({quantity} item{quantity > 1 ? 's' : ''}):</span>
                   </div>
-                  <span className="font-semibold text-grey-900">{formatCurrency(subtotal, "PHP")}</span>
+                  <span className="font-bold text-grey-900">{formatCurrency(subtotal, "PHP")}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-grey-700">
+                  <div className="flex items-center gap-2 text-grey-800 font-medium">
                     <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
                       <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
                     </svg>
                     <span>Shipping ({selectedBoxSize} {boxTypePreference}):</span>
                   </div>
-                  <span className="font-semibold text-grey-900">{formatCurrency(shippingFee, "PHP")}</span>
+                  <span className="font-bold text-grey-900">{formatCurrency(shippingFee, "PHP")}</span>
                 </div>
-                <div className="border-t-2 border-soft-blue-200 pt-3">
+                <div className="border-t-2 border-grey-200 pt-3">
                   <div className="flex items-center justify-between">
                     <span className="text-base font-bold text-grey-900">Total Amount:</span>
                     <span className="text-2xl font-bold text-soft-blue-600">{formatCurrency(total, "PHP")}</span>
