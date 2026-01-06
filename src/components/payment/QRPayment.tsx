@@ -7,7 +7,7 @@ import type { BankType } from "@/services/api";
 interface QRPaymentProps {
   amount: number; // Pre-identified amount (exact amount to pay)
   orderId: string;
-  paymentType?: "full" | "downpayment";
+  paymentType?: "full" | "downpayment" | "balance";
   downpaymentAmount?: number;
   balance?: number;
   subtotal?: number; // Product subtotal
@@ -47,12 +47,12 @@ export function QRPayment({
     // TODO: Generate actual QR code from backend API with pre-identified amount
     // The QR code should contain the exact amount so customer can't modify it
     // Format: Contains merchant info + exact amount encoded
-    const paymentAmount = paymentType === "downpayment" && downpaymentAmount 
-      ? downpaymentAmount 
+    const paymentAmount = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance" && amount)
+      ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
       : amount;
     
     // Format currency for display (without encoding issues)
-    const amountText = formatCurrency(paymentAmount, "PHP");
+    const amountText = formatCurrency(paymentAmount || 0, "PHP");
     
     // Create SVG with proper encoding - use encodeURIComponent instead of btoa for Unicode support
     const svgContent = `
@@ -63,6 +63,7 @@ export function QRPayment({
         <text x="100" y="120" text-anchor="middle" font-size="10" font-weight="bold">Amount:</text>
         <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="bold">${amountText}</text>
         ${paymentType === "downpayment" ? `<text x="100" y="160" text-anchor="middle" font-size="8">Downpayment</text>` : ''}
+        ${paymentType === "balance" ? `<text x="100" y="160" text-anchor="middle" font-size="8">Balance Payment</text>` : ''}
       </svg>
     `.trim();
     
@@ -87,8 +88,8 @@ export function QRPayment({
     }
   }, [banks, selectedBank]);
 
-  const paymentAmount = paymentType === "downpayment" && downpaymentAmount 
-    ? downpaymentAmount 
+  const paymentAmount: number = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance")
+    ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
     : amount;
 
   return (
@@ -104,6 +105,14 @@ export function QRPayment({
             {balance && (
               <span className="ml-2">Balance: {formatCurrency(balance, "PHP")}</span>
             )}
+          </p>
+        </div>
+      )}
+      {paymentType === "balance" && (
+        <div className="mb-4 rounded-lg bg-warning/10 p-3 text-sm">
+          <p className="font-semibold text-warning">Balance Payment</p>
+          <p className="text-muted-foreground">
+            Paying remaining balance: {formatCurrency(amount, "PHP")}
           </p>
         </div>
       )}

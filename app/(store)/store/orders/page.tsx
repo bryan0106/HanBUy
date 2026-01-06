@@ -27,7 +27,7 @@ export default function StoreOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"cart" | "orders" | "receive" | "rate">("cart");
+  const [activeTab, setActiveTab] = useState<"cart" | "orders" | "receive" | "rate" | "payments">("cart");
   const [orderDetails, setOrderDetails] = useState<Record<string, any>>({});
   const [loadingOrderDetails, setLoadingOrderDetails] = useState<Record<string, boolean>>({});
 
@@ -267,6 +267,16 @@ export default function StoreOrdersPage() {
             }`}
           >
             Rate
+          </button>
+          <button
+            onClick={() => setActiveTab("payments")}
+            className={`shrink-0 px-2 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
+              activeTab === "payments"
+                ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Payments
           </button>
         </div>
       </div>
@@ -629,6 +639,226 @@ export default function StoreOrdersPage() {
                         </div>
                       );
                     })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Payments Tab */}
+      {activeTab === "payments" && (
+        <div>
+          {loading ? (
+            <div className="py-12 text-center">
+              <p className="text-muted-foreground">Loading payment information...</p>
+            </div>
+          ) : (
+            <>
+              {/* Payment Summary Cards */}
+              <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-2 text-sm text-muted-foreground">Total Orders</div>
+                  <div className="text-2xl font-bold text-foreground">{orders.length}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-2 text-sm text-muted-foreground">Paid Orders</div>
+                  <div className="text-2xl font-bold text-success">
+                    {orders.filter((o) => o.paymentStatus === "paid").length}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-2 text-sm text-muted-foreground">Pending Payment</div>
+                  <div className="text-2xl font-bold text-warning">
+                    {orders.filter((o) => o.paymentStatus === "pending" || o.paymentStatus === "partial").length}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-2 text-sm text-muted-foreground">Total Balance</div>
+                  <div className="text-2xl font-bold text-error">
+                    {formatCurrency(
+                      orders.reduce((sum, order) => {
+                        const orderDetail = orderDetails[order.id];
+                        const balance = orderDetail?.balance || 0;
+                        return sum + (balance > 0 ? balance : 0);
+                      }, 0),
+                      "PHP"
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Orders with Payment Status */}
+              {orders.length === 0 ? (
+                <div className="rounded-lg border border-border bg-card p-12 text-center">
+                  <div className="mb-4 text-6xl">💳</div>
+                  <h2 className="mb-2 text-xl font-semibold">No payment information</h2>
+                  <p className="mb-6 text-muted-foreground">
+                    Your payment history will appear here once you place an order
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map((order) => {
+                    // Load order details if not loaded
+                    if (!orderDetails[order.id] && !loadingOrderDetails[order.id]) {
+                      loadOrderDetails(order.id);
+                    }
+                    const orderDetail = orderDetails[order.id];
+                    const isLoading = loadingOrderDetails[order.id];
+                    const balance = orderDetail?.balance || 0;
+                    const paymentType = orderDetail?.payment_type || orderDetail?.paymentType || "full";
+                    const paymentStatus = order.paymentStatus;
+                    const hasBalance = balance > 0;
+
+                    return (
+                      <div
+                        key={order.id}
+                        className="rounded-lg border border-border bg-card p-4 sm:p-6"
+                      >
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex-1">
+                            <div className="mb-2 flex items-center gap-3">
+                              <h3 className="font-semibold text-foreground text-base sm:text-lg">
+                                {order.orderNumber}
+                              </h3>
+                              <span
+                                className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                  paymentStatus === "paid"
+                                    ? "bg-success/10 text-success"
+                                    : paymentStatus === "partial"
+                                    ? "bg-warning/10 text-warning"
+                                    : "bg-error/10 text-error"
+                                }`}
+                              >
+                                {paymentStatus === "paid"
+                                  ? "Paid"
+                                  : paymentStatus === "partial"
+                                  ? "Partial"
+                                  : "Pending"}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {order.items} item{order.items > 1 ? "s" : ""} • {formatDate(order.createdAt)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-foreground">
+                              {formatCurrency(order.total, order.currency)}
+                            </div>
+                            {hasBalance && (
+                              <div className="mt-1 text-sm font-semibold text-error">
+                                Balance: {formatCurrency(balance, order.currency)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Payment Details */}
+                        {isLoading ? (
+                          <div className="py-4 text-center text-sm text-muted-foreground">
+                            Loading payment details...
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {/* Payment Type and Status */}
+                            <div className="rounded-lg bg-grey-50 p-3">
+                              <div className="mb-2 flex items-center justify-between">
+                                <span className="text-sm font-medium text-grey-700">Payment Type</span>
+                                <span className="text-sm font-semibold capitalize text-grey-900">
+                                  {paymentType === "installment"
+                                    ? "Installment"
+                                    : paymentType === "downpayment"
+                                    ? "Downpayment"
+                                    : "Full Payment"}
+                                </span>
+                              </div>
+                              {paymentType === "installment" && orderDetail?.installment_plan && (
+                                <div className="mt-2 text-xs text-grey-600">
+                                  {orderDetail.installment_plan.paid_installments || 0} of{" "}
+                                  {orderDetail.installment_plan.total_installments || 0} installments paid
+                                </div>
+                              )}
+                              {paymentType === "downpayment" && (
+                                <div className="mt-2 text-xs text-grey-600">
+                                  Downpayment: {formatCurrency(orderDetail?.downpayment_amount || 0, "PHP")}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Payment History */}
+                            {orderDetail?.payment_history && orderDetail.payment_history.length > 0 && (
+                              <div className="rounded-lg border border-border bg-white p-3">
+                                <h4 className="mb-3 text-sm font-semibold text-grey-900">Payment History</h4>
+                                <div className="space-y-2">
+                                  {orderDetail.payment_history.map((payment: any, idx: number) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0"
+                                    >
+                                      <div>
+                                        <div className="text-sm font-medium text-grey-900">
+                                          {payment.payment_type === "installment"
+                                            ? `Installment #${payment.installment_number}`
+                                            : payment.payment_type === "downpayment"
+                                            ? "Downpayment"
+                                            : payment.payment_type === "balance"
+                                            ? "Balance Payment"
+                                            : "Full Payment"}
+                                        </div>
+                                        <div className="text-xs text-grey-600">
+                                          {formatDate(new Date(payment.created_at))}
+                                          {payment.verified && (
+                                            <span className="ml-2 text-success">✓ Verified</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-sm font-semibold text-grey-900">
+                                          {formatCurrency(payment.amount, payment.currency || "PHP")}
+                                        </div>
+                                        <div className="text-xs text-grey-600 capitalize">
+                                          {payment.payment_method?.bank || "N/A"}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Pay Balance Button */}
+                            {hasBalance && (
+                              <div className="flex gap-3">
+                                <Link
+                                  href={`/store/payment?orderId=${order.id}&type=balance`}
+                                  className="flex-1 rounded-lg bg-soft-blue-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                                >
+                                  Pay Balance
+                                </Link>
+                                <Link
+                                  href={`/store/orders/${order.id}`}
+                                  className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-grey-50"
+                                >
+                                  View Details
+                                </Link>
+                              </div>
+                            )}
+
+                            {/* No Balance - View Details */}
+                            {!hasBalance && (
+                              <Link
+                                href={`/store/orders/${order.id}`}
+                                className="block rounded-lg border border-border bg-background px-4 py-2 text-center text-sm font-medium transition-colors hover:bg-grey-50"
+                              >
+                                View Order Details
+                              </Link>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>

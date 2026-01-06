@@ -41,16 +41,65 @@ export function NotificationButton() {
     };
   }, [isOpen]);
 
+  // Helper function to extract order ID from message and generate link
+  const generateNotificationLink = (title: string, message: string): string => {
+    // Extract order number (ORD-YYYY-XXX format)
+    const orderMatch = message.match(/ORD-(\d{4}-\d{3})/);
+    if (orderMatch) {
+      const orderNumber = orderMatch[0];
+      // Map order numbers to order IDs (in real app, this would come from API)
+      const orderIdMap: Record<string, string> = {
+        "ORD-2024-001": "order-test-1",
+        "ORD-2024-002": "order-test-2",
+        "ORD-2024-003": "order-test-3",
+        "ORD-2024-004": "order-test-4",
+      };
+      const orderId = orderIdMap[orderNumber];
+      
+      if (orderId) {
+        // Payment-related notifications go to payment details
+        if (title.includes("Payment") || title.includes("payment")) {
+          return `/store/payments/${orderId}`;
+        }
+        // All other order notifications go to order details
+        return `/store/orders/${orderId}`;
+      }
+    }
+    
+    // Extract box ID (BOX-YYYY-XXX format)
+    const boxMatch = message.match(/BOX-(\d{4}-\d{3})/);
+    if (boxMatch) {
+      return "/store/box-tracking";
+    }
+    
+    // Extract invoice ID (INV-YYYY-XXX format)
+    const invoiceMatch = message.match(/INV-(\d{4}-\d{3})/);
+    if (invoiceMatch) {
+      // For invoices, try to find associated order
+      const invoiceNumber = invoiceMatch[0];
+      const invoiceOrderMap: Record<string, string> = {
+        "INV-2024-001": "order-test-1",
+      };
+      const orderId = invoiceOrderMap[invoiceNumber];
+      if (orderId) {
+        return `/store/payments/${orderId}`;
+      }
+    }
+    
+    // Default fallback
+    return "/store/orders";
+  };
+
   const loadNotifications = async () => {
     // TODO: Fetch from API
-    const mockData: Notification[] = [
+    const mockNotifications: Notification[] = [
       {
         id: "1",
         title: "Order Confirmed",
         message: "Your order ORD-2024-001 has been confirmed",
         read: false,
         createdAt: "2024-12-29T00:00:00Z",
-        link: "/store/orders",
+        link: "",
       },
       {
         id: "2",
@@ -58,7 +107,7 @@ export function NotificationButton() {
         message: "Payment for invoice INV-2024-001 has been received",
         read: false,
         createdAt: "2024-12-29T00:00:00Z",
-        link: "/store/orders",
+        link: "",
       },
       {
         id: "3",
@@ -66,11 +115,18 @@ export function NotificationButton() {
         message: "Your order ORD-2024-002 is now in transit",
         read: true,
         createdAt: "2024-12-28T00:00:00Z",
-        link: "/store/orders",
+        link: "",
       },
     ];
-    setNotifications(mockData);
-    setUnreadCount(mockData.filter(n => !n.read).length);
+    
+    // Generate links for each notification
+    const notificationsWithLinks = mockNotifications.map(notif => ({
+      ...notif,
+      link: generateNotificationLink(notif.title, notif.message),
+    }));
+    
+    setNotifications(notificationsWithLinks);
+    setUnreadCount(notificationsWithLinks.filter(n => !n.read).length);
   };
 
   const markAsRead = (id: string) => {

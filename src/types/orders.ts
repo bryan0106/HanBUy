@@ -21,10 +21,12 @@ export interface Order {
   status: OrderStatus;
   paymentStatus: "pending" | "partial" | "paid" | "failed" | "refunded";
   paymentMethod?: PaymentMethod;
-  paymentType: "full" | "downpayment"; // Payment type
+  paymentType: "full" | "downpayment" | "installment"; // Payment type
   downpaymentAmount?: number; // Required if paymentType is "downpayment"
   downpaymentPaid?: number; // Amount of downpayment already paid
-  balance?: number; // Remaining balance (for downpayment)
+  balance?: number; // Remaining balance (for downpayment or installment)
+  installmentPlan?: InstallmentPlan; // Installment payment plan
+  paymentHistory?: PaymentRecord[]; // History of all payments made
   qrCode?: string;
   proofOfPayment?: string;
   shippingAddress: Address;
@@ -114,5 +116,39 @@ export interface DocumentUpload {
   uploadedAt: Date;
   verified: boolean;
   verifiedAt?: Date;
+}
+
+export interface InstallmentPlan {
+  totalInstallments: number; // Total number of installments
+  installmentAmount: number; // Amount per installment
+  paidInstallments: number; // Number of installments paid
+  nextDueDate?: Date; // Next payment due date
+  schedule: InstallmentSchedule[]; // Payment schedule
+}
+
+export interface InstallmentSchedule {
+  installmentNumber: number; // 1, 2, 3, etc.
+  dueDate: Date;
+  amount: number;
+  paid: boolean;
+  paidAt?: Date;
+  paymentMethod?: PaymentMethod;
+}
+
+export interface PaymentRecord {
+  id: string;
+  orderId: string;
+  amount: number;
+  currency: "PHP" | "KRW";
+  paymentType: "full" | "downpayment" | "installment" | "balance";
+  installmentNumber?: number; // If installment payment
+  paymentMethod: PaymentMethod;
+  status: "pending" | "verified" | "failed";
+  proofOfPayment?: string;
+  verified: boolean;
+  verifiedAt?: Date;
+  verifiedBy?: string;
+  createdAt: Date;
+  notes?: string;
 }
 

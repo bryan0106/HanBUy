@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
 import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
+import { LikeButton } from "@/components/store/LikeButton";
 
 type ViewType = "list" | "single" | "grid";
 
@@ -346,23 +347,29 @@ export default function OnhandProductsPage() {
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
                     return (
-                      <Link
+                      <div
                         key={product.id}
-                        href={`/store/products/${product.id}`}
                         className="group flex gap-4 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="h-20 w-20 shrink-0 rounded-lg object-cover sm:h-24 sm:w-24"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200 sm:h-24 sm:w-24"></div>
-                        )}
+                        <Link
+                          href={`/store/products/${product.id}`}
+                          className="flex gap-4 flex-1"
+                        >
+                          <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24">
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="h-full w-full rounded-lg object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-full w-full rounded-lg bg-grey-200"></div>
+                            )}
+                            <LikeButton productId={product.id} size="sm" />
+                          </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="mb-1 font-semibold group-hover:text-soft-blue-600 sm:mb-2">
                             {product.name}
@@ -386,7 +393,8 @@ export default function OnhandProductsPage() {
                             </span>
                           </div>
                         </div>
-                      </Link>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -395,23 +403,26 @@ export default function OnhandProductsPage() {
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
                     return (
-                      <Link
+                      <div
                         key={product.id}
-                        href={`/store/products/${product.id}`}
-                        className="group block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-lg sm:p-6"
+                        className="group relative block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-lg sm:p-6"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="mb-4 aspect-video w-full rounded-lg object-cover sm:aspect-square sm:h-64"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="mb-4 aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-64"></div>
-                        )}
+                        <Link href={`/store/products/${product.id}`}>
+                          <div className="relative mb-4 aspect-video w-full sm:aspect-square sm:h-64 sm:mb-6">
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="aspect-video w-full rounded-lg object-cover sm:aspect-square sm:h-full"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-full"></div>
+                            )}
+                            <LikeButton productId={product.id} />
+                          </div>
                         <h3 className="mb-2 text-lg font-semibold group-hover:text-soft-blue-600 sm:text-xl">
                           {product.name}
                         </h3>
@@ -433,7 +444,8 @@ export default function OnhandProductsPage() {
                             In Stock ({product.stock})
                           </span>
                         </div>
-                      </Link>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -442,23 +454,26 @@ export default function OnhandProductsPage() {
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
                     return (
-                      <Link
+                      <div
                         key={product.id}
-                        href={`/store/products/${product.id}`}
-                        className="group rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
+                        className="group relative rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="mb-3 aspect-square w-full rounded-lg object-cover sm:mb-4"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="mb-3 aspect-square w-full rounded-lg bg-grey-200 sm:mb-4"></div>
-                        )}
+                        <Link href={`/store/products/${product.id}`}>
+                          <div className="relative mb-3 aspect-square w-full sm:mb-4">
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="aspect-square w-full rounded-lg object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
+                            )}
+                            <LikeButton productId={product.id} size="sm" />
+                          </div>
                         <h3 className="mb-1 font-semibold group-hover:text-soft-blue-600 sm:mb-2">
                           {product.name}
                         </h3>
@@ -480,7 +495,8 @@ export default function OnhandProductsPage() {
                             In Stock ({product.stock})
                           </span>
                         </div>
-                      </Link>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -492,4 +508,5 @@ export default function OnhandProductsPage() {
     </div>
   );
 }
+
 

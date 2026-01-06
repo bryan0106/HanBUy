@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
 import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
+import { LikeButton } from "@/components/store/LikeButton";
 
 type ViewType = "list" | "single" | "grid";
 
@@ -325,23 +326,29 @@ function ProductsContent() {
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
                     return (
-                      <Link
+                      <div
                         key={product.id}
-                        href={`/store/products/${product.id}`}
                         className="group flex gap-4 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="h-20 w-20 shrink-0 rounded-lg object-cover sm:h-24 sm:w-24"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200 sm:h-24 sm:w-24"></div>
-                        )}
+                        <Link
+                          href={`/store/products/${product.id}`}
+                          className="flex gap-4 flex-1"
+                        >
+                          <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24">
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="h-full w-full rounded-lg object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-full w-full rounded-lg bg-grey-200"></div>
+                            )}
+                            <LikeButton productId={product.id} size="sm" />
+                          </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="mb-1 font-semibold group-hover:text-soft-blue-600 sm:mb-2">
                             {product.name}
@@ -358,7 +365,8 @@ function ProductsContent() {
                             {formatCurrency(product.price, "KRW")}
                           </p>
                         </div>
-                      </Link>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -367,23 +375,26 @@ function ProductsContent() {
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
                     return (
-                      <Link
+                      <div
                         key={product.id}
-                        href={`/store/products/${product.id}`}
-                        className="group block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-lg sm:p-6"
+                        className="group relative block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-lg sm:p-6"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="mb-4 aspect-square w-full rounded-lg object-cover sm:mb-6"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="mb-4 aspect-square w-full rounded-lg bg-grey-200 sm:mb-6"></div>
-                        )}
+                        <Link href={`/store/products/${product.id}`}>
+                          <div className="relative mb-4 aspect-square w-full sm:mb-6">
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="aspect-square w-full rounded-lg object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
+                            )}
+                            <LikeButton productId={product.id} />
+                          </div>
                         <h3 className="mb-2 font-semibold group-hover:text-soft-blue-600 sm:text-lg">
                           {product.name}
                         </h3>
@@ -398,7 +409,8 @@ function ProductsContent() {
                         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
                           {formatCurrency(product.price, "KRW")}
                         </p>
-                      </Link>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -407,23 +419,26 @@ function ProductsContent() {
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
                     return (
-                      <Link
+                      <div
                         key={product.id}
-                        href={`/store/products/${product.id}`}
-                        className="group rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
+                        className="group relative rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-lg sm:p-4"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="mb-3 aspect-square w-full rounded-lg object-cover sm:mb-4"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="mb-3 aspect-square w-full rounded-lg bg-grey-200 sm:mb-4"></div>
-                        )}
+                        <Link href={`/store/products/${product.id}`}>
+                          <div className="relative mb-3 aspect-square w-full sm:mb-4">
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="aspect-square w-full rounded-lg object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
+                            )}
+                            <LikeButton productId={product.id} size="sm" />
+                          </div>
                         <h3 className="mb-1 text-sm font-semibold group-hover:text-soft-blue-600 sm:mb-2 sm:text-base">
                           {product.name}
                         </h3>
@@ -438,7 +453,8 @@ function ProductsContent() {
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {formatCurrency(product.price, "KRW")}
                         </p>
-                      </Link>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -465,3 +481,4 @@ export default function ProductsPage() {
     </Suspense>
   );
 }
+

@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { QRPayment } from "@/components/payment/QRPayment";
 import { Button } from "@/components/ui/button";
-import { bankService, type BankType } from "@/services/api";
+import { bankService, orderService, type BankType } from "@/services/api";
 
 interface OrderSummary {
   subtotal: number;
@@ -24,10 +24,12 @@ function PaymentPageContent() {
   const [loading, setLoading] = useState(true);
   const [bankTypes, setBankTypes] = useState<BankType[]>([]);
   const [orderSummary, setOrderSummary] = useState<OrderSummary | null>(null);
-  const [paymentType, setPaymentType] = useState<"full" | "downpayment">("full");
+  const [paymentType, setPaymentType] = useState<"full" | "downpayment" | "balance">("full");
   const [downpaymentAmount, setDownpaymentAmount] = useState<number>(0);
   const [processing, setProcessing] = useState(false);
+  const [existingOrder, setExistingOrder] = useState<any>(null);
   const orderId = searchParams.get("orderId");
+  const paymentTypeParam = searchParams.get("type"); // "balance" for balance payments
 
   // Helper function to get default banks
   const getDefaultBanks = (): BankType[] => [
@@ -60,6 +62,22 @@ function PaymentPageContent() {
           } catch (e) {
             console.error("Error parsing temp order:", e);
           }
+        }
+      } else if (orderId && paymentTypeParam === "balance") {
+        // Fetch existing order for balance payment
+        try {
+          const fetchedOrder = await orderService.getOrder(orderId);
+          setExistingOrder(fetchedOrder);
+          orderData = fetchedOrder;
+          
+          // Set payment type to balance
+          setPaymentType("balance");
+          
+          // Set balance amount
+          const balance = fetchedOrder.balance || 0;
+          setDownpaymentAmount(balance);
+        } catch (error) {
+          console.error("Error fetching order for balance payment:", error);
         }
       }
 
@@ -192,20 +210,36 @@ function PaymentPageContent() {
 
   const balance = paymentType === "downpayment" 
     ? orderSummary.total - downpaymentAmount 
+    : paymentType === "balance"
+    ? existingOrder?.balance || 0
     : 0;
   const paymentAmount = paymentType === "downpayment" 
     ? downpaymentAmount 
-    : orderSummary.total;
+    : paymentType === "balance"
+    ? existingOrder?.balance || orderSummary?.total || 0
+    : orderSummary?.total || 0;
 
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-          Payment
+          {paymentType === "balance" ? "Pay Balance" : "Payment"}
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Complete your payment to confirm your order
+          {paymentType === "balance"
+            ? "Pay your remaining balance for this order"
+            : "Complete your payment to confirm your order"}
         </p>
+        {paymentType === "balance" && existingOrder && (
+          <div className="mt-3 rounded-lg bg-warning/10 p-3">
+            <p className="text-sm text-warning">
+              <strong>Order:</strong> {existingOrder.order_number || existingOrder.orderNumber}
+            </p>
+            <p className="text-sm text-warning">
+              <strong>Remaining Balance:</strong> {formatCurrency(existingOrder.balance || 0, "PHP")}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
@@ -253,7 +287,8 @@ function PaymentPageContent() {
               </div>
             </div>
 
-            {/* Payment Type Selection */}
+            {/* Payment Type Selection - Only show if not balance payment */}
+            {paymentType !== "balance" && (
             <div className="mt-6">
               <label className="mb-3 block text-sm font-medium">
                 Payment Type
@@ -298,20 +333,21 @@ function PaymentPageContent() {
                 </button>
               </div>
             </div>
+            )}
           </div>
         </div>
 
         {/* Payment Section */}
         <div className="lg:col-span-2">
           <QRPayment
-            amount={orderSummary.total}
+            amount={paymentAmount}
             orderId={orderId || "temp-order-id"}
-            paymentType={paymentType}
-            downpaymentAmount={downpaymentAmount}
+            paymentType={paymentType === "balance" ? "balance" : paymentType}
+            downpaymentAmount={paymentType === "balance" ? paymentAmount : downpaymentAmount}
             balance={balance}
-            subtotal={orderSummary.subtotal}
-            isf={orderSummary.isf}
-            lsf={orderSummary.lsf}
+            subtotal={paymentType === "balance" ? (existingOrder?.subtotal || 0) : orderSummary.subtotal}
+            isf={paymentType === "balance" ? (existingOrder?.isf || 0) : orderSummary.isf}
+            lsf={paymentType === "balance" ? (existingOrder?.lsf || 0) : orderSummary.lsf}
             onPaymentComplete={handlePaymentComplete}
             bankTypes={bankTypes.length > 0 ? bankTypes : undefined}
           />

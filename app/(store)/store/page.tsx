@@ -5,6 +5,7 @@ import Link from "next/link";
 import { productService } from "@/services/api";
 import { formatCurrency } from "@/lib/currency";
 import { categories } from "@/lib/mockData";
+import { LikeButton } from "@/components/store/LikeButton";
 import type { Product } from "@/types";
 
 export default function HomePage() {
@@ -87,45 +88,45 @@ export default function HomePage() {
     const mainImage = product.images && product.images.length > 0 ? product.images[0] : "/placeholder-product.png";
 
     return (
-      <Link
-        href={`/store/products/${product.id}`}
-        className="group relative overflow-hidden rounded-xl border border-border bg-white transition-all hover:shadow-lg"
-      >
-        <div className="relative aspect-square w-full overflow-hidden bg-grey-100">
-          <img
-            src={mainImage}
-            alt={product.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = "/placeholder-product.png";
-            }}
-          />
-          {product.stock && product.stock < 10 && (
-            <div className="absolute top-2 right-2 rounded-full bg-red-500 px-2 py-1 text-xs font-semibold text-white">
-              Low Stock
-            </div>
-          )}
-        </div>
-        <div className="p-4">
-          <p className="mb-1 text-xs font-medium text-grey-600">{product.brand}</p>
-          <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-grey-900 group-hover:text-soft-blue-600">
-            {product.name}
-          </h3>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-base font-bold text-grey-900">
-                ₱{priceInPHP.toFixed(2)}
-              </p>
-              <p className="text-xs text-grey-500">
-                {formatCurrency(product.price, product.currency)}
-              </p>
-            </div>
-            {product.stock && product.stock > 0 && (
-              <span className="text-xs text-grey-600">In Stock</span>
+      <div className="group relative overflow-hidden rounded-xl border border-border bg-white transition-all hover:shadow-lg">
+        <Link href={`/store/products/${product.id}`}>
+          <div className="relative aspect-square w-full overflow-hidden bg-grey-100">
+            <img
+              src={mainImage}
+              alt={product.name}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/placeholder-product.png";
+              }}
+            />
+            {product.stock && product.stock < 10 && (
+              <div className="absolute top-2 left-2 rounded-full bg-red-500 px-2 py-1 text-xs font-semibold text-white">
+                Low Stock
+              </div>
             )}
+            <LikeButton productId={product.id} size="sm" />
           </div>
-        </div>
-      </Link>
+          <div className="p-4">
+            <p className="mb-1 text-xs font-medium text-grey-600">{product.brand}</p>
+            <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-grey-900 group-hover:text-soft-blue-600">
+              {product.name}
+            </h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-base font-bold text-grey-900">
+                  ₱{priceInPHP.toFixed(2)}
+                </p>
+                <p className="text-xs text-grey-500">
+                  {formatCurrency(product.price, product.currency)}
+                </p>
+              </div>
+              {product.stock && product.stock > 0 && (
+                <span className="text-xs text-grey-600">In Stock</span>
+              )}
+            </div>
+          </div>
+        </Link>
+      </div>
     );
   };
 

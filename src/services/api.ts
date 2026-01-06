@@ -702,9 +702,39 @@ async function mockGetOrder(orderId: string): Promise<OrderResponse> {
     payment_status: order.paymentStatus,
     payment_type: order.paymentType,
     payment_method: order.paymentMethod,
-    downpayment_amount: order.paymentType === "downpayment" ? order.total * 0.5 : null,
-    balance: order.paymentType === "downpayment" ? order.total * 0.5 : null,
+    downpayment_amount: order.paymentType === "downpayment" ? (order.downpaymentAmount || order.total * 0.5) : null,
+    balance: order.balance || (order.paymentType === "downpayment" ? (order.total - (order.downpaymentPaid || order.total * 0.5)) : null),
     qr_code: order.paymentMethod?.qrCode,
+    payment_history: order.paymentHistory ? order.paymentHistory.map((p: any) => ({
+      id: p.id,
+      order_id: order.id,
+      amount: p.amount,
+      currency: p.currency,
+      payment_type: p.paymentType,
+      installment_number: p.installmentNumber,
+      payment_method: p.paymentMethod,
+      status: p.status,
+      verified: p.verified,
+      verified_at: p.verifiedAt?.toISOString(),
+      created_at: p.createdAt.toISOString(),
+    })) : (order.paymentStatus === "partial" || order.paymentStatus === "paid") ? [{
+      id: `payment-${order.id}-1`,
+      order_id: order.id,
+      amount: order.paymentType === "downpayment" ? (order.downpaymentPaid || order.total * 0.5) : order.total,
+      currency: order.currency,
+      payment_type: order.paymentType,
+      payment_method: order.paymentMethod,
+      status: "verified",
+      verified: true,
+      verified_at: order.paidAt?.toISOString(),
+      created_at: order.paidAt?.toISOString() || order.createdAt.toISOString(),
+    }] : [],
+    installment_plan: order.installmentPlan ? {
+      total_installments: order.installmentPlan.totalInstallments,
+      installment_amount: order.installmentPlan.installmentAmount,
+      paid_installments: order.installmentPlan.paidInstallments,
+      next_due_date: order.installmentPlan.nextDueDate?.toISOString(),
+    } : null,
     box_type_preference: order.boxTypePreference,
     shipping_address: order.shippingAddress,
     fulfillment_status: order.fulfillmentStatus,
@@ -1141,11 +1171,30 @@ export interface OrderResponse {
   currency: "PHP" | "KRW";
   status: string;
   payment_status: string;
-  payment_type: "full" | "downpayment";
+  payment_type: "full" | "downpayment" | "balance" | "installment";
   payment_method?: any;
   downpayment_amount?: number | null;
   balance?: number | null;
   qr_code?: string;
+  payment_history?: Array<{
+    id: string;
+    order_id: string;
+    amount: number;
+    currency: "PHP" | "KRW";
+    payment_type: string;
+    installment_number?: number;
+    payment_method?: any;
+    status: string;
+    verified: boolean;
+    verified_at?: string;
+    created_at: string;
+  }>;
+  installment_plan?: {
+    total_installments: number;
+    installment_amount: number;
+    paid_installments: number;
+    next_due_date?: string;
+  } | null;
   box_type_preference: "solo" | "shared";
   shipping_address: {
     street: string;
