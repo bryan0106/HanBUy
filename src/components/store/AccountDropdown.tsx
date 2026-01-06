@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 export function AccountDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -103,14 +103,16 @@ export function AccountDropdown() {
               <span>⚙️</span>
               <span>Account Settings</span>
             </Link>
-            <Link
-              href="/dashboard"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
-            >
-              <span>📊</span>
-              <span>Dashboard</span>
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/dashboard"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-4 py-2 text-sm text-grey-700 transition-colors hover:bg-grey-50"
+              >
+                <span>📊</span>
+                <span>Dashboard</span>
+              </Link>
+            )}
             <button
               onClick={handleLogout}
               className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-error transition-colors hover:bg-grey-50"
