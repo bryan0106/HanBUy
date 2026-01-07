@@ -159,29 +159,72 @@ a:hover {
 /* Ensure buttons with pink/muted rose background always have white text */
 button[class*="bg-[#FF85A2]"],
 button[class*="bg-muted-rose"],
-button[class*="bg-soft-blue-600"]:not([class*="text-"]),
-.btn-pink {
+button[class*="bg-soft-blue-600"],
+button[class*="bg-soft-blue-600"] *,
+div[class*="bg-[#FF85A2]"],
+div[class*="bg-muted-rose"],
+div[class*="bg-soft-blue-600"],
+div[class*="bg-soft-blue-600"] *,
+.btn-pink,
+.btn-pink * {
+  color: white !important;
+}
+
+/* Ensure all child elements inside pink buttons have white text */
+button[class*="bg-[#FF85A2]"] span,
+button[class*="bg-[#FF85A2]"] p,
+button[class*="bg-[#FF85A2]"] div,
+button[class*="bg-muted-rose"] span,
+button[class*="bg-muted-rose"] p,
+button[class*="bg-muted-rose"] div,
+button[class*="bg-soft-blue-600"] span,
+button[class*="bg-soft-blue-600"] p,
+button[class*="bg-soft-blue-600"] div,
+div[class*="bg-[#FF85A2]"] span,
+div[class*="bg-[#FF85A2]"] p,
+div[class*="bg-[#FF85A2]"] div,
+div[class*="bg-muted-rose"] span,
+div[class*="bg-muted-rose"] p,
+div[class*="bg-muted-rose"] div,
+div[class*="bg-soft-blue-600"] span,
+div[class*="bg-soft-blue-600"] p,
+div[class*="bg-soft-blue-600"] div {
   color: white !important;
 }
 
 /* Ensure links with pink/muted rose background always have white text - override general link color */
 a[class*="bg-[#FF85A2]"],
 a[class*="bg-muted-rose"],
+a[class*="bg-soft-blue-600"],
 a.btn-pink,
 a[class*="bg-[#FF85A2]"] *,
 a[class*="bg-muted-rose"] *,
+a[class*="bg-soft-blue-600"] *,
 a.inline-block[class*="bg-[#FF85A2]"],
-a.inline-block[class*="bg-[#FF85A2]"] * {
+a.inline-block[class*="bg-[#FF85A2]"] *,
+a.inline-block[class*="bg-soft-blue-600"],
+a.inline-block[class*="bg-soft-blue-600"] * {
   color: white !important;
 }
 
 a[class*="bg-[#FF85A2]"]:hover,
 a[class*="bg-muted-rose"]:hover,
+a[class*="bg-soft-blue-600"]:hover,
 a.btn-pink:hover,
 a[class*="bg-[#FF85A2]"]:hover *,
 a[class*="bg-muted-rose"]:hover *,
+a[class*="bg-soft-blue-600"]:hover *,
 a.inline-block[class*="bg-[#FF85A2]"]:hover,
-a.inline-block[class*="bg-[#FF85A2]"]:hover * {
+a.inline-block[class*="bg-[#FF85A2]"]:hover *,
+a.inline-block[class*="bg-soft-blue-600"]:hover,
+a.inline-block[class*="bg-soft-blue-600"]:hover * {
   color: white !important;
   opacity: 1;
+}
+
+/* Ensure button elements with pink background have white text even with other text color classes */
+button[class*="bg-[#FF85A2]"] *,
+button[class*="bg-muted-rose"] *,
+button[class*="bg-soft-blue-600"] * {
+  color: white !important;
 }
