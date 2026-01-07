@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
+import { LikeButton } from "@/components/store/LikeButton";
 
 interface PreorderProduct {
   id: string;
@@ -493,18 +494,23 @@ export default function PreorderProductsPage() {
                         key={product.id}
                         className="rounded-lg border border-border bg-card p-3 sm:p-4"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="mb-3 aspect-square w-full rounded-lg object-cover sm:mb-4"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="mb-3 aspect-square w-full rounded-lg bg-grey-200 sm:mb-4"></div>
-                        )}
+                        <Link href={`/store/products/${product.id}`}>
+                          <div className="relative mb-3 aspect-square w-full overflow-hidden sm:mb-4">
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="aspect-square w-full rounded-lg object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
+                            )}
+                            <LikeButton productId={product.id} size="sm" />
+                          </div>
+                        </Link>
                         <h3 className="mb-1 font-semibold sm:mb-2">{product.name}</h3>
                         {product.brand && (
                           <p className="mb-1 text-xs text-muted-foreground sm:text-sm">

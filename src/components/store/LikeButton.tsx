@@ -114,8 +114,8 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
     <button
       onClick={handleToggleLike}
       disabled={isLoading || !isAuthenticated}
-      className={`absolute right-2 top-2 z-10 rounded-full bg-white/90 p-1.5 shadow-md transition-all hover:bg-white hover:scale-110 active:scale-95 ${
-        isLiked ? "text-error" : "text-grey-600 hover:text-error"
+      className={`absolute right-2 top-2 z-10 rounded-[4px] bg-white border border-[#FCE4EC] p-1.5 transition-all hover:bg-[#FFF5F7] ${
+        isLiked ? "text-[#FF85A2]" : "text-[#6b7280] hover:text-[#FF85A2]"
       } ${sizeClasses[size]} ${className}`}
       aria-label={isLiked ? "Remove from liked items" : "Add to liked items"}
       title={isLiked ? "Remove from liked items" : "Add to liked items"}

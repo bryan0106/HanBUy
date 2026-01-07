@@ -6,12 +6,20 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
 import type { Invoice } from "@/types";
 
-export default function InvoicesPage() {
-  const { user, isAuthenticated } = useAuth();
+export default function StoreInvoicesPage() {
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/auth/login?redirect=/store/invoices");
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -37,20 +45,16 @@ export default function InvoicesPage() {
     await invoiceService.downloadInvoicePDF(invoiceId);
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="container mx-auto px-4 py-12 text-center">
+      <div className="container mx-auto px-4 py-8 text-center">
         <p className="text-[#6b7280]">Loading invoices...</p>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-[#6b7280]">Please log in to view your invoices.</p>
-      </div>
-    );
+    return null; // Will redirect
   }
 
   return (
@@ -160,3 +164,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+

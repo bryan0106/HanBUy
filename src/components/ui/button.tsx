@@ -22,7 +22,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(
           "inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
           {
-            "bg-soft-blue-600 text-white hover:bg-soft-blue-700":
+            "bg-[#FF85A2] text-white hover:bg-[#FF85A2]/90":
               variant === "default",
             "bg-secondary text-secondary-foreground hover:bg-secondary/80":
               variant === "secondary",

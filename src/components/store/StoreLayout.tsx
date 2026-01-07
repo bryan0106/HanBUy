@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { invoiceService } from "@/services/api";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { AccountDropdown } from "./AccountDropdown";
 import { NotificationButton } from "./NotificationButton";
@@ -16,15 +17,15 @@ interface StoreLayoutProps {
 export function StoreLayout({ children }: StoreLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hasInvoices, setHasInvoices] = useState(false);
 
   const navItems = [
     { label: "Home", href: "/store" },
     { label: "Onhand Items", href: "/store/products/onhand" },
     { label: "Pre-Order", href: "/store/products/preorder" },
-    { label: "Price Comparison", href: "/store/products/kr-comparison" },
     { label: "How It Works", href: "/store/how-it-works" },
   ];
 
@@ -37,51 +38,37 @@ export function StoreLayout({ children }: StoreLayoutProps) {
     }
   };
 
+  // Check if user has invoices
+  useEffect(() => {
+    const checkInvoices = async () => {
+      if (isAuthenticated && user?.id) {
+        try {
+          const invoices = await invoiceService.getUserInvoices(user.id);
+          setHasInvoices(invoices.length > 0);
+        } catch (error) {
+          console.error("Error checking invoices:", error);
+          setHasInvoices(false);
+        }
+      } else {
+        setHasInvoices(false);
+      }
+    };
+
+    checkInvoices();
+  }, [isAuthenticated, user?.id]);
+
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="container mx-auto flex h-16 items-center gap-3 px-4">
-          {/* Logo */}
-          <Link href="/store" className="text-xl font-bold text-primary sm:text-2xl shrink-0">
+      {/* Navigation Bar - Flat Design */}
+      <header className="sticky top-0 z-40 border-b border-[#FCE4EC] bg-white">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          {/* Logo - Left */}
+          <Link href="/store" className="text-xl font-bold text-[#2C2C2C] sm:text-2xl shrink-0">
             HanBuy
           </Link>
 
-          {/* Search Input */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-md">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products..."
-                className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-grey-500 transition-colors focus:border-soft-blue-600 focus:outline-none"
-                suppressHydrationWarning
-              />
-              <button
-                type="submit"
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-500 hover:text-soft-blue-600"
-                aria-label="Search"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </form>
-
-          {/* Navigation Links - Desktop */}
-          <nav className="hidden lg:flex items-center gap-6">
+          {/* Navigation Links - Centered */}
+          <nav className="hidden lg:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
               return (
@@ -91,8 +78,8 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                   className={cn(
                     "text-sm font-semibold transition-colors",
                     isActive
-                      ? "text-soft-blue-600"
-                      : "text-grey-700 hover:text-soft-blue-600"
+                      ? "text-[#FF85A2]"
+                      : "text-[#2C2C2C] hover:text-[#FF85A2]"
                   )}
                 >
                   {item.label}
@@ -101,20 +88,44 @@ export function StoreLayout({ children }: StoreLayoutProps) {
             })}
           </nav>
 
-          {/* Account/Login Button */}
-          {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              <NotificationButton />
-              <AccountDropdown />
-            </div>
-          ) : (
+          {/* Right Side - Cart Icon and Account */}
+          <div className="flex items-center gap-3">
+            {/* Cart Icon */}
             <Link
-              href="/auth/login"
-              className="shrink-0 rounded-lg bg-soft-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-soft-blue-700"
+              href="/store/checkout"
+              className="flex items-center justify-center p-2 text-[#2C2C2C] hover:text-[#FF85A2] transition-colors"
+              aria-label="Shopping Cart"
             >
-              Login
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
             </Link>
-          )}
+
+            {/* Account/Login Button */}
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <NotificationButton />
+                <AccountDropdown />
+              </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="shrink-0 rounded-[4px] bg-[#FF85A2] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#FF85A2]/90"
+              >
+                Login
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Mobile Menu */}
@@ -130,10 +141,10 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                         href={item.href}
                         onClick={() => setMobileMenuOpen(false)}
                         className={cn(
-                          "block rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                          "block rounded-[4px] px-4 py-2 text-sm font-medium transition-colors",
                           isActive
-                            ? "bg-soft-blue-50 text-soft-blue-600"
-                            : "text-grey-700 hover:bg-grey-50 hover:text-grey-900"
+                            ? "bg-[#FFF5F7] text-[#FF85A2]"
+                            : "text-[#2C2C2C] hover:bg-[#FFF5F7] hover:text-[#FF85A2]"
                         )}
                       >
                         {item.label}
@@ -154,7 +165,7 @@ export function StoreLayout({ children }: StoreLayoutProps) {
       <MobileBottomNav />
 
       {/* Footer */}
-      <footer className="border-t border-border bg-white pb-16 md:pb-8">
+      <footer className="border-t border-[#FCE4EC] bg-white pb-16 md:pb-8">
         <div className="container mx-auto px-4 py-6 sm:py-8">
           {/* Mobile: 2-column grid, Desktop: 4-column */}
           <div className="grid grid-cols-2 gap-6 sm:gap-8 md:grid-cols-4">
@@ -173,22 +184,22 @@ export function StoreLayout({ children }: StoreLayoutProps) {
               <h4 className="mb-3 text-sm font-semibold text-grey-900 sm:mb-4">Shop</h4>
               <ul className="space-y-2 text-xs text-grey-700 sm:text-sm">
                 <li>
-                  <Link href="/store/products" className="block font-medium transition-colors hover:text-soft-blue-600">
+                  <Link href="/store/products" className="block font-medium transition-colors hover:text-[#FF85A2]">
                     All Products
                   </Link>
                 </li>
                 <li>
-                  <Link href="/store/products/onhand" className="block font-medium transition-colors hover:text-soft-blue-600">
+                  <Link href="/store/products/onhand" className="block font-medium transition-colors hover:text-[#FF85A2]">
                     Onhand Items
                   </Link>
                 </li>
                 <li>
-                  <Link href="/store/products/preorder" className="block font-medium transition-colors hover:text-soft-blue-600">
+                  <Link href="/store/products/preorder" className="block font-medium transition-colors hover:text-[#FF85A2]">
                     Pre-Order
                   </Link>
                 </li>
                 <li>
-                  <Link href="/store/how-it-works" className="block font-medium transition-colors hover:text-soft-blue-600">
+                  <Link href="/store/how-it-works" className="block font-medium transition-colors hover:text-[#FF85A2]">
                     How It Works
                   </Link>
                 </li>
@@ -202,32 +213,34 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                 {isAuthenticated ? (
                   <>
                     <li>
-                      <Link href="/store/orders" className="block font-medium transition-colors hover:text-soft-blue-600">
+                      <Link href="/store/orders" className="block font-medium transition-colors hover:text-[#FF85A2]">
                         My Orders
                       </Link>
                     </li>
                     <li>
-                      <Link href="/dashboard/box" className="block font-medium transition-colors hover:text-soft-blue-600">
+                      <Link href="/dashboard/box" className="block font-medium transition-colors hover:text-[#FF85A2]">
                         My Box
                       </Link>
                     </li>
                     <li>
-                      <Link href="/store/account" className="block font-medium transition-colors hover:text-soft-blue-600">
+                      <Link href="/store/account" className="block font-medium transition-colors hover:text-[#FF85A2]">
                         Account
                       </Link>
                     </li>
-                    <li>
-                      <Link
-                        href="/dashboard/invoices"
-                        className="block font-medium transition-colors hover:text-soft-blue-600"
-                      >
-                        Invoices
-                      </Link>
-                    </li>
+                    {hasInvoices && (
+                      <li>
+                        <Link
+                          href="/store/invoices"
+                          className="block font-medium transition-colors hover:text-[#FF85A2]"
+                        >
+                          Invoices
+                        </Link>
+                      </li>
+                    )}
                   </>
                 ) : (
                   <li>
-                    <Link href="/auth/login" className="block font-medium transition-colors hover:text-soft-blue-600">
+                    <Link href="/auth/login" className="block font-medium transition-colors hover:text-[#FF85A2]">
                       Login / Sign Up
                     </Link>
                   </li>
@@ -240,12 +253,12 @@ export function StoreLayout({ children }: StoreLayoutProps) {
               <h4 className="mb-4 text-sm font-semibold text-grey-900">Support</h4>
               <ul className="space-y-2 text-sm text-grey-700">
                 <li>
-                  <Link href="/store/about" className="block font-medium transition-colors hover:text-soft-blue-600">
+                  <Link href="/store/about" className="block font-medium transition-colors hover:text-[#FF85A2]">
                     About Us
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="block font-medium transition-colors hover:text-soft-blue-600">
+                  <Link href="/store/contact" className="block font-medium transition-colors hover:text-[#FF85A2]">
                     Contact
                   </Link>
                 </li>
@@ -257,10 +270,10 @@ export function StoreLayout({ children }: StoreLayoutProps) {
           <div className="mt-6 border-t border-border pt-6 md:hidden">
             <h4 className="mb-3 text-sm font-semibold text-grey-900">Support</h4>
             <div className="grid grid-cols-2 gap-4">
-              <Link href="/store/about" className="text-xs font-medium text-grey-700 transition-colors hover:text-soft-blue-600 sm:text-sm">
+              <Link href="/store/about" className="text-xs font-medium text-grey-700 transition-colors hover:text-[#FF85A2] sm:text-sm">
                 About Us
               </Link>
-              <Link href="/contact" className="text-xs font-medium text-grey-700 transition-colors hover:text-soft-blue-600 sm:text-sm">
+              <Link href="/store/contact" className="text-xs font-medium text-grey-700 transition-colors hover:text-[#FF85A2] sm:text-sm">
                 Contact
               </Link>
             </div>

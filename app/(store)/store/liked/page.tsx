@@ -112,7 +112,7 @@ export default function LikedItemsPage() {
             return (
               <div
                 key={product.id}
-                className="group relative rounded-lg border border-border bg-card transition-shadow hover:shadow-lg"
+                className="group relative rounded-[4px] border border-[#FCE4EC] bg-white transition-shadow"
               >
                 <Link href={`/store/products/${product.id}`}>
                   <div className="relative aspect-square w-full overflow-hidden rounded-t-lg bg-grey-100">
@@ -136,13 +136,16 @@ export default function LikedItemsPage() {
                     <LikeButton productId={product.id} size="sm" />
                   </div>
                   <div className="p-4">
-                    <h3 className="mb-2 line-clamp-2 text-sm font-semibold sm:text-base">
+                    {product.brand && (
+                      <p className="mb-1 text-xs font-medium text-[#6b7280]">{product.brand}</p>
+                    )}
+                    <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-[#2C2C2C] sm:text-base">
                       {product.name}
                     </h3>
-                    <p className="text-lg font-bold text-soft-blue-600">
+                    <p className="text-lg font-bold text-[#FF85A2]">
                       ₱{priceInPHP.toFixed(2)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-[#6b7280]">
                       {formatCurrency(product.price, product.currency)}
                     </p>
                   </div>

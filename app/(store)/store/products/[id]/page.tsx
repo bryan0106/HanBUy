@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { productService, boxTypeService, cartService, type BoxType } from "@/services/api";
+import { productService, boxTypeService, cartService, orderService, type BoxType } from "@/services/api";
 import { formatCurrency } from "@/lib/currency";
 import type { Product, ProductVariation, ProductReview } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { getProductReviews, getAverageRating } from "@/lib/mockData";
+import { PriceComparison } from "@/components/store/PriceComparison";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -42,6 +43,12 @@ export default function ProductDetailPage() {
   const [reviewTitle, setReviewTitle] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  // Price comparison modal state
+  const [showPriceComparison, setShowPriceComparison] = useState(false);
+  // Purchase verification state
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [hasAlreadyReviewed, setHasAlreadyReviewed] = useState(false);
+  const [checkingPurchase, setCheckingPurchase] = useState(true);
 
   // Box size pricing (PHP) - Define before use in useEffect
   const boxSizePricing = {
@@ -69,6 +76,15 @@ export default function ProductDetailPage() {
     loadProduct();
     loadBoxTypes();
   }, [productId]);
+
+  useEffect(() => {
+    if (isAuthenticated && user && product) {
+      checkUserPurchase();
+    } else {
+      setCheckingPurchase(false);
+      setHasPurchased(false);
+    }
+  }, [isAuthenticated, user, product]);
 
   const loadProduct = async () => {
     setLoading(true);
@@ -120,6 +136,50 @@ export default function ProductDetailPage() {
       ]);
     } finally {
       setBoxTypesLoading(false);
+    }
+  };
+
+  const checkUserPurchase = async () => {
+    if (!isAuthenticated || !user || !product) {
+      setCheckingPurchase(false);
+      setHasPurchased(false);
+      return;
+    }
+
+    setCheckingPurchase(true);
+    try {
+      // Get user's orders (only paid or partially paid orders)
+      const orders = await orderService.getOrders({
+        user_id: user.id,
+        payment_status: 'paid'
+      });
+      
+      // Also check partial payments
+      const partialOrders = await orderService.getOrders({
+        user_id: user.id,
+        payment_status: 'partial'
+      });
+      
+      const allOrders = [...orders, ...partialOrders];
+      
+      // Check if user has purchased this product
+      const hasPurchasedProduct = allOrders.some(order => {
+        // Check if any order item matches this product
+        return order.order_items?.some(item => item.product_id === product.id);
+      });
+
+      setHasPurchased(hasPurchasedProduct);
+
+      // Check if user has already reviewed this product
+      if (hasPurchasedProduct) {
+        const userReview = reviews.find(r => r.userId === user.id);
+        setHasAlreadyReviewed(!!userReview);
+      }
+    } catch (error) {
+      console.error("Error checking user purchase:", error);
+      setHasPurchased(false);
+    } finally {
+      setCheckingPurchase(false);
     }
   };
 
@@ -387,7 +447,17 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <>
+      {/* Price Comparison Modal */}
+      {product && (
+        <PriceComparison
+          product={product}
+          isOpen={showPriceComparison}
+          onClose={() => setShowPriceComparison(false)}
+        />
+      )}
+
+      <div className="container mx-auto px-4 py-8">
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Product Images */}
         <div>
@@ -482,9 +552,20 @@ export default function ProductDetailPage() {
             {product.name}
           </h1>
           <div className="mb-6">
-            <p className="text-3xl font-bold text-soft-blue-600">
-              {formatCurrency(priceInPHP, "PHP")}
-            </p>
+            <div className="flex items-center gap-3 mb-2">
+              <p className="text-3xl font-bold text-soft-blue-600">
+                {formatCurrency(priceInPHP, "PHP")}
+              </p>
+              <button
+                onClick={() => setShowPriceComparison(true)}
+                className="rounded-[4px] border border-[#FCE4EC] bg-white px-4 py-2 text-sm font-semibold text-[#FF85A2] transition-colors hover:bg-[#FFF5F7] flex items-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Compare Prices
+              </button>
+            </div>
             <p className="text-sm font-medium text-grey-600">
               {formatCurrency(currentPrice, "KRW")}
               {currentPrice !== product.price && (
@@ -940,22 +1021,25 @@ export default function ProductDetailPage() {
               onClick={() => setActiveReviewTab("reviews")}
               className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
                 activeReviewTab === "reviews"
-                  ? "border-soft-blue-600 text-soft-blue-600"
-                  : "border-transparent text-grey-600 hover:text-grey-900"
+                  ? "border-[#FF85A2] text-[#FF85A2]"
+                  : "border-transparent text-[#6b7280] hover:text-[#2C2C2C]"
               }`}
             >
               Reviews ({reviews.length})
             </button>
-            <button
-              onClick={() => setActiveReviewTab("write")}
-              className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
-                activeReviewTab === "write"
-                  ? "border-soft-blue-600 text-soft-blue-600"
-                  : "border-transparent text-grey-600 hover:text-grey-900"
-              }`}
-            >
-              Write a Review
-            </button>
+            {/* Only show Write a Review tab if user has purchased the product */}
+            {hasPurchased && !hasAlreadyReviewed && (
+              <button
+                onClick={() => setActiveReviewTab("write")}
+                className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 ${
+                  activeReviewTab === "write"
+                    ? "border-[#FF85A2] text-[#FF85A2]"
+                    : "border-transparent text-[#6b7280] hover:text-[#2C2C2C]"
+                }`}
+              >
+                Write a Review
+              </button>
+            )}
           </div>
         </div>
 
@@ -967,14 +1051,19 @@ export default function ProductDetailPage() {
                 <p className="text-grey-600">Loading reviews...</p>
               </div>
             ) : reviews.length === 0 ? (
-              <div className="rounded-lg border border-border bg-grey-50 p-8 text-center">
-                <p className="mb-4 text-grey-600">No reviews yet. Be the first to review this product!</p>
-                <button
-                  onClick={() => setActiveReviewTab("write")}
-                  className="rounded-lg bg-soft-blue-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700"
-                >
-                  Write First Review
-                </button>
+              <div className="rounded-[4px] border border-[#FCE4EC] bg-[#FFF5F7] p-8 text-center">
+                <p className="mb-4 text-[#6b7280]">No reviews yet.</p>
+                {isAuthenticated && hasPurchased && !hasAlreadyReviewed && (
+                  <button
+                    onClick={() => setActiveReviewTab("write")}
+                    className="rounded-[4px] bg-[#FF85A2] px-6 py-2 font-semibold text-white transition-colors hover:bg-[#FF85A2]/90"
+                  >
+                    Write First Review
+                  </button>
+                )}
+                {isAuthenticated && !hasPurchased && (
+                  <p className="text-sm text-[#6b7280]">Purchase this product to write the first review!</p>
+                )}
               </div>
             ) : (
               <div className="space-y-6">
@@ -1049,16 +1138,51 @@ export default function ProductDetailPage() {
 
         {/* Write Review Tab Content */}
         {activeReviewTab === "write" && (
-          <div className="rounded-lg border border-border bg-white p-6 shadow-sm">
+          <div className="rounded-[4px] border border-[#FCE4EC] bg-white p-6">
             {!isAuthenticated ? (
               <div className="text-center py-8">
-                <p className="mb-4 text-grey-600">Please log in to write a review.</p>
+                <p className="mb-4 text-[#6b7280]">Please log in to write a review.</p>
                 <Link
                   href={`/auth/login?redirect=/store/products/${productId}`}
-                  className="inline-block rounded-lg bg-soft-blue-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                  className="inline-block rounded-[4px] bg-[#FF85A2] px-6 py-2 font-semibold text-white transition-colors hover:bg-[#FF85A2]/90"
                 >
                   Login to Review
                 </Link>
+              </div>
+            ) : checkingPurchase ? (
+              <div className="text-center py-8">
+                <p className="text-[#6b7280]">Checking purchase status...</p>
+              </div>
+            ) : hasAlreadyReviewed ? (
+              <div className="text-center py-8">
+                <p className="mb-4 text-[#6b7280]">You have already reviewed this product.</p>
+                <button
+                  onClick={() => setActiveReviewTab("reviews")}
+                  className="inline-block rounded-[4px] bg-[#FF85A2] px-6 py-2 font-semibold text-white transition-colors hover:bg-[#FF85A2]/90"
+                >
+                  View Your Review
+                </button>
+              </div>
+            ) : !hasPurchased ? (
+              <div className="text-center py-8">
+                <p className="mb-2 text-lg font-semibold text-[#2C2C2C]">Purchase Required</p>
+                <p className="mb-4 text-[#6b7280]">
+                  You need to purchase this product before you can write a review.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={handleAddToCart}
+                    className="rounded-[4px] border border-[#FCE4EC] bg-white px-6 py-2 font-semibold text-[#FF85A2] transition-colors hover:bg-[#FFF5F7]"
+                  >
+                    Add to Cart
+                  </button>
+                  <button
+                    onClick={handleBuyNow}
+                    className="rounded-[4px] bg-[#FF85A2] px-6 py-2 font-semibold text-white transition-colors hover:bg-[#FF85A2]/90"
+                  >
+                    Buy Now
+                  </button>
+                </div>
               </div>
             ) : (
               <form
@@ -1074,6 +1198,9 @@ export default function ProductDetailPage() {
                   // For now, we'll just show a success message
                   alert("Thank you for your review! (This is a demo - review not saved)");
                   
+                  // Mark that user has reviewed
+                  setHasAlreadyReviewed(true);
+                  
                   // Reset form
                   setReviewRating(5);
                   setReviewTitle("");
@@ -1084,7 +1211,7 @@ export default function ProductDetailPage() {
                 className="space-y-6"
               >
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-grey-900">
+                  <label className="mb-2 block text-sm font-semibold text-[#2C2C2C]">
                     Rating *
                   </label>
                   <div className="flex items-center gap-2">
@@ -1108,7 +1235,7 @@ export default function ProductDetailPage() {
                         </svg>
                       </button>
                     ))}
-                    <span className="ml-2 text-sm text-grey-600">
+                    <span className="ml-2 text-sm text-[#6b7280]">
                       {reviewRating === 5
                         ? "Excellent"
                         : reviewRating === 4
@@ -1123,7 +1250,7 @@ export default function ProductDetailPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="review-title" className="mb-2 block text-sm font-semibold text-grey-900">
+                  <label htmlFor="review-title" className="mb-2 block text-sm font-semibold text-[#2C2C2C]">
                     Review Title (Optional)
                   </label>
                   <input
@@ -1132,12 +1259,12 @@ export default function ProductDetailPage() {
                     value={reviewTitle}
                     onChange={(e) => setReviewTitle(e.target.value)}
                     placeholder="Summarize your review"
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-grey-500 focus:border-soft-blue-600 focus:outline-none"
+                    className="w-full rounded-[4px] border border-[#FCE4EC] bg-white px-4 py-2 text-sm text-[#2C2C2C] placeholder:text-[#6b7280] focus:border-[#FF85A2] focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="review-comment" className="mb-2 block text-sm font-semibold text-grey-900">
+                  <label htmlFor="review-comment" className="mb-2 block text-sm font-semibold text-[#2C2C2C]">
                     Your Review *
                   </label>
                   <textarea
@@ -1147,34 +1274,32 @@ export default function ProductDetailPage() {
                     placeholder="Share your experience with this product..."
                     rows={6}
                     required
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-grey-500 focus:border-soft-blue-600 focus:outline-none resize-none"
+                    className="w-full rounded-[4px] border border-[#FCE4EC] bg-white px-4 py-2 text-sm text-[#2C2C2C] placeholder:text-[#6b7280] focus:border-[#FF85A2] focus:outline-none resize-none"
                   />
-                  <p className="mt-1 text-xs text-grey-500">
+                  <p className="mt-1 text-xs text-[#6b7280]">
                     Minimum 10 characters required
                   </p>
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <Button
+                  <button
                     type="submit"
                     disabled={submittingReview || reviewComment.length < 10}
-                    className="flex-1"
-                    size="lg"
+                    className="flex-1 rounded-[4px] bg-[#FF85A2] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#FF85A2]/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {submittingReview ? "Submitting..." : "Submit Review"}
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="button"
-                    variant="outline"
                     onClick={() => {
                       setReviewRating(5);
                       setReviewTitle("");
                       setReviewComment("");
                     }}
-                    size="lg"
+                    className="rounded-[4px] border border-[#FCE4EC] bg-white px-6 py-3 font-semibold text-[#2C2C2C] transition-colors hover:bg-[#FFF5F7]"
                   >
                     Clear
-                  </Button>
+                  </button>
                 </div>
               </form>
             )}
@@ -1363,6 +1488,7 @@ export default function ProductDetailPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
