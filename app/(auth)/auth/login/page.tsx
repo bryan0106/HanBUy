@@ -25,16 +25,23 @@ function LoginForm() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      console.log("Auth state updated - isAuthenticated:", isAuthenticated, "user:", user, "isAdmin:", isAdmin);
       setLoading(false); // Reset loading when authenticated
-      // If user is admin, redirect to admin dashboard
-      if (isAdmin) {
-        router.push("/admin");
-      } else {
-        // Redirect customers to redirectParam if provided, otherwise to store page
-        const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
-          ? redirectParam 
-          : "/store";
-        router.replace(redirectTo);
+      
+      // Only redirect if we're still on the login page (prevent redirect loops)
+      if (window.location.pathname === '/auth/login') {
+        // If user is admin, redirect to admin dashboard
+        if (isAdmin) {
+          console.log("Redirecting admin to dashboard");
+          router.push("/admin");
+        } else {
+          // Redirect customers to redirectParam if provided, otherwise to store page
+          const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
+            ? redirectParam 
+            : "/store";
+          console.log("Redirecting customer to:", redirectTo);
+          router.replace(redirectTo);
+        }
       }
     }
   }, [isAuthenticated, user, isAdmin, router, redirectParam]);
@@ -48,10 +55,38 @@ function LoginForm() {
       console.log("Attempting login with:", { email, passwordLength: password.length });
       const result = await login(email, password);
       console.log("Login successful:", result);
-      // useEffect will handle redirect when user state updates
+      
+      // Immediately redirect after successful login using the result
+      setLoading(false);
+      
+      // Check user role from the login result
+      const userRole = result?.role;
+      const isUserAdmin = userRole === 'admin';
+      
+      console.log("Login result:", { userRole, isUserAdmin, result });
+      
+      // Redirect immediately based on user role
+      if (isUserAdmin) {
+        console.log("Redirecting to admin dashboard");
+        router.push("/admin");
+      } else {
+        const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
+          ? redirectParam 
+          : "/store";
+        console.log("Redirecting customer to:", redirectTo);
+        router.replace(redirectTo);
+      }
     } catch (err) {
-      console.error("Login error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Invalid email or password";
+      console.error("Login error:", {
+        error: err,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : typeof err === 'string' 
+        ? err 
+        : "Invalid email or password. Please check your credentials and try again.";
       setError(errorMessage);
       setLoading(false);
     }

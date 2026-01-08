@@ -67,6 +67,11 @@ export const authService = {
       // Store token if provided
       if (data.token && typeof window !== 'undefined') {
         localStorage.setItem('hanbuy_token', data.token);
+        // Store login timestamp to prevent immediate /auth/me redirects
+        sessionStorage.setItem('last_login_time', Date.now().toString());
+        console.log('✅ Token stored successfully');
+      } else {
+        console.warn('⚠️ No token in login response');
       }
 
       return data;
