@@ -108,35 +108,7 @@ export interface ProductVariation {
   imageUrl?: string; // Optional image for this specific variation
 }
 
-// Re-export new Product types from product.ts for backward compatibility
-export type { 
-  Product, 
-  ProductDetail,
-  ProductImage,
-  ProductCategory,
-  ProductBrand,
-  ProductStock,
-  ProductStore,
-  PreorderInfo,
-  ProductDimensions,
-  ProductVariation as ProductVariationNew
-} from './product';
-
-// Keep old ProductVariation for backward compatibility (deprecated)
-export interface ProductVariation {
-  id: string;
-  name: string; // e.g., "Size: Large", "Color: Red"
-  type: "size" | "color" | "other";
-  value: string; // e.g., "Large", "Red"
-  priceModifier?: number; // Additional price for this variation (can be negative)
-  stock: number;
-  sku?: string;
-  imageUrl?: string; // Optional image for this specific variation
-}
-
-// Legacy Product interface (deprecated - use Product from './product' instead)
-/** @deprecated Use Product from '@/types/product' instead */
-export interface ProductLegacy {
+export interface Product {
   id: string;
   name: string;
   description: string;
