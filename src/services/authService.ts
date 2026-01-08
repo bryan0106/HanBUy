@@ -37,7 +37,11 @@ export interface User {
 export interface LoginResponseRaw {
   success?: boolean;
   user?: User;
-  token: string;
+  data?: {
+    user?: User;
+    token?: string;
+  };
+  token?: string;
   message?: string;
   // Backend may return user fields at root level
   id?: string;
@@ -84,26 +88,38 @@ export const authService = {
    */
   async login(email: string, password: string): Promise<LoginResponse> {
     try {
+      console.log('📤 Sending login request...');
       const response = await apiClient.post<any>('/auth/login', {
         email,
         password,
       });
 
+      // Simple logging
+      console.log('✅ Login successful');
+
       const data: LoginResponseRaw = response.data;
 
-      // Handle different response formats
-      // Format 1: { success: true, user: {...}, token: "..." }
-      // Format 2: { id: "...", email: "...", name: "...", token: "..." } (user fields at root)
-      
+      // Simplified: Handle { success: true, data: { user: {...}, token: "..." } }
       let user: User;
       let token: string;
 
-      if (data.user && data.token) {
-        // Standard format with user object
+      // Primary format: { success: true, data: { user: {...}, token: "..." } }
+      if (data.data?.user && data.data?.token) {
+        user = data.data.user;
+        token = data.data.token;
+      }
+      // Fallback: token at root { success: true, data: { user: {...} }, token: "..." }
+      else if (data.data?.user && data.token) {
+        user = data.data.user;
+        token = data.token;
+      }
+      // Fallback: { success: true, user: {...}, token: "..." }
+      else if (data.user && data.token) {
         user = data.user;
         token = data.token;
-      } else if (data.id && data.email && data.token) {
-        // Backend returns user fields at root level
+      }
+      // Fallback: user fields at root
+      else if (data.id && data.email && data.token) {
         user = {
           id: data.id,
           email: data.email,
@@ -123,8 +139,14 @@ export const authService = {
           updated_at: data.updated_at,
         };
         token = data.token;
-      } else {
-        throw new Error('Invalid response format from login API');
+      }
+      else {
+        throw new Error('Invalid login response format');
+      }
+
+      // Simple check - if we have token and user, we're good
+      if (!token || !user) {
+        throw new Error('Login response missing token or user data');
       }
 
       // Create normalized response (always has user)
@@ -135,19 +157,23 @@ export const authService = {
         message: data.message,
       };
 
-      // Store token if provided
-      if (token && typeof window !== 'undefined') {
-        localStorage.setItem('hanbuy_token', token);
-        // Store login timestamp to prevent immediate /auth/me redirects
-        sessionStorage.setItem('last_login_time', Date.now().toString());
-        console.log('✅ Token stored successfully');
-      } else {
-        console.warn('⚠️ No token in login response');
+      // Store token and user immediately - simple and straightforward
+      if (typeof window !== 'undefined' && token && user) {
+        localStorage.setItem('hanbuy_token', token.trim());
+        localStorage.setItem('hanbuy_user', JSON.stringify(user));
+        console.log('✅ Token stored - user logged in');
       }
 
       return normalizedResponse;
     } catch (error) {
-      throw handleApiError(error);
+      console.error('❌ Login service error:', error);
+      const apiError = handleApiError(error);
+      console.error('❌ Processed error:', {
+        message: apiError.message,
+        status: apiError.status,
+        code: apiError.code
+      });
+      throw apiError;
     }
   },
 

@@ -23,25 +23,16 @@ function LoginForm() {
     }
   }, [errorParam]);
 
+  // Simple redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      console.log("Auth state updated - isAuthenticated:", isAuthenticated, "user:", user, "isAdmin:", isAdmin);
-      setLoading(false); // Reset loading when authenticated
-      
-      // Only redirect if we're still on the login page (prevent redirect loops)
-      if (window.location.pathname === '/auth/login') {
-        // If user is admin, redirect to admin dashboard
-        if (isAdmin) {
-          console.log("Redirecting admin to dashboard");
-          router.push("/admin");
-        } else {
-          // Redirect customers to redirectParam if provided, otherwise to store page
-          const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
-            ? redirectParam 
-            : "/store";
-          console.log("Redirecting customer to:", redirectTo);
-          router.replace(redirectTo);
-        }
+      if (isAdmin) {
+        router.push("/admin");
+      } else {
+        const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
+          ? redirectParam 
+          : "/store";
+        router.replace(redirectTo);
       }
     }
   }, [isAuthenticated, user, isAdmin, router, redirectParam]);
@@ -52,36 +43,24 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      console.log("Attempting login with:", { email, passwordLength: password.length });
       const result = await login(email, password);
-      console.log("Login successful:", result);
       
-      // Immediately redirect after successful login using the result
+      if (!result) {
+        throw new Error("Login succeeded but no user data returned");
+      }
+      
       setLoading(false);
       
-      // Check user role from the login result
-      const userRole = result?.role;
-      const isUserAdmin = userRole === 'admin';
-      
-      console.log("Login result:", { userRole, isUserAdmin, result });
-      
-      // Redirect immediately based on user role
-      if (isUserAdmin) {
-        console.log("Redirecting to admin dashboard");
+      // Simple redirect based on role
+      if (result.role === 'admin') {
         router.push("/admin");
       } else {
         const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
           ? redirectParam 
           : "/store";
-        console.log("Redirecting customer to:", redirectTo);
         router.replace(redirectTo);
       }
     } catch (err) {
-      console.error("Login error:", {
-        error: err,
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined
-      });
       const errorMessage = err instanceof Error 
         ? err.message 
         : typeof err === 'string' 
