@@ -120,4 +120,11 @@ export const authService = {
       throw handleApiError(error);
     }
   },
+
+  /**
+   * Get current user (alias for getCurrentUser)
+   */
+  async getMe(): Promise<User> {
+    return this.getCurrentUser();
+  },
 };

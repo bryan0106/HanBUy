@@ -111,4 +111,18 @@ export const cartService = {
       throw handleApiError(error);
     }
   },
+
+  /**
+   * Get cart (alias for getCartItems)
+   */
+  async getCart(userId: string): Promise<CartItem[]> {
+    return this.getCartItems(userId);
+  },
+
+  /**
+   * Remove from cart (alias for removeCartItem)
+   */
+  async removeFromCart(cartItemId: string): Promise<void> {
+    return this.removeCartItem(cartItemId);
+  },
 };

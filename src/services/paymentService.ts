@@ -110,4 +110,11 @@ export const paymentService = {
       throw handleApiError(error);
     }
   },
+
+  /**
+   * Get payment by ID (alias for getPaymentStatus)
+   */
+  async getPayment(paymentId: string): Promise<PaymentStatus> {
+    return this.getPaymentStatus(paymentId);
+  },
 };

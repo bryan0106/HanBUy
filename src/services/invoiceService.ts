@@ -124,6 +124,13 @@ export const invoiceService = {
   },
 
   /**
+   * Get invoice PDF (alias for downloadInvoicePDF)
+   */
+  async getInvoicePDF(id: string): Promise<Blob> {
+    return this.downloadInvoicePDF(id);
+  },
+
+  /**
    * Create invoice (Admin only)
    */
   async createInvoice(data: CreateInvoiceRequest): Promise<Invoice> {
