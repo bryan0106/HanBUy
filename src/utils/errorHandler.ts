@@ -1,4 +1,4 @@
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 
 export interface ApiError {
   message: string;
@@ -11,8 +11,8 @@ export interface ApiError {
  * Parse API errors and return user-friendly error messages
  */
 export function handleApiError(error: unknown): ApiError {
-  // Axios errors
-  if (error instanceof AxiosError) {
+  // Axios errors - use isAxiosError helper instead of instanceof
+  if (axios.isAxiosError(error)) {
     const status = error.response?.status;
     const data = error.response?.data as any;
 
@@ -111,7 +111,7 @@ export function getErrorMessage(error: unknown): string {
  * Check if error is a network error
  */
 export function isNetworkError(error: unknown): boolean {
-  if (error instanceof AxiosError) {
+  if (axios.isAxiosError(error)) {
     return !error.response || error.code === 'ERR_NETWORK';
   }
   return false;
@@ -121,7 +121,7 @@ export function isNetworkError(error: unknown): boolean {
  * Check if error is a timeout error
  */
 export function isTimeoutError(error: unknown): boolean {
-  if (error instanceof AxiosError) {
+  if (axios.isAxiosError(error)) {
     return error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
   }
   return false;
@@ -131,7 +131,7 @@ export function isTimeoutError(error: unknown): boolean {
  * Check if error is an authentication error
  */
 export function isAuthError(error: unknown): boolean {
-  if (error instanceof AxiosError) {
+  if (axios.isAxiosError(error)) {
     return error.response?.status === 401 || error.response?.status === 403;
   }
   return false;

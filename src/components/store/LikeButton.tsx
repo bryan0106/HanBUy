@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { likedService } from "@/services/likedService";
 
 interface LikeButtonProps {
   productId: string;
@@ -14,11 +15,11 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
   const [isLiked, setIsLiked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load liked status from localStorage on mount and when storage changes
+  // Load liked status from localStorage only (no API call - avoids excessive requests)
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       const updateLikedStatus = () => {
-        const likedItems = getLikedItems();
+        const likedItems = getLikedItemsFromStorage();
         setIsLiked(likedItems.some((item) => item.productId === productId));
       };
       
@@ -34,25 +35,19 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
         window.removeEventListener("storage", updateLikedStatus);
         window.removeEventListener("likedItemsUpdated", updateLikedStatus);
       };
+    } else {
+      setIsLiked(false);
     }
   }, [productId, isAuthenticated, user?.id]);
 
-  const getLikedItems = (): Array<{ productId: string; likedAt: string }> => {
+  // Get liked items from localStorage (no API call)
+  const getLikedItemsFromStorage = (): Array<{ productId: string; likedAt: string }> => {
     if (typeof window === "undefined") return [];
     try {
       const stored = localStorage.getItem(`hanbuy_liked_${user?.id || "guest"}`);
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
-    }
-  };
-
-  const saveLikedItems = (items: Array<{ productId: string; likedAt: string }>): void => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(`hanbuy_liked_${user?.id || "guest"}`, JSON.stringify(items));
-    } catch (error) {
-      console.error("Error saving liked items:", error);
     }
   };
 
@@ -67,32 +62,40 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
 
     setIsLoading(true);
     try {
-      const likedItems = getLikedItems();
-      
       if (isLiked) {
-        // Remove from liked items
-        const updated = likedItems.filter((item) => item.productId !== productId);
-        saveLikedItems(updated);
+        // Remove from liked items via API
+        await likedService.removeFromLiked(productId);
         setIsLiked(false);
         
-        // TODO: Call API to remove from liked items
+        // Also remove from localStorage as backup
+        const likedItems = getLikedItemsFromStorage();
+        const updated = likedItems.filter((item) => item.productId !== productId);
+        if (typeof window !== "undefined" && user?.id) {
+          localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
+        }
       } else {
-        // Add to liked items
+        // Add to liked items via API
+        await likedService.addToLiked(productId);
+        setIsLiked(true);
+        
+        // Also save to localStorage as backup
+        const likedItems = getLikedItemsFromStorage();
         const newItem = {
           productId,
           likedAt: new Date().toISOString(),
         };
         const updated = [...likedItems, newItem];
-        saveLikedItems(updated);
-        setIsLiked(true);
-        
-        // TODO: Call API to add to liked items
+        if (typeof window !== "undefined" && user?.id) {
+          localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
+        }
       }
       
       // Dispatch custom event to update other LikeButton components in the same tab
       window.dispatchEvent(new Event("likedItemsUpdated"));
     } catch (error) {
       console.error("Error toggling like:", error);
+      // Revert UI state on error
+      setIsLiked(!isLiked);
     } finally {
       setIsLoading(false);
     }

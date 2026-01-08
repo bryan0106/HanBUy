@@ -1,5 +1,4 @@
 import apiClient from '@/lib/apiClient';
-import { handleApiError } from '@/utils/errorHandler';
 
 export interface Notification {
   id: string;
@@ -79,7 +78,8 @@ export const notificationService = {
       const response = await apiClient.get<GetNotificationsResponse>('/notifications', { params });
       return response.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 
@@ -93,7 +93,8 @@ export const notificationService = {
       );
       return response.data.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 
@@ -107,7 +108,8 @@ export const notificationService = {
       );
       return response.data.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 
@@ -124,7 +126,8 @@ export const notificationService = {
       );
       return response.data.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 };

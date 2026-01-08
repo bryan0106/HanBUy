@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 
 // Get base URL from environment variable
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hanbuyapi.onrender.com/api';
@@ -14,10 +14,11 @@ const apiClient: AxiosInstance = axios.create({
 
 // Request interceptor - Add JWT token to all requests
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  (config) => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('hanbuy_token');
       if (token && token.trim()) {
+        config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token.trim()}`;
       }
     }

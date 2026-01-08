@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { notificationService } from "@/services/notificationService";
 
 interface Notification {
   id: string;
@@ -30,51 +31,48 @@ export default function StoreNotificationsPage() {
     if (!authLoading && isAuthenticated) {
       loadNotifications();
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, router, filter]);
 
-  // Helper function to extract order ID from message and generate link
-  const generateNotificationLink = (title: string, message: string): string => {
-    // Extract order number (ORD-YYYY-XXX format)
-    const orderMatch = message.match(/ORD-(\d{4}-\d{3})/);
-    if (orderMatch) {
-      const orderNumber = orderMatch[0];
-      // Map order numbers to order IDs (in real app, this would come from API)
-      const orderIdMap: Record<string, string> = {
-        "ORD-2024-001": "order-test-1",
-        "ORD-2024-002": "order-test-2",
-        "ORD-2024-003": "order-test-3",
-        "ORD-2024-004": "order-test-4",
-      };
-      const orderId = orderIdMap[orderNumber];
-      
-      if (orderId) {
-        // Payment-related notifications go to payment details
-        if (title.includes("Payment") || title.includes("payment")) {
-          return `/store/payments/${orderId}`;
+  // Helper function to generate link from notification metadata or message
+  const generateNotificationLink = (
+    type: string,
+    title: string,
+    message: string,
+    metadata?: Record<string, unknown>
+  ): string => {
+    // First, try to use metadata if available
+    if (metadata) {
+      if (metadata.order_id) {
+        if (type === "payment" || title.toLowerCase().includes("payment")) {
+          return `/store/payments/${metadata.order_id}`;
         }
-        // All other order notifications go to order details
-        return `/store/orders/${orderId}`;
+        return `/store/orders/${metadata.order_id}`;
+      }
+      if (metadata.invoice_id) {
+        return `/store/payments/${metadata.order_id || ""}`;
+      }
+      if (metadata.box_id) {
+        return "/store/box-tracking";
       }
     }
+
+    // Fallback to parsing message
+    const orderMatch = message.match(/ORD-(\d{4}-\d{3})/);
+    if (orderMatch) {
+      if (type === "payment" || title.toLowerCase().includes("payment")) {
+        return "/store/payments";
+      }
+      return "/store/orders";
+    }
     
-    // Extract box ID (BOX-YYYY-XXX format)
     const boxMatch = message.match(/BOX-(\d{4}-\d{3})/);
     if (boxMatch) {
       return "/store/box-tracking";
     }
     
-    // Extract invoice ID (INV-YYYY-XXX format)
     const invoiceMatch = message.match(/INV-(\d{4}-\d{3})/);
     if (invoiceMatch) {
-      // For invoices, try to find associated order
-      const invoiceNumber = invoiceMatch[0];
-      const invoiceOrderMap: Record<string, string> = {
-        "INV-2024-001": "order-test-1",
-      };
-      const orderId = invoiceOrderMap[invoiceNumber];
-      if (orderId) {
-        return `/store/payments/${orderId}`;
-      }
+      return "/store/payments";
     }
     
     // Default fallback
@@ -82,77 +80,56 @@ export default function StoreNotificationsPage() {
   };
 
   const loadNotifications = async () => {
-    setLoading(true);
-    // TODO: Fetch from API
-    const mockNotifications: Notification[] = [
-      {
-        id: "1",
-        title: "Order Confirmed",
-        message: "Your order ORD-2024-001 has been confirmed",
-        read: false,
-        createdAt: "2024-12-29T10:00:00Z",
-        link: "",
-      },
-      {
-        id: "2",
-        title: "Payment Received",
-        message: "Payment for invoice INV-2024-001 has been received",
-        read: false,
-        createdAt: "2024-12-29T09:30:00Z",
-        link: "",
-      },
-      {
-        id: "3",
-        title: "Order Shipped",
-        message: "Your order ORD-2024-002 is now in transit",
-        read: true,
-        createdAt: "2024-12-28T14:00:00Z",
-        link: "",
-      },
-      {
-        id: "4",
-        title: "Box Received at Manila",
-        message: "Your box BOX-2024-001 has been received at Manila office",
-        read: true,
-        createdAt: "2024-12-27T11:00:00Z",
-        link: "",
-      },
-      {
-        id: "5",
-        title: "Payment Reminder",
-        message: "Your order ORD-2024-003 payment is due in 2 days",
-        read: true,
-        createdAt: "2024-12-26T16:00:00Z",
-        link: "",
-      },
-      {
-        id: "6",
-        title: "Order Delivered",
-        message: "Your order ORD-2024-004 has been delivered successfully",
-        read: true,
-        createdAt: "2024-12-25T10:00:00Z",
-        link: "",
-      },
-    ];
-    
-    // Generate links for each notification
-    const notificationsWithLinks = mockNotifications.map(notif => ({
-      ...notif,
-      link: generateNotificationLink(notif.title, notif.message),
-    }));
-    
-    setNotifications(notificationsWithLinks);
-    setLoading(false);
+    try {
+      setLoading(true);
+      const params: { read?: boolean; limit?: number } = {};
+      
+      if (filter === "unread") {
+        params.read = false;
+      } else if (filter === "read") {
+        params.read = true;
+      }
+      
+      const response = await notificationService.getNotifications(params);
+      
+      // Map API response to component format
+      const mappedNotifications: Notification[] = response.data.map((notif) => ({
+        id: notif.id,
+        title: notif.title,
+        message: notif.message,
+        read: notif.read,
+        createdAt: notif.created_at,
+        link: generateNotificationLink(notif.type, notif.title, notif.message, notif.metadata),
+      }));
+      
+      setNotifications(mappedNotifications);
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationService.markNotificationRead(id);
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+      await Promise.all(unreadIds.map(id => notificationService.markNotificationRead(id)));
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+    }
   };
 
   const filteredNotifications = notifications.filter((notif) => {

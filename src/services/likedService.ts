@@ -1,5 +1,4 @@
 import apiClient from '@/lib/apiClient';
-import { handleApiError } from '@/utils/errorHandler';
 
 export interface LikedItem {
   id: string;
@@ -56,7 +55,8 @@ export const likedService = {
       const response = await apiClient.get<GetLikedItemsResponse>('/liked', { params });
       return response.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 
@@ -70,7 +70,8 @@ export const likedService = {
       });
       return response.data.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 
@@ -81,7 +82,8 @@ export const likedService = {
     try {
       await apiClient.delete<RemoveFromLikedResponse>(`/liked/${productId}`);
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 };

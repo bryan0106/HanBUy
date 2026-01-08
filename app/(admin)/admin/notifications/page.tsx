@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import apiClient from "@/lib/apiClient";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface Notification {
   id: string;
@@ -16,6 +18,23 @@ interface Notification {
   createdAt: Date;
 }
 
+interface AdminNotificationResponse {
+  success: boolean;
+  data: Array<{
+    id: string;
+    user_id: string;
+    recipient_name?: string;
+    recipient_email?: string;
+    type: string;
+    title: string;
+    message: string;
+    channels: string[];
+    status: "pending" | "sent" | "failed";
+    sent_at?: string;
+    created_at: string;
+  }>;
+}
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,47 +46,41 @@ export default function NotificationsPage() {
   }, [statusFilter, typeFilter]);
 
   const loadNotifications = async () => {
-    setLoading(true);
-    // TODO: Fetch from API
-    const mockData: Notification[] = [
-      {
-        id: "notif-1",
-        recipientName: "John Doe",
-        recipientEmail: "john@example.com",
-        type: "invoice_created",
-        title: "New Invoice Created",
-        message: "Invoice INV-2024-001 has been created. Amount: ₱3,285.00",
-        channels: ["email", "sms"],
-        status: "sent",
-        sentAt: new Date("2024-12-10T10:30:00"),
-        createdAt: new Date("2024-12-10T10:30:00"),
-      },
-      {
-        id: "notif-2",
-        recipientName: "Jane Smith",
-        recipientEmail: "jane@example.com",
-        type: "payment_reminder",
-        title: "Payment Reminder",
-        message: "Your invoice INV-2024-002 is due in 3 days.",
-        channels: ["email", "facebook_messenger"],
-        status: "pending",
-        createdAt: new Date("2024-12-29T09:00:00"),
-      },
-      {
-        id: "notif-3",
-        recipientName: "Mike Johnson",
-        recipientEmail: "mike@example.com",
-        type: "stock_alert",
-        title: "Low Stock Alert",
-        message: "Item COSRX-SNAIL-96 is running low (5 units remaining).",
-        channels: ["email", "sms"],
-        status: "sent",
-        sentAt: new Date("2024-12-28T14:00:00"),
-        createdAt: new Date("2024-12-28T14:00:00"),
-      },
-    ];
-    setNotifications(mockData);
-    setLoading(false);
+    try {
+      setLoading(true);
+      const params: { status?: string; type?: string } = {};
+      
+      if (statusFilter !== "all") {
+        params.status = statusFilter;
+      }
+      if (typeFilter !== "all") {
+        params.type = typeFilter;
+      }
+      
+      const response = await apiClient.get<AdminNotificationResponse>("/admin/notifications", { params });
+      
+      // Map API response to component format
+      const mappedNotifications: Notification[] = response.data.data.map((notif) => ({
+        id: notif.id,
+        recipientName: notif.recipient_name || "Unknown",
+        recipientEmail: notif.recipient_email || "",
+        type: notif.type,
+        title: notif.title,
+        message: notif.message,
+        channels: notif.channels || [],
+        status: notif.status,
+        sentAt: notif.sent_at ? new Date(notif.sent_at) : undefined,
+        createdAt: new Date(notif.created_at),
+      }));
+      
+      setNotifications(mappedNotifications);
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+      handleApiError(error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredNotifications = notifications.filter((notif) => {

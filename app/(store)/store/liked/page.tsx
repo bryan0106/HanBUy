@@ -5,12 +5,8 @@ import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { productService, type Product } from "@/services/productService";
+import { likedService, type LikedItem } from "@/services/likedService";
 import { LikeButton } from "@/components/store/LikeButton";
-
-interface LikedItem {
-  productId: string;
-  likedAt: string;
-}
 
 export default function LikedItemsPage() {
   const { isAuthenticated, user } = useAuth();
@@ -21,45 +17,82 @@ export default function LikedItemsPage() {
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       loadLikedItems();
+    } else {
+      setLoading(false);
     }
   }, [isAuthenticated, user?.id]);
 
   const loadLikedItems = async () => {
     setLoading(true);
     try {
-      // Get liked items from localStorage
-      const stored = localStorage.getItem(`hanbuy_liked_${user?.id || "guest"}`);
-      const liked: LikedItem[] = stored ? JSON.parse(stored) : [];
-      setLikedItems(liked);
+      // Get liked items from API (only called on this page, not on every product card)
+      const response = await likedService.getLikedItems();
+      setLikedItems(response.data);
+
+      // Sync API data to localStorage for LikeButton components to use
+      if (user?.id && typeof window !== "undefined") {
+        const localStorageData = response.data.map((item) => ({
+          productId: item.product_id,
+          likedAt: item.created_at,
+        }));
+        localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(localStorageData));
+      }
 
       // Fetch product details for liked items
-      if (liked.length > 0) {
-        const productPromises = liked.map((item) =>
-          productService.getProductById(item.productId).catch(() => null)
+      if (response.data.length > 0) {
+        const productPromises = response.data.map((item) =>
+          productService.getProductById(item.product_id).catch(() => null)
         );
         const productResults = await Promise.all(productPromises);
         const validProducts = productResults.filter((p): p is Product => p !== null);
         setProducts(validProducts);
+      } else {
+        setProducts([]);
       }
     } catch (error) {
       console.error("Error loading liked items:", error);
+      // Fallback to localStorage on error
+      try {
+        const stored = localStorage.getItem(`hanbuy_liked_${user?.id || "guest"}`);
+        const liked: Array<{ productId: string; likedAt: string }> = stored ? JSON.parse(stored) : [];
+        if (liked.length > 0) {
+          const productPromises = liked.map((item) =>
+            productService.getProductById(item.productId).catch(() => null)
+          );
+          const productResults = await Promise.all(productPromises);
+          const validProducts = productResults.filter((p): p is Product => p !== null);
+          setProducts(validProducts);
+        }
+      } catch (fallbackError) {
+        console.error("Error loading from localStorage fallback:", fallbackError);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRemoveLiked = (productId: string) => {
-    const updated = likedItems.filter((item) => item.productId !== productId);
-    setLikedItems(updated);
-    setProducts(products.filter((p) => p.id !== productId));
-    
-    // Update localStorage
-    if (user?.id) {
-      localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
+  const handleRemoveLiked = async (productId: string) => {
+    try {
+      // Remove from API
+      await likedService.removeFromLiked(productId);
+      
+      // Update local state
+      setLikedItems(prev => prev.filter((item) => item.product_id !== productId));
+      setProducts(prev => prev.filter((p) => p.id !== productId));
+      
+      // Also update localStorage as backup
+      if (user?.id) {
+        const stored = localStorage.getItem(`hanbuy_liked_${user.id}`);
+        const liked: Array<{ productId: string; likedAt: string }> = stored ? JSON.parse(stored) : [];
+        const updated = liked.filter((item) => item.productId !== productId);
+        localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
+      }
+      
+      // Trigger re-render of LikeButton components
+      window.dispatchEvent(new Event("likedItemsUpdated"));
+    } catch (error) {
+      console.error("Error removing liked item:", error);
     }
-    
-    // Trigger re-render of LikeButton components
-    window.dispatchEvent(new Event("storage"));
   };
 
   return (

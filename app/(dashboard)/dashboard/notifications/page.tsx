@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
+import { notificationService } from "@/services/notificationService";
 
 interface Notification {
   id: string;
@@ -20,73 +21,100 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [filter]);
+
+  // Helper function to generate link from notification metadata or message
+  const generateNotificationLink = (
+    type: string,
+    title: string,
+    message: string,
+    metadata?: Record<string, unknown>
+  ): string => {
+    // First, try to use metadata if available
+    if (metadata) {
+      if (metadata.order_id) {
+        if (type === "payment" || title.toLowerCase().includes("payment")) {
+          return `/dashboard/invoices`;
+        }
+        return `/dashboard/orders`;
+      }
+      if (metadata.invoice_id) {
+        return `/dashboard/invoices`;
+      }
+      if (metadata.box_id) {
+        return "/dashboard/box";
+      }
+    }
+
+    // Fallback to parsing message
+    if (message.includes("invoice") || message.includes("INV-")) {
+      return "/dashboard/invoices";
+    }
+    if (message.includes("order") || message.includes("ORD-")) {
+      if (type === "payment" || title.toLowerCase().includes("payment")) {
+        return "/dashboard/invoices";
+      }
+      return "/dashboard/orders";
+    }
+    if (message.includes("box") || message.includes("BOX-")) {
+      return "/dashboard/box";
+    }
+    
+    // Default fallback
+    return "/dashboard";
+  };
 
   const loadNotifications = async () => {
-    setLoading(true);
-    // TODO: Fetch from API
-    const mockData: Notification[] = [
-      {
-        id: "1",
-        title: "Order Confirmed",
-        message: "Your order ORD-2024-001 has been confirmed",
-        read: false,
-        createdAt: "2024-12-29T10:00:00Z",
-        link: "/dashboard/orders",
-      },
-      {
-        id: "2",
-        title: "Payment Received",
-        message: "Payment for invoice INV-2024-001 has been received",
-        read: false,
-        createdAt: "2024-12-29T09:30:00Z",
-        link: "/dashboard/invoices",
-      },
-      {
-        id: "3",
-        title: "Order Shipped",
-        message: "Your order ORD-2024-002 is now in transit",
-        read: true,
-        createdAt: "2024-12-28T14:00:00Z",
-        link: "/dashboard/orders",
-      },
-      {
-        id: "4",
-        title: "Box Received at Manila",
-        message: "Your box BOX-2024-001 has been received at Manila office",
-        read: true,
-        createdAt: "2024-12-27T11:00:00Z",
-        link: "/dashboard/box",
-      },
-      {
-        id: "5",
-        title: "Payment Reminder",
-        message: "Your order ORD-2024-003 payment is due in 2 days",
-        read: true,
-        createdAt: "2024-12-26T16:00:00Z",
-        link: "/dashboard/orders",
-      },
-      {
-        id: "6",
-        title: "Order Delivered",
-        message: "Your order ORD-2024-004 has been delivered successfully",
-        read: true,
-        createdAt: "2024-12-25T10:00:00Z",
-        link: "/dashboard/orders",
-      },
-    ];
-    setNotifications(mockData);
-    setLoading(false);
+    try {
+      setLoading(true);
+      const params: { read?: boolean; limit?: number } = {};
+      
+      if (filter === "unread") {
+        params.read = false;
+      } else if (filter === "read") {
+        params.read = true;
+      }
+      
+      const response = await notificationService.getNotifications(params);
+      
+      // Map API response to component format
+      const mappedNotifications: Notification[] = response.data.map((notif) => ({
+        id: notif.id,
+        title: notif.title,
+        message: notif.message,
+        read: notif.read,
+        createdAt: notif.created_at,
+        link: generateNotificationLink(notif.type, notif.title, notif.message, notif.metadata),
+      }));
+      
+      setNotifications(mappedNotifications);
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationService.markNotificationRead(id);
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+      await Promise.all(unreadIds.map(id => notificationService.markNotificationRead(id)));
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+    }
   };
 
   const filteredNotifications = notifications.filter((notif) => {
