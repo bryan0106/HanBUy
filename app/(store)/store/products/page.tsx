@@ -3,9 +3,8 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { productService } from "@/services/productService";
+import { productService, type Product } from "@/services/productService";
 import { formatCurrency } from "@/lib/currency";
-import type { Product } from "@/types";
 import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";

@@ -2,24 +2,29 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { productService } from "@/services/productService";
+import { productService, type Product } from "@/services/productService";
 import { cartService } from "@/services/cartService";
 import { orderService } from "@/services/orderService";
 import { utilityService, type BoxType } from "@/services/utilityService";
 import { formatCurrency } from "@/lib/currency";
-import type { Product, ProductVariation, ProductReview } from "@/types";
+import type { Product as ProductFromTypes, ProductVariation, ProductReview } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { getProductReviews, getAverageRating } from "@/lib/mockData";
 import { PriceComparison } from "@/components/store/PriceComparison";
 
+// Extended Product type that includes variations for this component
+type ProductWithVariations = Product & {
+  variations?: ProductVariation[];
+};
+
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const productId = params.id as string;
-  const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<ProductWithVariations | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -212,7 +217,7 @@ export default function ProductDetailPage() {
     // Auto-select appropriate box size based on product weight/dimensions
   useEffect(() => {
     if (product) {
-      const totalWeight = product.weight * quantity;
+      const totalWeight = (product.weight || 0) * quantity;
       const totalVolume = product.dimensions 
         ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 * quantity
         : totalWeight / 1000;
@@ -335,7 +340,7 @@ export default function ProductDetailPage() {
   const calculateShippingFee = () => {
     const size = boxSizePricing[selectedBoxSize];
     const pricing = size[boxTypePreference];
-    const weight = product.weight * quantity;
+    const weight = (product.weight || 0) * quantity;
     const volume = (product.dimensions 
       ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 
       : weight / 1000) * quantity; // Convert to CBM
@@ -395,10 +400,6 @@ export default function ProductDetailPage() {
         product_id: product.id,
         quantity: quantity,
         box_type_preference: boxTypePreference,
-        variations: Object.keys(variationData).length > 0 ? variationData : undefined,
-        selected_variation_ids: Object.values(selectedVariations).length > 0 
-          ? Object.values(selectedVariations) 
-          : undefined,
       });
 
       setCartSuccess(true);
@@ -461,7 +462,7 @@ export default function ProductDetailPage() {
       {/* Price Comparison Modal */}
       {product && (
         <PriceComparison
-          product={product}
+          product={product as unknown as ProductFromTypes}
           isOpen={showPriceComparison}
           onClose={() => setShowPriceComparison(false)}
         />
@@ -819,7 +820,7 @@ export default function ProductDetailPage() {
                   const maxVolume = sizeInfo.maxVolume;
                   
                   // Check if this size can accommodate the product
-                  const totalWeight = product.weight * quantity;
+                  const totalWeight = (product.weight || 0) * quantity;
                   const totalVolume = product.dimensions 
                     ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 * quantity
                     : totalWeight / 1000;

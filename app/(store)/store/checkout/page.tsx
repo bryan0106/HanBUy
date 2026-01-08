@@ -289,7 +289,7 @@ export default function CheckoutPage() {
                         Qty: {item.quantity}
                       </span>
                       <span className="font-semibold">
-                        {formatCurrency((item.price * item.quantity) * 0.042, "PHP")}
+                        {formatCurrency(((item.price || 0) * item.quantity) * 0.042, "PHP")}
                       </span>
                     </div>
                   </div>

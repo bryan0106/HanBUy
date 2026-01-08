@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, type Currency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
-import { productService } from "@/services/productService";
+import { productService, type Product } from "@/services/productService";
 import { LikeButton } from "@/components/store/LikeButton";
-import type { Product } from "@/types";
 
 interface LikedItem {
   productId: string;
@@ -36,7 +35,7 @@ export default function LikedItemsPage() {
       // Fetch product details for liked items
       if (liked.length > 0) {
         const productPromises = liked.map((item) =>
-          productService.getProduct(item.productId).catch(() => null)
+          productService.getProductById(item.productId).catch(() => null)
         );
         const productResults = await Promise.all(productPromises);
         const validProducts = productResults.filter((p): p is Product => p !== null);
@@ -146,7 +145,7 @@ export default function LikedItemsPage() {
                       ₱{priceInPHP.toFixed(2)}
                     </p>
                     <p className="text-xs text-[#6b7280]">
-                      {formatCurrency(product.price, product.currency)}
+                      {formatCurrency(product.price, product.currency as Currency)}
                     </p>
                   </div>
                 </Link>

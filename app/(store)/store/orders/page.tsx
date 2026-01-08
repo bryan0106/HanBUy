@@ -343,7 +343,7 @@ export default function StoreOrdersPage() {
                           <span className="font-medium">{item.quantity}</span>
                         </div>
                         <p className="text-lg font-bold text-soft-blue-600">
-                          {formatCurrency(item.price * item.quantity, "PHP")}
+                          {formatCurrency((item.price || 0) * item.quantity, "PHP")}
                         </p>
                       </div>
                       <button className="mt-2 text-sm text-error hover:underline">
@@ -358,7 +358,7 @@ export default function StoreOrdersPage() {
                   <span className="text-lg font-semibold">Total:</span>
                   <span className="text-2xl font-bold text-soft-blue-600">
                     {formatCurrency(
-                      cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+                      cartItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0),
                       "PHP"
                     )}
                   </span>
