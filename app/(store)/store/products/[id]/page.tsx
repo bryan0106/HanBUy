@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { productService, boxTypeService, cartService, orderService, type BoxType } from "@/services/api";
+import { productService } from "@/services/productService";
+import { cartService } from "@/services/cartService";
+import { orderService } from "@/services/orderService";
+import { utilityService, type BoxType } from "@/services/utilityService";
 import { formatCurrency } from "@/lib/currency";
 import type { Product, ProductVariation, ProductReview } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -88,44 +91,49 @@ export default function ProductDetailPage() {
 
   const loadProduct = async () => {
     setLoading(true);
-    const data = await productService.getProduct(productId);
-    setProduct(data);
-    
-    // Load reviews for this product
-    if (data) {
-      const productReviews = getProductReviews(data.id);
-      setReviews(productReviews);
+    try {
+      const data = await productService.getProductById(productId);
+      setProduct(data as any);
       
-      // Load related products - mix of same category and popular products
-      const allProducts = await productService.getProducts();
-      
-      // Get products from same category
-      const sameCategoryProducts = allProducts
-        .filter((p) => p.id !== data.id && p.category === data.category)
-        .slice(0, 2);
-      
-      // Get popular products from other categories (high stock or different categories)
-      const otherCategoryProducts = allProducts
-        .filter((p) => p.id !== data.id && p.category !== data.category)
-        .sort((a, b) => (b.stock || 0) - (a.stock || 0)) // Sort by stock (popularity indicator)
-        .slice(0, 6);
-      
-      // Mix and shuffle recommendations
-      const mixed = [...sameCategoryProducts, ...otherCategoryProducts]
-        .sort(() => Math.random() - 0.5) // Shuffle
-        .slice(0, 8); // Get 8 products
-      
-      setRelatedProducts(mixed);
+      // Load reviews for this product
+      if (data) {
+        const productReviews = getProductReviews(data.id);
+        setReviews(productReviews);
+        
+        // Load related products - mix of same category and popular products
+        const response = await productService.getProducts();
+        const allProducts = response.data;
+        
+        // Get products from same category
+        const sameCategoryProducts = allProducts
+          .filter((p) => p.id !== data.id && p.category === data.category)
+          .slice(0, 2);
+        
+        // Get popular products from other categories (high stock or different categories)
+        const otherCategoryProducts = allProducts
+          .filter((p) => p.id !== data.id && p.category !== data.category)
+          .sort((a, b) => (b.stock || 0) - (a.stock || 0)) // Sort by stock (popularity indicator)
+          .slice(0, 6);
+        
+        // Mix and shuffle recommendations
+        const mixed = [...sameCategoryProducts, ...otherCategoryProducts]
+          .sort(() => Math.random() - 0.5) // Shuffle
+          .slice(0, 8); // Get 8 products
+        
+        setRelatedProducts(mixed);
+      }
+    } catch (error) {
+      console.error("Error loading product:", error);
+    } finally {
+      setReviewsLoading(false);
+      setLoading(false);
     }
-    
-    setReviewsLoading(false);
-    setLoading(false);
   };
 
   const loadBoxTypes = async () => {
     setBoxTypesLoading(true);
     try {
-      const types = await boxTypeService.getBoxTypes();
+      const types = await utilityService.getBoxTypes();
       setBoxTypes(types);
     } catch (error) {
       console.warn("Failed to fetch box types from API, using defaults:", error);
@@ -149,16 +157,18 @@ export default function ProductDetailPage() {
     setCheckingPurchase(true);
     try {
       // Get user's orders (only paid or partially paid orders)
-      const orders = await orderService.getOrders({
+      const ordersResponse = await orderService.getOrders({
         user_id: user.id,
         payment_status: 'paid'
       });
+      const orders = ordersResponse.data;
       
       // Also check partial payments
-      const partialOrders = await orderService.getOrders({
+      const partialOrdersResponse = await orderService.getOrders({
         user_id: user.id,
         payment_status: 'partial'
       });
+      const partialOrders = partialOrdersResponse.data;
       
       const allOrders = [...orders, ...partialOrders];
       
@@ -1487,7 +1497,7 @@ export default function ProductDetailPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
     </>
   );
 }

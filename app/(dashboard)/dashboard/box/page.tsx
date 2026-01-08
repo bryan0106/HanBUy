@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { boxService } from "@/services/api";
+import { boxService } from "@/services/boxService";
 import { formatCurrency } from "@/lib/currency";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import type { Box } from "@/types";
+import type { Box } from "@/services/boxService";
 
 export default function BoxPage() {
   const [box, setBox] = useState<Box | null>(null);
@@ -16,9 +16,16 @@ export default function BoxPage() {
 
   const loadBox = async () => {
     setLoading(true);
-    const data = await boxService.getBox("user-1");
-    setBox(data);
-    setLoading(false);
+    try {
+      const boxesResponse = await boxService.getBoxes();
+      const data = boxesResponse.data.length > 0 ? boxesResponse.data[0] : null;
+      setBox(data);
+    } catch (error) {
+      console.error("Error loading box:", error);
+      setBox(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -48,7 +55,7 @@ export default function BoxPage() {
     );
   }
 
-  const totalWeight = box.items.reduce((sum, item) => sum + item.weight * item.quantity, 0);
+  const totalWeight = box.items.reduce((sum, item) => sum + (item.weight || 0) * item.quantity, 0);
   const totalValueKRW = box.items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
@@ -61,7 +68,7 @@ export default function BoxPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">My Solo Box</h1>
           <p className="mt-2 text-muted-foreground">
-            Box Number: <span className="font-semibold">{box.boxNumber}</span>
+            Box Number: <span className="font-semibold">{box.box_number}</span>
           </p>
         </div>
         <StatusBadge status={box.status} />
@@ -91,11 +98,11 @@ export default function BoxPage() {
         <p className="mb-2 text-sm font-medium text-muted-foreground">
           Current Location
         </p>
-        <p className="text-lg font-semibold">{box.currentLocation}</p>
-        {box.estimatedDelivery && (
+        <p className="text-lg font-semibold">{box.current_location || "N/A"}</p>
+        {box.estimated_delivery && (
           <p className="mt-2 text-sm text-muted-foreground">
             Estimated Delivery:{" "}
-            {box.estimatedDelivery.toLocaleDateString("en-US", {
+            {new Date(box.estimated_delivery).toLocaleDateString("en-US", {
               year: "numeric",
               month: "long",
               day: "numeric",
@@ -127,7 +134,7 @@ export default function BoxPage() {
                       Quantity: <span className="font-semibold">{item.quantity}</span>
                     </span>
                     <span className="text-muted-foreground">
-                      Weight: <span className="font-semibold">{item.weight} kg</span>
+                      Weight: <span className="font-semibold">{item.weight || 0} kg</span>
                     </span>
                   </div>
                 </div>

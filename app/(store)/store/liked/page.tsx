@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
-import { productService } from "@/services/api";
+import { productService } from "@/services/productService";
 import { LikeButton } from "@/components/store/LikeButton";
 import type { Product } from "@/types";
 

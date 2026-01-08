@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
-import { cartService, orderService, productService } from "@/services/api";
-import type { CartItem } from "@/services/api";
+import { cartService } from "@/services/cartService";
+import { orderService } from "@/services/orderService";
+import { productService } from "@/services/productService";
+import type { CartItem } from "@/services/cartService";
 import { Button } from "@/components/ui/button";
 
 interface ShippingAddress {
@@ -56,7 +58,7 @@ export default function CheckoutPage() {
           }
 
           try {
-            const product = await productService.getProduct(item.product_id);
+            const product = await productService.getProductById(item.product_id);
             if (product && product.images && product.images.length > 0) {
               return {
                 ...item,
@@ -103,7 +105,7 @@ export default function CheckoutPage() {
   };
 
   const calculateTotals = () => {
-    const subtotalKRW = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const subtotalKRW = cartItems.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
     const subtotalPHP = subtotalKRW * 0.042; // Convert KRW to PHP
 
     // Calculate ISF and LSF
@@ -155,13 +157,13 @@ export default function CheckoutPage() {
       // Prepare order items
       const orderItems = cartItems.map((item) => ({
         product_id: item.product_id,
-        product_name: item.product_name,
-        product_type: item.product_type,
+        product_name: item.product_name || item.product?.name || "Unknown Product",
+        product_type: item.product_type || "onhand",
         quantity: item.quantity,
-        unit_price: item.price * 0.042, // Convert to PHP
-        total: (item.price * item.quantity) * 0.042, // Convert to PHP
-        image_url: item.image_url || (item.product?.images?.[0] || undefined),
-        preorder_release_date: null, // TODO: Get from product if preorder
+        unit_price: (item.price || 0) * 0.042, // Convert to PHP
+        total: ((item.price || 0) * item.quantity) * 0.042, // Convert to PHP
+        image_url: item.image_url || item.product?.images?.[0],
+        preorder_release_date: undefined, // TODO: Get from product if preorder
       }));
 
       // Create order

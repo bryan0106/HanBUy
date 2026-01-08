@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { productService } from "@/services/api";
+import { productService } from "@/services/productService";
 import { formatCurrency } from "@/lib/currency";
 import { LikeButton } from "@/components/store/LikeButton";
 import type { Product } from "@/types";
@@ -85,9 +85,9 @@ export default function HomePage() {
   const loadHomePageData = async () => {
     setLoading(true);
     try {
-      const allProducts = await productService.getProducts();
+      const response = await productService.getProducts();
       // Featured products (first 8 products)
-      setFeaturedProducts(allProducts.slice(0, 8));
+      setFeaturedProducts(response.data.slice(0, 8) as any[]);
     } catch (error) {
       console.error("Error loading homepage data:", error);
     } finally {

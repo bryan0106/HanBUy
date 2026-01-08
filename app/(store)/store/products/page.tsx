@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { productService } from "@/services/api";
+import { productService } from "@/services/productService";
 import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
 import { categories } from "@/lib/mockData";
@@ -31,10 +31,16 @@ function ProductsContent() {
 
   const loadProducts = async () => {
     setLoading(true);
-    const category = selectedCategory === "all" ? undefined : selectedCategory;
-    const data = await productService.getProducts(category);
-    setProducts(data);
-    setLoading(false);
+    try {
+      const category = selectedCategory === "all" ? undefined : selectedCategory;
+      const response = await productService.getProducts({ category });
+      setProducts(response.data);
+    } catch (error) {
+      console.error("Error loading products:", error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { invoiceService } from "@/services/api";
+import { invoiceService } from "@/services/invoiceService";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
-import type { Invoice } from "@/types";
+import type { Invoice } from "@/services/invoiceService";
 
 export default function InvoicesPage() {
   const { user, isAuthenticated } = useAuth();
@@ -24,7 +24,8 @@ export default function InvoicesPage() {
     
     setLoading(true);
     try {
-      const data = await invoiceService.getUserInvoices(user.id);
+      const response = await invoiceService.getInvoices();
+      const data = response.data;
       setInvoices(data);
     } catch (error) {
       console.error("Error loading invoices:", error);
@@ -71,11 +72,11 @@ export default function InvoicesPage() {
               <div className="mb-4 flex items-start justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-[#2C2C2C]">
-                    Invoice {invoice.invoiceNumber}
+                    Invoice {invoice.invoice_number}
                   </h3>
-                  {invoice.boxId && (
+                  {invoice.box_id && (
                     <p className="text-sm text-[#6b7280]">
-                      Box: {invoice.boxId}
+                      Box: {invoice.box_id}
                     </p>
                   )}
                 </div>
@@ -85,22 +86,22 @@ export default function InvoicesPage() {
               <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-sm text-[#6b7280]">Date</p>
-                  <p className="font-semibold text-[#2C2C2C]">{formatDate(invoice.createdAt)}</p>
+                  <p className="font-semibold text-[#2C2C2C]">{formatDate(new Date(invoice.created_at))}</p>
                 </div>
                 <div>
                   <p className="text-sm text-[#6b7280]">Due Date</p>
-                  <p className="font-semibold text-[#2C2C2C]">{formatDate(invoice.dueDate)}</p>
+                  <p className="font-semibold text-[#2C2C2C]">{formatDate(new Date(invoice.due_date))}</p>
                 </div>
-                {invoice.paidAt && (
+                {invoice.paid_at && (
                   <div>
                     <p className="text-sm text-[#6b7280]">Paid On</p>
-                    <p className="font-semibold text-[#2C2C2C]">{formatDate(invoice.paidAt)}</p>
+                    <p className="font-semibold text-[#2C2C2C]">{formatDate(new Date(invoice.paid_at))}</p>
                   </div>
                 )}
-                {invoice.paymentMethod && (
+                {invoice.payment_method && (
                   <div>
                     <p className="text-sm text-[#6b7280]">Payment Method</p>
-                    <p className="font-semibold text-[#2C2C2C]">{invoice.paymentMethod}</p>
+                    <p className="font-semibold text-[#2C2C2C]">{invoice.payment_method}</p>
                   </div>
                 )}
               </div>
@@ -131,12 +132,12 @@ export default function InvoicesPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#6b7280]">Shipping Fee</span>
-                  <span className="text-[#2C2C2C]">{formatCurrency(invoice.shippingFee, invoice.currency)}</span>
+                  <span className="text-[#2C2C2C]">{formatCurrency(invoice.shipping_fee, invoice.currency)}</span>
                 </div>
-                {invoice.customsFee && (
+                {invoice.customs_fee && (
                   <div className="flex justify-between">
                     <span className="text-[#6b7280]">Customs Fee</span>
-                    <span className="text-[#2C2C2C]">{formatCurrency(invoice.customsFee, invoice.currency)}</span>
+                    <span className="text-[#2C2C2C]">{formatCurrency(invoice.customs_fee, invoice.currency)}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-[#FCE4EC] pt-2 font-semibold">

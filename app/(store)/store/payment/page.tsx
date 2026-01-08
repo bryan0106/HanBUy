@@ -6,7 +6,8 @@ import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { QRPayment } from "@/components/payment/QRPayment";
 import { Button } from "@/components/ui/button";
-import { bankService, orderService, type BankType } from "@/services/api";
+import { utilityService, type BankType } from "@/services/utilityService";
+import { orderService } from "@/services/orderService";
 
 interface OrderSummary {
   subtotal: number;
@@ -45,7 +46,7 @@ function PaymentPageContent() {
     try {
       // Fetch bank types from Express.js API
       try {
-        const banks = await bankService.getBankTypes();
+        const banks = await utilityService.getBankTypes();
         setBankTypes(banks);
       } catch (bankError) {
         console.warn("Failed to fetch bank types from API, using defaults:", bankError);
@@ -66,7 +67,7 @@ function PaymentPageContent() {
       } else if (orderId && paymentTypeParam === "balance") {
         // Fetch existing order for balance payment
         try {
-          const fetchedOrder = await orderService.getOrder(orderId);
+          const fetchedOrder = await orderService.getOrderById(orderId);
           setExistingOrder(fetchedOrder);
           orderData = fetchedOrder;
           

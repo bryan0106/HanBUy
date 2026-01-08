@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { productService } from "@/services/api";
+import { productService } from "@/services/productService";
 import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
 import { categories } from "@/lib/mockData";
@@ -26,11 +26,15 @@ export default function OnhandProductsPage() {
 
   const loadProducts = async () => {
     setLoading(true);
-    // TODO: Filter for onhand items only
-    const category = selectedCategory === "all" ? undefined : selectedCategory;
-    const data = await productService.getProducts(category);
-    setProducts(data.filter((p) => p.stock > 0));
-    setLoading(false);
+    try {
+      const response = await productService.getOnhandProducts();
+      setProducts(response.data as any[]);
+    } catch (error) {
+      console.error("Error loading onhand products:", error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));

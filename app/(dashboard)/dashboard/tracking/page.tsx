@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { trackingService } from "@/services/api";
+import { trackingService } from "@/services/trackingService";
 import { formatDateTime } from "@/lib/utils";
 import { BOX_STATUS_LABELS } from "@/lib/constants";
-import type { TrackingEvent } from "@/types";
+import type { TrackingEvent } from "@/services/trackingService";
 
 export default function TrackingPage() {
   const [trackingId, setTrackingId] = useState("");
@@ -23,9 +23,9 @@ export default function TrackingPage() {
     setError(null);
 
     try {
-      const data = await trackingService.searchTracking(trackingId.trim());
-      setEvents(data);
-      if (data.length === 0) {
+      const trackingInfo = await trackingService.getTracking(trackingId.trim());
+      setEvents(trackingInfo.events || []);
+      if (!trackingInfo.events || trackingInfo.events.length === 0) {
         setError("No tracking information found for this ID");
       }
     } catch (err) {

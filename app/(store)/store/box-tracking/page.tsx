@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { boxService, trackingService } from "@/services/api";
+import { boxService } from "@/services/boxService";
+import { trackingService } from "@/services/trackingService";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateTime } from "@/lib/utils";
 import { BOX_STATUS_LABELS } from "@/lib/constants";
-import type { Box, TrackingEvent } from "@/types";
+import type { Box } from "@/services/boxService";
+import type { TrackingEvent } from "@/services/trackingService";
 import Link from "next/link";
 
 export default function BoxTrackingPage() {
@@ -36,13 +38,14 @@ export default function BoxTrackingPage() {
     setLoading(true);
     try {
       // Fetch user's boxes
-      const boxesData = await boxService.getUserBoxes(user.id);
-      setBoxes(boxesData || []);
+      const boxesResponse = await boxService.getBoxes();
+      setBoxes(boxesResponse.data || []);
       
       // If there's at least one box, load tracking for the first one
-      if (boxesData && boxesData.length > 0) {
+      const boxesData = boxesResponse.data || [];
+      if (boxesData.length > 0) {
         setSelectedBox(boxesData[0]);
-        await loadTracking(boxesData[0].boxNumber);
+        await loadTracking(boxesData[0].box_number);
       }
     } catch (err: any) {
       console.error("Error loading boxes:", err);
@@ -56,8 +59,8 @@ export default function BoxTrackingPage() {
     setTrackingLoading(true);
     setError(null);
     try {
-      const events = await trackingService.searchTracking(boxNumber);
-      setTrackingEvents(events || []);
+      const trackingInfo = await trackingService.getTracking(boxNumber);
+      setTrackingEvents(trackingInfo.events || []);
     } catch (err: any) {
       console.error("Error loading tracking:", err);
       setError("Failed to load tracking information.");
@@ -69,7 +72,7 @@ export default function BoxTrackingPage() {
 
   const handleBoxSelect = async (box: Box) => {
     setSelectedBox(box);
-    await loadTracking(box.boxNumber);
+    await loadTracking(box.box_number);
   };
 
   const statusOrder: Record<string, number> = {
@@ -163,7 +166,7 @@ export default function BoxTrackingPage() {
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span className="font-semibold text-foreground text-sm sm:text-base">
-                        {box.boxNumber}
+                        {box.box_number}
                       </span>
                       <span
                         className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -183,10 +186,10 @@ export default function BoxTrackingPage() {
                     <p className="mt-1 text-sm font-medium text-foreground">
                       {formatCurrency(totalValuePHP, "PHP")}
                     </p>
-                    {box.estimatedDelivery && (
+                    {box.estimated_delivery && (
                       <p className="mt-1 text-xs text-muted-foreground">
                         Est. Delivery:{" "}
-                        {box.estimatedDelivery.toLocaleDateString("en-US", {
+                        {new Date(box.estimated_delivery).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
@@ -207,10 +210,10 @@ export default function BoxTrackingPage() {
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-                        {selectedBox.boxNumber}
+                        {selectedBox.box_number}
                       </h2>
                       <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                        {selectedBox.currentLocation}
+                        {selectedBox.current_location || "N/A"}
                       </p>
                     </div>
                     <span
@@ -238,7 +241,7 @@ export default function BoxTrackingPage() {
                       <p className="text-xs text-muted-foreground">Total Weight</p>
                       <p className="text-base font-bold sm:text-lg">
                         {selectedBox.items
-                          .reduce((sum, item) => sum + item.weight * item.quantity, 0)
+                          .reduce((sum, item) => sum + (item.weight || 0) * item.quantity, 0)
                           .toFixed(2)}{" "}
                         kg
                       </p>
@@ -328,9 +331,9 @@ export default function BoxTrackingPage() {
                           className="flex gap-3 rounded-lg border border-border bg-white p-3 sm:gap-4 sm:p-4"
                         >
                           {/* Product Image */}
-                          {item.imageUrl ? (
+                          {item.image_url ? (
                             <img
-                              src={item.imageUrl}
+                              src={item.image_url}
                               alt={item.name}
                               className="h-16 w-16 shrink-0 rounded-lg object-cover sm:h-20 sm:w-20"
                               onError={(e) => {

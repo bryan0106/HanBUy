@@ -6,7 +6,10 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { cartService, productService, orderService, type CartItem } from "@/services/api";
+import { cartService } from "@/services/cartService";
+import { productService } from "@/services/productService";
+import { orderService } from "@/services/orderService";
+import type { CartItem } from "@/services/cartService";
 
 interface Order {
   id: string;
@@ -64,7 +67,7 @@ export default function StoreOrdersPage() {
             
             // Otherwise, fetch product details to get the image
             try {
-              const product = await productService.getProduct(item.product_id);
+              const product = await productService.getProductById(item.product_id);
               if (product && product.images && product.images.length > 0) {
                 return {
                   ...item,
@@ -109,7 +112,8 @@ export default function StoreOrdersPage() {
           console.log('User ID:', user.id);
           console.log('User object:', user);
           
-          const ordersData = await orderService.getOrders({ user_id: user.id });
+          const ordersResponse = await orderService.getOrders({ user_id: user.id });
+          const ordersData = ordersResponse.data;
           
           console.log('=== ORDERS API RESPONSE ===');
           console.log('Orders data type:', typeof ordersData);
@@ -179,7 +183,7 @@ export default function StoreOrdersPage() {
     
     setLoadingOrderDetails(prev => ({ ...prev, [orderId]: true }));
     try {
-      const orderDetail = await orderService.getOrder(orderId);
+      const orderDetail = await orderService.getOrderById(orderId);
       setOrderDetails(prev => ({ ...prev, [orderId]: orderDetail }));
     } catch (error) {
       console.error(`Error loading order ${orderId}:`, error);

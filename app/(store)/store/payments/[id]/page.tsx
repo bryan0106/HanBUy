@@ -6,7 +6,7 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { orderService } from "@/services/api";
+import { orderService } from "@/services/orderService";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -34,7 +34,7 @@ export default function PaymentDetailsPage() {
     setLoading(true);
     setError(null);
     try {
-      const orderData = await orderService.getOrder(orderId);
+      const orderData = await orderService.getOrderById(orderId);
       
       // Verify the order belongs to the current user
       if (orderData.user_id !== user?.id) {

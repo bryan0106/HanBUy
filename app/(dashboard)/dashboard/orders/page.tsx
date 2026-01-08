@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
-import { orderService } from "@/services/api";
+import { orderService } from "@/services/orderService";
 
 interface Order {
   id: string;
@@ -46,7 +46,8 @@ export default function OrdersPage() {
       // Note: Dashboard might need user context or admin access
       // For now, fetch all orders (admin) or user-specific orders
       try {
-        const ordersData = await orderService.getOrders();
+        const ordersResponse = await orderService.getOrders();
+        const ordersData = ordersResponse.data;
         
         // Map API response to Order interface
         const mappedOrders: Order[] = ordersData.map((order) => ({
