@@ -1,125 +1,92 @@
 import apiClient from '@/lib/apiClient';
-import { handleApiError } from '@/utils/errorHandler';
-
-export interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  currency: string;
-  images: string[];
-  category?: string;
-  brand?: string;
-  sku?: string;
-  stock: number;
-  status: 'active' | 'inactive' | 'out_of_stock';
-  product_type: 'onhand' | 'preorder' | 'kr_website';
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface GetProductsParams {
-  category?: string;
-  status?: 'active' | 'inactive' | 'out_of_stock';
-  product_type?: 'onhand' | 'preorder' | 'kr_website';
-  page?: number;
-  limit?: number;
-  search?: string;
-}
-
-export interface GetProductsResponse {
-  success: boolean;
-  data: Product[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export interface GetProductResponse {
-  success: boolean;
-  data: Product;
-}
-
-export interface KrComparisonResponse {
-  success: boolean;
-  data: {
-    product_id: string;
-    kr_price: number;
-    ph_price: number;
-    savings: number;
-    savings_percentage: number;
-  };
-}
+import type { 
+  GetProductsParams, 
+  GetProductsResponse, 
+  Product, 
+  ProductDetail,
+  GetProductDetailResponse 
+} from '@/types/product';
 
 export const productService = {
   /**
-   * Get all products with optional filters
+   * Get all products with unified filtering
    */
   async getProducts(params?: GetProductsParams): Promise<GetProductsResponse> {
     try {
       const response = await apiClient.get<GetProductsResponse>('/products', { params });
       return response.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 
   /**
    * Get single product by ID
    */
-  async getProductById(id: string): Promise<Product> {
+  async getProductById(id: string): Promise<ProductDetail> {
     try {
-      const response = await apiClient.get<GetProductResponse>(`/products/${id}`);
+      const response = await apiClient.get<GetProductDetailResponse>(`/products/${id}`);
       return response.data.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Re-throw the original error so components can handle it properly
+      throw error;
     }
   },
 
   /**
-   * Get onhand items only
+   * Get onhand products (convenience method)
    */
-  async getOnhandProducts(params?: { page?: number; limit?: number }): Promise<GetProductsResponse> {
-    try {
-      const response = await apiClient.get<GetProductsResponse>('/products/onhand', { params });
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
+  async getOnhandProducts(params?: Omit<GetProductsParams, 'product_type'>): Promise<GetProductsResponse> {
+    return this.getProducts({ ...params, product_type: 'onhand' });
   },
 
   /**
-   * Get preorder items only
+   * Get preorder products (convenience method)
    */
-  async getPreorderProducts(params?: { page?: number; limit?: number }): Promise<GetProductsResponse> {
-    try {
-      const response = await apiClient.get<GetProductsResponse>('/products/preorder', { params });
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
+  async getPreorderProducts(params?: Omit<GetProductsParams, 'product_type'>): Promise<GetProductsResponse> {
+    return this.getProducts({ ...params, product_type: 'preorder' });
   },
 
   /**
-   * Get price comparison for Korean products
+   * Get products by store/warehouse
    */
-  async getKrComparison(productId: string): Promise<KrComparisonResponse['data']> {
-    try {
-      const response = await apiClient.get<KrComparisonResponse>('/products/kr-comparison', {
-        params: { product_id: productId },
-      });
-      return response.data.data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
+  async getProductsByStore(storeId: string, params?: Omit<GetProductsParams, 'store_id'>): Promise<GetProductsResponse> {
+    return this.getProducts({ ...params, store_id: storeId });
+  },
+
+  /**
+   * Search products
+   */
+  async searchProducts(searchTerm: string, params?: Omit<GetProductsParams, 'search'>): Promise<GetProductsResponse> {
+    return this.getProducts({ ...params, search: searchTerm });
+  },
+
+  /**
+   * Get products by category
+   */
+  async getProductsByCategory(category: string, params?: Omit<GetProductsParams, 'category'>): Promise<GetProductsResponse> {
+    return this.getProducts({ ...params, category });
+  },
+
+  /**
+   * Get products by brand
+   */
+  async getProductsByBrand(brand: string, params?: Omit<GetProductsParams, 'brand'>): Promise<GetProductsResponse> {
+    return this.getProducts({ ...params, brand });
+  },
+
+  /**
+   * Get products by price range
+   */
+  async getProductsByPriceRange(
+    minPrice: number,
+    maxPrice: number,
+    params?: Omit<GetProductsParams, 'min_price' | 'max_price'>
+  ): Promise<GetProductsResponse> {
+    return this.getProducts({ ...params, min_price: minPrice, max_price: maxPrice });
   },
 };
+
+// Export types for backward compatibility
+export type { Product, ProductDetail, GetProductsParams, GetProductsResponse };

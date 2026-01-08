@@ -1,21 +1,20 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { productService, type Product } from "@/services/productService";
+import { useProducts } from "@/hooks/useProducts";
+import type { Product } from "@/types/product";
 import { formatCurrency } from "@/lib/currency";
-import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";
+import { getPrimaryImage, getDisplayPrice, getDisplayCurrency, getBrandName, getAvailableStock, isInStock } from "@/lib/productUtils";
 
 type ViewType = "list" | "single" | "grid";
 
 function ProductsContent() {
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get("category");
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>(
     categoryParam || "all"
   );
@@ -23,35 +22,28 @@ function ProductsContent() {
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [viewType, setViewType] = useState<ViewType>("grid");
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    loadProducts();
-  }, [selectedCategory]);
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const category = selectedCategory === "all" ? undefined : selectedCategory;
-      const response = await productService.getProducts({ category });
-      setProducts(response.data);
-    } catch (error) {
-      console.error("Error loading products:", error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
+  // Build API params from filters
+  const apiParams = {
+    product_type: "all" as const,
+    category: selectedCategory === "all" ? undefined : selectedCategory,
+    brand: selectedBrand === "all" ? undefined : selectedBrand,
+    min_price: priceRange[0] > 0 ? priceRange[0] / 0.042 : undefined, // Convert PHP to KRW
+    max_price: priceRange[1] < 100000 ? priceRange[1] / 0.042 : undefined,
+    page: currentPage,
+    limit: 20,
+    sort: "created_desc" as const,
   };
 
-  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
+  const { products, loading, error, pagination, aggregations, loadMore } = useProducts(apiParams);
 
-  const filteredProducts = products.filter((product) => {
-    const priceInPHP = product.price * 0.042; // Mock conversion
-    const matchesPrice =
-      priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
-    const matchesBrand =
-      selectedBrand === "all" || product.brand === selectedBrand;
-    return matchesPrice && matchesBrand;
-  });
+  // Get brands from aggregations or extract from products
+  const brands = aggregations?.brands || 
+    Array.from(new Set(products.map((p) => getBrandName(p)).filter(Boolean))) as string[];
+
+  // Get categories from aggregations
+  const categories = aggregations?.categories || [];
 
   return (
     <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6 md:py-8">
@@ -76,7 +68,10 @@ function ProductsContent() {
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.slug)}
+              onClick={() => {
+                setSelectedCategory(cat.slug);
+                setCurrentPage(1);
+              }}
               className={cn(
                 "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors",
                 selectedCategory === cat.slug
@@ -84,7 +79,7 @@ function ProductsContent() {
                   : "bg-grey-100 text-grey-700 hover:bg-grey-200"
               )}
             >
-              {cat.name}
+              {cat.name} {cat.count !== undefined && `(${cat.count})`}
             </button>
           ))}
         </div>
@@ -250,10 +245,13 @@ function ProductsContent() {
                       name="category"
                       value={cat.slug}
                       checked={selectedCategory === cat.slug}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedCategory(e.target.value);
+                        setCurrentPage(1);
+                      }}
                       className="mr-2"
                     />
-                    {cat.name}
+                    {cat.name} {cat.count !== undefined && `(${cat.count})`}
                   </label>
                 ))}
               </div>
@@ -267,15 +265,22 @@ function ProductsContent() {
                 </h3>
                 <select
                   value={selectedBrand}
-                  onChange={(e) => setSelectedBrand(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedBrand(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2"
                 >
                   <option value="all">All Brands</option>
-                  {brands.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
+                  {brands.map((brand) => {
+                    const brandName = typeof brand === 'string' ? brand : brand.name;
+                    const brandId = typeof brand === 'string' ? brand : brand.id;
+                    return (
+                      <option key={brandId} value={brandName}>
+                        {brandName} {typeof brand === 'object' && brand.count !== undefined && `(${brand.count})`}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             )}
@@ -290,18 +295,20 @@ function ProductsContent() {
                   type="number"
                   placeholder="Min"
                   value={priceRange[0]}
-                  onChange={(e) =>
-                    setPriceRange([Number(e.target.value), priceRange[1]])
-                  }
+                  onChange={(e) => {
+                    setPriceRange([Number(e.target.value), priceRange[1]]);
+                    setCurrentPage(1);
+                  }}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2"
                 />
                 <input
                   type="number"
                   placeholder="Max"
                   value={priceRange[1]}
-                  onChange={(e) =>
-                    setPriceRange([priceRange[0], Number(e.target.value)])
-                  }
+                  onChange={(e) => {
+                    setPriceRange([priceRange[0], Number(e.target.value)]);
+                    setCurrentPage(1);
+                  }}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2"
                 />
               </div>
@@ -311,25 +318,31 @@ function ProductsContent() {
 
         {/* Products Display */}
         <div className="flex-1">
-          {loading ? (
+          {loading && products.length === 0 ? (
             <div className="py-8 text-center sm:py-12">
               <p className="text-muted-foreground">Loading products...</p>
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : error ? (
+            <div className="py-8 text-center sm:py-12">
+              <p className="text-error">Error: {error}</p>
+            </div>
+          ) : products.length === 0 ? (
             <div className="py-8 text-center sm:py-12">
               <p className="text-muted-foreground">No products found.</p>
             </div>
           ) : (
             <>
               <div className="mb-3 text-sm text-muted-foreground sm:mb-4">
-                Showing {filteredProducts.length} product(s)
+                Showing {products.length} of {pagination?.total || 0} product(s)
               </div>
               
               {/* Different View Types */}
               {viewType === "list" ? (
                 <div className="space-y-3 sm:space-y-4">
-                  {filteredProducts.map((product) => {
-                    const priceInPHP = product.price * 0.042;
+                  {products.map((product) => {
+                    const displayPrice = getDisplayPrice(product);
+                    const displayCurrency = getDisplayCurrency(product);
+                    const brandName = getBrandName(product);
                     return (
                       <div
                         key={product.id}
@@ -340,35 +353,38 @@ function ProductsContent() {
                           className="flex gap-4 flex-1"
                         >
                           <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24">
-                            {product.images && product.images.length > 0 ? (
-                              <img
-                                src={product.images[0]}
-                                alt={product.name}
-                                className="h-full w-full rounded-lg object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                                }}
-                              />
-                            ) : (
-                              <div className="h-full w-full rounded-lg bg-grey-200"></div>
-                            )}
+                            <img
+                              src={getPrimaryImage(product)}
+                              alt={product.name}
+                              className="h-full w-full rounded-lg object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                              }}
+                            />
                             <LikeButton productId={product.id} size="sm" />
                           </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="mb-1 font-semibold group-hover:text-soft-blue-600 sm:mb-2">
                             {product.name}
                           </h3>
-                          {product.brand && (
+                          {brandName && (
                             <p className="mb-2 text-xs text-muted-foreground sm:text-sm">
-                              {product.brand}
+                              {brandName}
                             </p>
                           )}
                           <p className="text-base font-bold text-soft-blue-600 sm:text-lg">
-                            {formatCurrency(priceInPHP, "PHP")}
+                            {formatCurrency(displayPrice, displayCurrency)}
                           </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {formatCurrency(product.price, "KRW")}
-                          </p>
+                          {product.currency === 'KRW' && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {formatCurrency(product.price, "KRW")}
+                            </p>
+                          )}
+                          {isInStock(product) && (
+                            <span className="mt-1 inline-block rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">
+                              In Stock ({getAvailableStock(product)})
+                            </span>
+                          )}
                         </div>
                         </Link>
                       </div>
@@ -377,8 +393,10 @@ function ProductsContent() {
                 </div>
               ) : viewType === "single" ? (
                 <div className="space-y-4 sm:space-y-6">
-                  {filteredProducts.map((product) => {
-                    const priceInPHP = product.price * 0.042;
+                  {products.map((product) => {
+                    const displayPrice = getDisplayPrice(product);
+                    const displayCurrency = getDisplayCurrency(product);
+                    const brandName = getBrandName(product);
                     return (
                       <div
                         key={product.id}
@@ -386,34 +404,37 @@ function ProductsContent() {
                       >
                         <Link href={`/store/products/${product.id}`}>
                           <div className="relative mb-4 aspect-square w-full sm:mb-6">
-                            {product.images && product.images.length > 0 ? (
-                              <img
-                                src={product.images[0]}
-                                alt={product.name}
-                                className="aspect-square w-full rounded-lg object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                                }}
-                              />
-                            ) : (
-                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
-                            )}
+                            <img
+                              src={getPrimaryImage(product)}
+                              alt={product.name}
+                              className="aspect-square w-full rounded-lg object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                              }}
+                            />
                             <LikeButton productId={product.id} />
                           </div>
                         <h3 className="mb-2 font-semibold group-hover:text-soft-blue-600 sm:text-lg">
                           {product.name}
                         </h3>
-                        {product.brand && (
+                        {brandName && (
                           <p className="mb-2 text-sm text-muted-foreground">
-                            {product.brand}
+                            {brandName}
                           </p>
                         )}
                         <p className="text-lg font-bold text-soft-blue-600 sm:text-xl">
-                          {formatCurrency(priceInPHP, "PHP")}
+                          {formatCurrency(displayPrice, displayCurrency)}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                          {formatCurrency(product.price, "KRW")}
-                        </p>
+                        {product.currency === 'KRW' && (
+                          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                            {formatCurrency(product.price, "KRW")}
+                          </p>
+                        )}
+                        {isInStock(product) && (
+                          <span className="mt-2 inline-block rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">
+                            In Stock ({getAvailableStock(product)})
+                          </span>
+                        )}
                         </Link>
                       </div>
                     );
@@ -421,8 +442,10 @@ function ProductsContent() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:grid-cols-3">
-                  {filteredProducts.map((product) => {
-                    const priceInPHP = product.price * 0.042;
+                  {products.map((product) => {
+                    const displayPrice = getDisplayPrice(product);
+                    const displayCurrency = getDisplayCurrency(product);
+                    const brandName = getBrandName(product);
                     return (
                       <div
                         key={product.id}
@@ -430,38 +453,73 @@ function ProductsContent() {
                       >
                         <Link href={`/store/products/${product.id}`}>
                           <div className="relative mb-3 aspect-square w-full sm:mb-4">
-                            {product.images && product.images.length > 0 ? (
-                              <img
-                                src={product.images[0]}
-                                alt={product.name}
-                                className="aspect-square w-full rounded-lg object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                                }}
-                              />
-                            ) : (
-                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
-                            )}
+                            <img
+                              src={getPrimaryImage(product)}
+                              alt={product.name}
+                              className="aspect-square w-full rounded-lg object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                              }}
+                            />
                             <LikeButton productId={product.id} size="sm" />
                           </div>
                         <h3 className="mb-1 text-sm font-semibold group-hover:text-soft-blue-600 sm:mb-2 sm:text-base">
                           {product.name}
                         </h3>
-                        {product.brand && (
+                        {brandName && (
                           <p className="mb-1 text-xs text-muted-foreground sm:mb-2 sm:text-sm">
-                            {product.brand}
+                            {brandName}
                           </p>
                         )}
                         <p className="text-base font-bold text-soft-blue-600 sm:text-lg">
-                          {formatCurrency(priceInPHP, "PHP")}
+                          {formatCurrency(displayPrice, displayCurrency)}
                         </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {formatCurrency(product.price, "KRW")}
-                        </p>
+                        {product.currency === 'KRW' && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {formatCurrency(product.price, "KRW")}
+                          </p>
+                        )}
+                        {isInStock(product) && (
+                          <span className="mt-1 inline-block rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">
+                            In Stock ({getAvailableStock(product)})
+                          </span>
+                        )}
                         </Link>
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Pagination */}
+              {pagination && pagination.total_pages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-4">
+                  <button
+                    disabled={!pagination.has_prev || loading}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-grey-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {pagination.page} of {pagination.total_pages}
+                  </span>
+                  <button
+                    disabled={!pagination.has_next || loading}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-grey-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                  {pagination.has_next && (
+                    <button
+                      onClick={loadMore}
+                      disabled={loading}
+                      className="rounded-lg bg-soft-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-soft-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Load More
+                    </button>
+                  )}
                 </div>
               )}
             </>
