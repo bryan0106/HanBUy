@@ -9,7 +9,6 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [justLoggedIn, setJustLoggedIn] = useState(false);
 
   const checkAuth = useCallback(async () => {
     // Simple: Just check localStorage for user and token
