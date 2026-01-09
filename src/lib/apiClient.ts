@@ -12,7 +12,7 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor - Add JWT token to all requests
+// Request interceptor - Add JWT token to all requests and prevent caching
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
@@ -22,6 +22,19 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token.trim()}`;
       }
     }
+    
+    // Prevent caching for GET requests by adding cache-busting timestamp
+    // Note: We don't set Cache-Control headers here as they trigger CORS preflight
+    // The backend should set appropriate cache-control headers in the response
+    if (config.method === 'get') {
+      // Add cache-busting timestamp to query params to ensure fresh data
+      const timestamp = Date.now();
+      config.params = {
+        ...config.params,
+        _t: timestamp, // Cache-busting parameter
+      };
+    }
+    
     return config;
   },
   (error: AxiosError) => {

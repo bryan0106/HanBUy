@@ -1,35 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { categories } from "@/lib/mockData";
+import { productService } from "@/services/productService";
+import type { Product } from "@/services/productService";
 import toast from "react-hot-toast";
 
-interface ScrapedData {
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-  images: string[];
-  brand?: string;
-  sku?: string;
-  category?: string;
-  stock?: number;
-  weight?: number;
-  dimensions?: {
-    length?: number;
-    width?: number;
-    height?: number;
-  };
-}
-
-export default function NewInventoryItemPage() {
+export default function EditInventoryItemPage() {
   const router = useRouter();
-  const [url, setUrl] = useState("");
-  const [scraping, setScraping] = useState(false);
+  const params = useParams();
+  const productId = params.id as string;
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [showUrlInput, setShowUrlInput] = useState(false);
+  const loadingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -53,61 +40,71 @@ export default function NewInventoryItemPage() {
     },
   });
 
-  const handleScrape = async () => {
-    if (!url.trim()) {
-      const errorMsg = "Please enter a product URL";
-      setError(errorMsg);
-      toast.error(errorMsg);
+  useEffect(() => {
+    if (!hasLoadedRef.current && productId) {
+      hasLoadedRef.current = true;
+      loadProduct();
+    }
+  }, [productId]);
+
+  const loadProduct = async () => {
+    // Prevent duplicate calls
+    if (loadingRef.current) {
+      console.log("Product load already in progress, skipping duplicate call");
       return;
     }
 
-    setScraping(true);
-    setError("");
-    const scrapeToast = toast.loading("Scraping product data...");
-
+    loadingRef.current = true;
+    let loadingToast: string | undefined;
     try {
-      const response = await fetch("/api/products/scrape", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to scrape product");
-      }
-
-      const data = result.data;
+      setLoading(true);
+      loadingToast = toast.loading("Loading product...");
+      const product = await productService.getProductById(productId);
       
-      // Pre-fill form with scraped data
+      // Format dates for input fields
+      const orderDate = product.order_date ? new Date(product.order_date).toISOString().split('T')[0] : "";
+      const releaseDate = product.release_date ? new Date(product.release_date).toISOString().split('T')[0] : "";
+      
       setFormData({
-        ...formData,
-        name: data.name || formData.name,
-        description: data.description || formData.description,
-        price: data.price || formData.price,
-        currency: (data.currency === "KRW" || data.currency === "PHP" ? data.currency : "KRW") as "KRW" | "PHP",
-        images: Array.isArray(data.images) ? data.images : formData.images,
-        category: data.category || formData.category,
-        brand: data.brand || formData.brand,
-        sku: data.sku || formData.sku,
-        weight: data.weight || formData.weight,
-        dimensions: data.dimensions || formData.dimensions,
+        name: product.name || "",
+        description: product.description || "",
+        price: product.price || 0,
+        currency: (product.currency === "KRW" || product.currency === "PHP" ? product.currency : "KRW") as "KRW" | "PHP",
+        images: product.images || [],
+        category: product.category || "",
+        brand: product.brand || "",
+        sku: product.sku || "",
+        stock: product.stock || 0,
+        weight: product.weight || 0,
+        status: product.status || "active",
+        product_type: (
+          product.product_type === "preorder" || product.product_type === "preorder_and_onhand"
+            ? "preorder"
+            : product.product_type === "onhand"
+            ? "onhand"
+            : product.product_type === "kr_website"
+            ? "kr_website"
+            : "onhand"
+        ) as "onhand" | "preorder" | "kr_website",
+        order_date: orderDate,
+        release_date: releaseDate,
+        dimensions: product.dimensions || { length: 0, width: 0, height: 0 },
       });
       
-      toast.dismiss(scrapeToast);
-      toast.success("Product data scraped successfully!");
-      setShowUrlInput(false);
-      setUrl("");
+      if (loadingToast) {
+        toast.dismiss(loadingToast);
+        toast.success("Product loaded successfully");
+      }
     } catch (err: any) {
-      toast.dismiss(scrapeToast);
-      const errorMsg = err instanceof Error ? err.message : "Failed to scrape product";
-      setError(errorMsg);
-      toast.error(errorMsg);
+      if (loadingToast) {
+        toast.dismiss(loadingToast);
+      }
+      const errorMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Failed to load product";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
-      setScraping(false);
+      setLoading(false);
+      loadingRef.current = false;
     }
   };
 
@@ -117,21 +114,30 @@ export default function NewInventoryItemPage() {
 
     // Validate required fields
     if (!formData.name.trim()) {
-      setError("Product name is required");
+      const errorMsg = "Product name is required";
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
     if (formData.images.length === 0) {
-      setError("At least one product image is required");
+      const errorMsg = "At least one product image is required";
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
     if (formData.product_type === "preorder" && (!formData.order_date || !formData.release_date)) {
-      setError("Order date and release date are required for preorder products");
+      const errorMsg = "Order date and release date are required for preorder products";
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
-    let createToast: string | undefined;
+    setSaving(true);
+    setError("");
+    let updateToast: string | undefined;
     try {
       // Prepare payload according to product table structure
+      // Make sure to use correct fields: product_type and status
       const payload: any = {
         name: formData.name.trim(),
         description: formData.description.trim() || null,
@@ -142,8 +148,8 @@ export default function NewInventoryItemPage() {
         brand: formData.brand.trim() || null,
         sku: formData.sku.trim() || null,
         stock: formData.stock,
-        status: formData.status,
-        product_type: formData.product_type,
+        status: formData.status, // Must be "active", "inactive", or "out_of_stock"
+        product_type: formData.product_type, // Can be "onhand", "preorder", or "kr_website"
         weight: formData.weight || null,
         dimensions: formData.dimensions.length > 0 || formData.dimensions.width > 0 || formData.dimensions.height > 0
           ? formData.dimensions
@@ -156,24 +162,27 @@ export default function NewInventoryItemPage() {
         payload.release_date = formData.release_date ? new Date(formData.release_date).toISOString() : null;
       }
 
-      createToast = toast.loading("Creating product...");
-      const { productService } = await import("@/services/productService");
-      await productService.createProduct(payload);
-      toast.dismiss(createToast);
-      toast.success(`"${formData.name}" created successfully!`);
+      console.log("Updating product with payload:", payload);
+      updateToast = toast.loading("Updating product...");
+      await productService.updateProduct(productId, payload);
+      toast.dismiss(updateToast);
+      toast.success("Product updated successfully!");
       // Add query parameter to trigger refresh on inventory page
       router.push("/admin/inventory?refreshed=true");
       router.refresh(); // Force Next.js to refresh the page
     } catch (err: any) {
-      if (createToast) toast.dismiss(createToast);
-      const errorMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Failed to create product";
+      console.error("Failed to update product:", err);
+      if (updateToast) toast.dismiss(updateToast);
+      const errorMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Failed to update product";
       setError(errorMessage);
       toast.error(errorMessage);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleImageRemove = (index: number) => {
-    const newImages = [...(formData.images || [])];
+    const newImages = [...formData.images];
     newImages.splice(index, 1);
     setFormData({ ...formData, images: newImages });
   };
@@ -182,15 +191,23 @@ export default function NewInventoryItemPage() {
     if (url.trim()) {
       setFormData({
         ...formData,
-        images: [...(formData.images || []), url],
+        images: [...formData.images, url],
       });
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading product...</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Add New Inventory Item</h1>
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Edit Inventory Item</h1>
         <Link
           href="/admin/inventory"
           className="text-sm text-soft-blue-600 hover:underline sm:text-base"
@@ -199,49 +216,11 @@ export default function NewInventoryItemPage() {
         </Link>
       </div>
 
-      {/* URL Import Section */}
-      <div className="mb-6 rounded-lg border border-border bg-card p-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Quick Import from URL</h2>
-            <p className="text-sm text-muted-foreground">
-              Paste a product URL to automatically fill in product details
-            </p>
-          </div>
-          <button
-            onClick={() => setShowUrlInput(!showUrlInput)}
-            className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700 sm:w-auto"
-          >
-            {showUrlInput ? "Cancel" : "📥 Import from URL"}
-          </button>
+      {error && (
+        <div className="mb-6 rounded-lg bg-error/10 p-3 text-sm text-error">
+          {error}
         </div>
-        
-        {showUrlInput && (
-          <div className="mt-4 flex flex-col gap-4 sm:flex-row">
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://gmarket.co.kr/product/... or https://amazon.com/..."
-              className="flex-1 rounded-lg border border-border bg-background px-4 py-2"
-              disabled={scraping}
-            />
-            <button
-              onClick={handleScrape}
-              disabled={scraping || !url.trim()}
-              className="w-full rounded-lg bg-soft-blue-600 px-6 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700 disabled:opacity-50 sm:w-auto"
-            >
-              {scraping ? "Scraping..." : "Scrape"}
-            </button>
-          </div>
-        )}
-        
-        {error && (
-          <div className="mt-4 rounded-lg bg-error/10 p-3 text-sm text-error">
-            {error}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Product Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -308,7 +287,7 @@ export default function NewInventoryItemPage() {
                   required
                   className="w-full rounded-lg border border-border bg-background px-4 py-2"
                 >
-                  <option value="all">All Categories</option>
+                  <option value="">Select Category</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.slug}>
                       {cat.name}
@@ -545,9 +524,24 @@ export default function NewInventoryItemPage() {
           <div className="flex flex-col gap-4 sm:flex-row">
             <button
               type="submit"
-              className="w-full rounded-lg bg-soft-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700 sm:w-auto"
+              disabled={saving}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white transition-colors sm:w-auto ${
+                saving
+                  ? "bg-grey-400 cursor-not-allowed"
+                  : "bg-soft-blue-600 hover:bg-soft-blue-700"
+              }`}
             >
-              Save Product
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Updating...
+                </span>
+              ) : (
+                "Update Product"
+              )}
             </button>
             <Link
               href="/admin/inventory"

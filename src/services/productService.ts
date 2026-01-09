@@ -147,4 +147,39 @@ export const productService = {
       throw handleApiError(error);
     }
   },
+
+  /**
+   * Create a new product
+   */
+  async createProduct(productData: Partial<Product>): Promise<Product> {
+    try {
+      const response = await apiClient.post<GetProductResponse>('/products', productData);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Update an existing product
+   */
+  async updateProduct(id: string, productData: Partial<Product>): Promise<Product> {
+    try {
+      const response = await apiClient.put<GetProductResponse>(`/products/${id}`, productData);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Delete a product
+   */
+  async deleteProduct(id: string): Promise<void> {
+    try {
+      await apiClient.delete(`/products/${id}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
 };
