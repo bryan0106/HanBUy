@@ -23,11 +23,12 @@ function LoginForm() {
     }
   }, [errorParam]);
 
-  // Simple redirect if already authenticated
+  // Simple redirect if already authenticated (only customers allowed here)
   useEffect(() => {
     if (isAuthenticated && user) {
       if (isAdmin) {
-        router.push("/admin");
+        // Admin trying to access customer login - redirect to admin login
+        router.push("/admin/login");
       } else {
         const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
           ? redirectParam 
@@ -51,15 +52,25 @@ function LoginForm() {
       
       setLoading(false);
       
-      // Simple redirect based on role
+      // Check if user is admin - redirect to admin login if admin
       if (result.role === 'admin') {
-        router.push("/admin");
-      } else {
-        const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
-          ? redirectParam 
-          : "/store";
-        router.replace(redirectTo);
+        setError("Admin accounts must login at /admin/login");
+        // Clear the login attempt (user will be logged out automatically)
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('hanbuy_token');
+          localStorage.removeItem('hanbuy_user');
+        }
+        setTimeout(() => {
+          router.push("/admin/login");
+        }, 2000);
+        return;
       }
+      
+      // Customer login - redirect to store
+      const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
+        ? redirectParam 
+        : "/store";
+      router.replace(redirectTo);
     } catch (err) {
       const errorMessage = err instanceof Error 
         ? err.message 
@@ -77,7 +88,7 @@ function LoginForm() {
         <div className="mb-6 text-center">
           <h1 className="mb-2 text-3xl font-bold text-foreground">Welcome Back</h1>
           <p className="text-muted-foreground">
-            Sign in to access your dashboard
+            Sign in to access the store
           </p>
         </div>
 
@@ -131,24 +142,8 @@ function LoginForm() {
         </form>
 
         <div className="mt-6 space-y-2 rounded-lg bg-grey-50 p-4 text-sm text-muted-foreground">
-          <p className="font-semibold text-foreground">Test Accounts:</p>
+          <p className="font-semibold text-foreground">Test Customer Accounts:</p>
           <div className="space-y-3">
-            <div>
-              <p className="mb-1">
-                <strong>Admin:</strong> admin@hanbuy.com / admin (or admin123)
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("admin@hanbuy.com");
-                  setPassword("admin123");
-                }}
-                disabled={loading}
-                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Click to fill admin credentials
-              </button>
-            </div>
             <div>
               <p className="mb-1">
                 <strong>Customer 1:</strong> customer1@test.com / test123
@@ -199,10 +194,16 @@ function LoginForm() {
             </div>
           </div>
         </div>
-        <div className="mt-4 text-center">
+        <div className="mt-4 text-center space-y-2">
+          <Link
+            href="/admin/login"
+            className="block text-sm text-soft-blue-600 hover:underline"
+          >
+            Admin Login →
+          </Link>
           <Link
             href="/store"
-            className="text-sm text-soft-blue-600 hover:underline"
+            className="block text-sm text-muted-foreground hover:underline"
           >
             ← Back to Store
           </Link>

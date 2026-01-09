@@ -54,15 +54,20 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
-        const isAuthPage = currentPath === '/auth/login' || currentPath === '/auth/register';
+        const isAuthPage = currentPath === '/auth/login' || currentPath === '/auth/register' || currentPath === '/admin/login';
+        const isAdminPage = currentPath.startsWith('/admin');
         
         // Clear tokens
         localStorage.removeItem('hanbuy_token');
         localStorage.removeItem('hanbuy_user');
         
-        // Redirect to login if not already on auth pages
+        // Redirect to appropriate login page if not already on auth pages
         if (!isAuthPage) {
-          window.location.href = '/auth/login';
+          if (isAdminPage) {
+            window.location.href = '/admin/login';
+          } else {
+            window.location.href = '/auth/login';
+          }
         }
       }
     }

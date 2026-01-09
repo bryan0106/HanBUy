@@ -33,7 +33,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = () => {
     logout();
-    router.push("/auth/login");
+    router.push("/admin/login");
   };
 
   const handleNavClick = () => {

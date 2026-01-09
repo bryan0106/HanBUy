@@ -724,11 +724,6 @@ export const authService = {
    *   - "Account not approved. Please wait for admin approval." (403)
    */
   login: async (email: string, password: string): Promise<LoginResponse> => {
-    // Use mock data if running on localhost
-    if (isLocalhost()) {
-      return mockLogin(email, password);
-    }
-    
     const url = `${API_BASE_URL}/auth/login`;
     
     try {
@@ -817,10 +812,7 @@ export const authService = {
         throw new Error("Request timeout: Login service did not respond in time. Please check if the backend server is running.");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
         // User-friendly error message
-        const isLocalhost = API_BASE_URL.includes('localhost');
-        const errorMessage = isLocalhost
-          ? `Network error: Could not connect to login service. Make sure the backend server is running at ${API_BASE_URL}`
-          : `Network error: Could not connect to login service. The backend API at ${API_BASE_URL} may be unavailable.`;
+        const errorMessage = `Network error: Could not connect to login service. The backend API at ${API_BASE_URL} may be unavailable.`;
         
         throw new Error(errorMessage);
       } else {

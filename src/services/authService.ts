@@ -158,7 +158,15 @@ export const authService = {
       };
 
       // Store token and user immediately - simple and straightforward
+      // Always reset localStorage if admin logs in
       if (typeof window !== 'undefined' && token && user) {
+        // If admin, clear all localStorage first to reset any previous session
+        if (user.role === 'admin') {
+          localStorage.removeItem('hanbuy_token');
+          localStorage.removeItem('hanbuy_user');
+        }
+        
+        // Store new token and user
         localStorage.setItem('hanbuy_token', token.trim());
         localStorage.setItem('hanbuy_user', JSON.stringify(user));
       }

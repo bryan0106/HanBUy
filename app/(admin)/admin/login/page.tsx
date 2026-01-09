@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { Spinner } from "@/components/ui/spinner";
 
-function LoginForm() {
+function AdminLoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,22 +18,23 @@ function LoginForm() {
   const errorParam = searchParams.get("error");
 
   useEffect(() => {
-    if (errorParam === "admin_access_required") {
-      setError("Admin access required. Please login at /admin");
+    if (errorParam === "customer_access_required") {
+      setError("This is an admin login page. Please use customer login for store access.");
     }
   }, [errorParam]);
 
-  // Simple redirect if already authenticated (only customers allowed here)
+  // Redirect if already authenticated as admin
   useEffect(() => {
     if (isAuthenticated && user) {
       if (isAdmin) {
-        // Admin trying to access customer login - redirect to admin login
-        router.push("/admin");
-      } else {
-        const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
-          ? redirectParam 
-          : "/store";
+        const redirectTo = redirectParam && redirectParam.startsWith("/admin") && redirectParam.length > 6
+          ? redirectParam
+          : "/admin";
         router.replace(redirectTo);
+      } else {
+        // Customer trying to access admin login - redirect to customer login
+        setError("This is an admin login page. Please use customer login for store access.");
+        router.push("/auth/login?error=customer_access_required");
       }
     }
   }, [isAuthenticated, user, isAdmin, router, redirectParam]);
@@ -50,26 +51,24 @@ function LoginForm() {
         throw new Error("Login succeeded but no user data returned");
       }
       
-      setLoading(false);
-      
-      // Check if user is admin - redirect to admin login if admin
-      if (result.role === 'admin') {
-        setError("Admin accounts must login at /admin");
+      // Check if user is admin
+      if (result.role !== 'admin') {
+        setError("Admin access required. Please login with admin credentials.");
+        setLoading(false);
         // Clear the login attempt (user will be logged out automatically)
         if (typeof window !== 'undefined') {
           localStorage.removeItem('hanbuy_token');
           localStorage.removeItem('hanbuy_user');
         }
-        setTimeout(() => {
-          router.push("/admin");
-        }, 2000);
         return;
       }
       
-      // Customer login - redirect to store
-      const redirectTo = redirectParam && redirectParam.startsWith("/") && redirectParam.length > 1 
-        ? redirectParam 
-        : "/store";
+      setLoading(false);
+      
+      // Redirect to admin dashboard
+      const redirectTo = redirectParam && redirectParam.startsWith("/admin") && redirectParam.length > 6
+        ? redirectParam
+        : "/admin";
       router.replace(redirectTo);
     } catch (err) {
       const errorMessage = err instanceof Error 
@@ -86,9 +85,9 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-grey-50">
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 shadow-lg">
         <div className="mb-6 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-foreground">Welcome Back</h1>
+          <h1 className="mb-2 text-3xl font-bold text-foreground">Admin Login</h1>
           <p className="text-muted-foreground">
-            Sign in to access the store
+            Sign in to access admin dashboard
           </p>
         </div>
 
@@ -105,7 +104,7 @@ function LoginForm() {
               required
               disabled={loading}
               className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-soft-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              placeholder="your@email.com"
+              placeholder="admin@hanbuy.com"
             />
           </div>
 
@@ -137,75 +136,42 @@ function LoginForm() {
             className="w-full rounded-lg bg-soft-blue-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading && <Spinner size="sm" className="text-white" />}
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in..." : "Sign In as Admin"}
           </button>
         </form>
 
         <div className="mt-6 space-y-2 rounded-lg bg-grey-50 p-4 text-sm text-muted-foreground">
-          <p className="font-semibold text-foreground">Test Customer Accounts:</p>
-          <div className="space-y-3">
-            <div>
-              <p className="mb-1">
-                <strong>Customer 1:</strong> customer1@test.com / test123
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("customer1@test.com");
-                  setPassword("test123");
-                }}
-                disabled={loading}
-                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Click to fill customer 1 credentials
-              </button>
-            </div>
-            <div>
-              <p className="mb-1">
-                <strong>Customer 2:</strong> customer2@test.com / test123
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("customer2@test.com");
-                  setPassword("test123");
-                }}
-                disabled={loading}
-                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Click to fill customer 2 credentials
-              </button>
-            </div>
-            <div>
-              <p className="mb-1">
-                <strong>Customer 3:</strong> customer3@test.com / test123
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("customer3@test.com");
-                  setPassword("test123");
-                }}
-                disabled={loading}
-                className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Click to fill customer 3 credentials
-              </button>
-            </div>
+          <p className="font-semibold text-foreground">Test Admin Account:</p>
+          <div>
+            <p className="mb-1">
+              <strong>Admin:</strong> admin@hanbuy.com / admin123
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("admin@hanbuy.com");
+                setPassword("admin123");
+              }}
+              disabled={loading}
+              className="text-xs text-soft-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Click to fill admin credentials
+            </button>
           </div>
         </div>
+
         <div className="mt-4 text-center space-y-2">
           <Link
-            href="/admin"
+            href="/auth/login"
             className="block text-sm text-soft-blue-600 hover:underline"
           >
-            Admin Login →
+            Customer Login →
           </Link>
           <Link
             href="/store"
             className="block text-sm text-muted-foreground hover:underline"
           >
-            ← Browse Store
+            ← Back to Store
           </Link>
         </div>
       </div>
@@ -213,19 +179,19 @@ function LoginForm() {
   );
 }
 
-export default function Home() {
+export default function AdminLoginPage() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center bg-grey-50">
         <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 shadow-lg">
           <div className="mb-6 text-center">
-            <h1 className="mb-2 text-3xl font-bold text-foreground">Welcome Back</h1>
+            <h1 className="mb-2 text-3xl font-bold text-foreground">Admin Login</h1>
             <p className="text-muted-foreground">Loading...</p>
           </div>
         </div>
       </div>
     }>
-      <LoginForm />
+      <AdminLoginForm />
     </Suspense>
   );
 }

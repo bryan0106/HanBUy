@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 
@@ -12,16 +12,28 @@ export default function Layout({
 }) {
   const { isAuthenticated, isAdmin, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Exclude root /admin route from authentication check (it's the login page)
+  const isLoginPage = pathname === "/admin";
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !isLoginPage) {
+      // For other admin routes (not /admin), require authentication
       if (!isAuthenticated) {
-        router.push("/auth/login?redirect=/admin");
+        router.push("/admin?redirect=" + encodeURIComponent(pathname || "/admin"));
       } else if (!isAdmin) {
-        router.push("/auth/login?redirect=/admin&error=admin_access_required");
+        router.push("/admin?error=admin_access_required");
       }
     }
-  }, [isAuthenticated, isAdmin, loading, router]);
+  }, [isAuthenticated, isAdmin, loading, router, isLoginPage, pathname]);
+
+  // Allow /admin route (login page) to render without authentication
+  // The page component itself will handle showing login or dashboard
+  // Never show sidebar on login page
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (
