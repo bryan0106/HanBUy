@@ -1,0 +1,62 @@
+# HanBuy Project Rules
+
+## Authentication & Security
+- Frontend sends plain text password (NEVER hash on frontend)
+- Backend uses bcrypt.compare(plainPassword, password_hash) for verification
+- Backend field name is `password_hash` (NOT `password`)
+- NEVER return password_hash in API responses
+- Always normalize email: email.toLowerCase().trim()
+- Always trim password before comparison
+
+## API Response Format
+- Success: { success: true, user: {...}, token: "..." }
+- Error: { success: false, error: "...", message: "..." }
+- User object NEVER includes password_hash
+
+## Code Style
+- Use TypeScript
+- Use async/await (not .then())
+- Handle errors with try/catch
+- Use meaningful variable names
+- Add minimal logging (console.log for debugging only)
+
+## File Structure
+- Services: src/services/
+- Hooks: src/hooks/
+- Components: src/components/
+- Types: src/types/
+- Utils: src/utils/
+
+## API Client
+- Use apiClient from @/lib/apiClient
+- Base URL: process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api'
+- Token stored in localStorage as 'hanbuy_token'
+- User stored in localStorage as 'hanbuy_user'
+
+## Error Handling
+- 401: Invalid credentials → Show "Invalid email or password"
+- 403: Account not approved → Show approval message
+- 400: Validation error → Show specific field errors
+- 500: Server error → Show generic error message
+
+## Testing
+- Test with real API endpoints
+- Verify password_hash is never in response
+- Test email normalization
+- Test error cases (401, 403, 400)
+
+## Don't
+- Don't create documentation files unless explicitly asked
+- Don't hash passwords on frontend
+- Don't return password_hash in responses
+- Don't log passwords or password hashes
+- Don't use .then() chains (use async/await)
+
+## Do
+- Fix code directly
+- Normalize emails
+- Trim passwords
+- Handle all error cases
+- Store token and user after login
+- Clear storage on 401 errors
+

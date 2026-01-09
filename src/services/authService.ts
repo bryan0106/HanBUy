@@ -88,10 +88,14 @@ export const authService = {
    */
   async login(email: string, password: string): Promise<LoginResponse> {
     try {
+      // Normalize email (lowercase, trim) - backend should do this too but ensure frontend does it
+      const normalizedEmail = email.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+      
       console.log('📤 Sending login request...');
       const response = await apiClient.post<any>('/auth/login', {
-        email,
-        password,
+        email: normalizedEmail,
+        password: trimmedPassword,
       });
 
       // Simple logging
@@ -163,6 +167,7 @@ export const authService = {
         localStorage.setItem('hanbuy_user', JSON.stringify(user));
         console.log('✅ Token stored - user logged in');
       }
+
 
       return normalizedResponse;
     } catch (error) {

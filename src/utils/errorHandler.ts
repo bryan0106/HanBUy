@@ -55,7 +55,7 @@ export function handleApiError(error: unknown): ApiError {
         };
       case 401:
         return {
-          message: 'Unauthorized. Please log in again.',
+          message: data?.message || data?.error || 'Invalid email or password',
           status: 401,
         };
       case 403:

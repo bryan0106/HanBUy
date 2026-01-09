@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 
 // Get base URL from environment variable
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hanbuyapi.onrender.com/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
