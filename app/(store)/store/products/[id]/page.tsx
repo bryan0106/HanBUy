@@ -5,9 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { productService, type Product } from "@/services/productService";
 import { cartService } from "@/services/cartService";
 import { orderService } from "@/services/orderService";
-import { utilityService, type BoxType } from "@/services/utilityService";
 import { currencyService } from "@/services/currencyService";
-import { boxService, type AvailableSharedBox } from "@/services/boxService";
 import { formatCurrency } from "@/lib/currency";
 import type { Product as ProductFromTypes, ProductVariation, ProductReview } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -15,11 +13,13 @@ import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { getProductReviews, getAverageRating } from "@/lib/mockData";
 import { PriceComparison } from "@/components/store/PriceComparison";
+import { PriceComparisonInline } from "@/components/store/PriceComparisonInline";
 import { ProductImageSkeleton, ProductInfoSkeleton, ReviewSkeleton } from "@/components/ui/skeleton";
 import { ImageZoom } from "@/components/store/ImageZoom";
 import { StickyCartBar } from "@/components/store/StickyCartBar";
 import { SocialShare } from "@/components/store/SocialShare";
 import { ErrorBoundary } from "@/components/store/ErrorBoundary";
+import { ProductSelectionModal } from "@/components/store/ProductSelectionModal";
 
 // Extended Product type that includes variations for this component
 type ProductWithVariations = Product & {
@@ -37,22 +37,17 @@ export default function ProductDetailPage() {
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
-  const [boxTypes, setBoxTypes] = useState<BoxType[]>([]);
-  const [boxTypesLoading, setBoxTypesLoading] = useState(true);
-  const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
-  const [selectedBoxSize, setSelectedBoxSize] = useState<"small" | "medium" | "large">("large");
-  // Shared box states
-  const [availableSharedBoxes, setAvailableSharedBoxes] = useState<AvailableSharedBox[]>([]);
-  const [selectedSharedBoxId, setSelectedSharedBoxId] = useState<string | null>(null);
-  const [loadingSharedBoxes, setLoadingSharedBoxes] = useState(false);
-  // Solo box states
-  const [availableSoloBoxes, setAvailableSoloBoxes] = useState<AvailableSharedBox[]>([]);
-  const [selectedSoloBoxId, setSelectedSoloBoxId] = useState<string | null>(null);
-  const [loadingSoloBoxes, setLoadingSoloBoxes] = useState(false);
-  const [showBoxSizeSelection, setShowBoxSizeSelection] = useState(false);
+  // Box selection removed - will be done on request shipping page
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
+  // Accordion states
+  const [productDetailsOpen, setProductDetailsOpen] = useState(false);
+  const [priceComparisonOpen, setPriceComparisonOpen] = useState(false);
+  const [priceSummaryOpen, setPriceSummaryOpen] = useState(false);
+  // Product selection modal state
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [modalActionType, setModalActionType] = useState<"addToCart" | "buyNow">("addToCart");
   // Variation states
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
   // Swipe states for mobile
@@ -82,47 +77,12 @@ export default function ProductDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Box size pricing (PHP) - Define before use in useEffect
-  const boxSizePricing = {
-    small: {
-      solo: { base: 1500, perKg: 50, perCbm: 1000 },
-      shared: { base: 800, perKg: 30, perCbm: 600 },
-      maxWeight: 5, // kg
-      maxVolume: 0.1, // CBM
-    },
-    medium: {
-      solo: { base: 2300, perKg: 80, perCbm: 2000 },
-      shared: { base: 1500, perKg: 50, perCbm: 1200 },
-      maxWeight: 15, // kg
-      maxVolume: 0.3, // CBM
-    },
-    large: {
-      solo: { base: 3500, perKg: 120, perCbm: 3000 },
-      shared: { base: 2200, perKg: 70, perCbm: 1800 },
-      maxWeight: 30, // kg
-      maxVolume: 0.6, // CBM
-    },
-  };
+  // Box selection moved to request shipping page
 
   useEffect(() => {
     loadProduct();
-    loadBoxTypes();
     loadCurrencyRate();
   }, [productId]);
-
-  // Load boxes when box type is selected or user changes
-  useEffect(() => {
-    if (boxTypePreference === "shared" && !loadingSharedBoxes) {
-      loadAvailableSharedBoxes();
-    } else if (boxTypePreference === "solo" && !loadingSoloBoxes) {
-      if (user?.id) {
-        loadAvailableSoloBoxes();
-      } else {
-        // No user, show size selection
-        setShowBoxSizeSelection(true);
-      }
-    }
-  }, [boxTypePreference, user?.id]);
 
   const loadCurrencyRate = async () => {
     setCurrencyLoading(true);
@@ -136,6 +96,7 @@ export default function ProductDetailPage() {
       setCurrencyLoading(false);
     }
   };
+
 
   useEffect(() => {
     if (isAuthenticated && user && product) {
@@ -201,22 +162,6 @@ export default function ProductDetailPage() {
     }
   };
 
-  const loadBoxTypes = async () => {
-    setBoxTypesLoading(true);
-    try {
-      const types = await utilityService.getBoxTypes();
-      setBoxTypes(types);
-    } catch (error) {
-      console.warn("Failed to fetch box types from API, using defaults:", error);
-      // Fallback to default box types
-      setBoxTypes([
-        { code: "SOLO", name: "SOLO", description: "Solo Box" },
-        { code: "SHARED", name: "SHARED", description: "Shared Box" },
-      ]);
-    } finally {
-      setBoxTypesLoading(false);
-    }
-  };
 
   const checkUserPurchase = async () => {
     if (!isAuthenticated || !user || !product) {
@@ -232,21 +177,27 @@ export default function ProductDetailPage() {
         user_id: user.id,
         payment_status: 'paid'
       });
-      const orders = ordersResponse.data;
+      const orders = ordersResponse?.data || [];
       
       // Also check partial payments
-      const partialOrdersResponse = await orderService.getOrders({
-        user_id: user.id,
-        payment_status: 'partial'
-      });
-      const partialOrders = partialOrdersResponse.data;
+      let partialOrders: any[] = [];
+      try {
+        const partialOrdersResponse = await orderService.getOrders({
+          user_id: user.id,
+          payment_status: 'partial'
+        });
+        partialOrders = partialOrdersResponse?.data || [];
+      } catch (partialError) {
+        // Silently handle partial orders error - not critical
+        console.warn("Could not fetch partial orders:", partialError);
+      }
       
       const allOrders = [...orders, ...partialOrders];
       
       // Check if user has purchased this product
       const hasPurchasedProduct = allOrders.some(order => {
         // Check if any order item matches this product
-        return order.order_items?.some(item => item.product_id === product.id);
+        return order.order_items?.some((item: any) => item.product_id === product.id);
       });
 
       setHasPurchased(hasPurchasedProduct);
@@ -256,8 +207,12 @@ export default function ProductDetailPage() {
         const userReview = reviews.find(r => r.userId === user.id);
         setHasAlreadyReviewed(!!userReview);
       }
-    } catch (error) {
-      console.error("Error checking user purchase:", error);
+    } catch (error: any) {
+      // Only log if it's a real error, not just missing data
+      if (error?.message || error?.response) {
+        console.error("Error checking user purchase:", error?.message || error);
+      }
+      // Default to not purchased on error
       setHasPurchased(false);
     } finally {
       setCheckingPurchase(false);
@@ -280,23 +235,6 @@ export default function ProductDetailPage() {
     }
   }, [product]);
 
-    // Auto-select appropriate box size based on product weight/dimensions
-  useEffect(() => {
-    if (product) {
-      const totalWeight = (product.weight || 0) * quantity;
-      const totalVolume = product.dimensions 
-        ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 * quantity
-        : totalWeight / 1000;
-      
-      if (totalWeight <= boxSizePricing.small.maxWeight && totalVolume <= boxSizePricing.small.maxVolume) {
-        setSelectedBoxSize("small");
-      } else if (totalWeight <= boxSizePricing.medium.maxWeight && totalVolume <= boxSizePricing.medium.maxVolume) {
-        setSelectedBoxSize("medium");
-      } else {
-        setSelectedBoxSize("large");
-      }
-    }
-  }, [product, quantity]);
 
   if (loading && !product) {
     return (
@@ -362,150 +300,31 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleBoxTypeSelect = async (boxType: "SOLO" | "SHARED") => {
-    const newPreference = boxType.toLowerCase() as "solo" | "shared";
-    setBoxTypePreference(newPreference);
-    
-    // If switching to shared, load available shared boxes
-    if (newPreference === "shared") {
-      await loadAvailableSharedBoxes();
-      // Reset solo box selection
-      setSelectedSoloBoxId(null);
-      setShowBoxSizeSelection(false);
-    } else {
-      // If switching to solo, load available solo boxes
-      await loadAvailableSoloBoxes();
-      // Reset shared box selection
-      setSelectedSharedBoxId(null);
-    }
-  };
+  // Box selection functions removed - handled on request shipping page
 
-  const loadAvailableSoloBoxes = async () => {
-    if (!user?.id) {
-      // No user, show size selection
-      setShowBoxSizeSelection(true);
-      return;
-    }
-
-    setLoadingSoloBoxes(true);
-    try {
-      // Get customer's own pending solo boxes (not yet delivered)
-      // Customer can add more items to fill their existing box
-      const boxes = await boxService.getAvailableSoloBoxes(user.id);
-      
-      if (boxes.length === 0) {
-        // No existing pending solo boxes, show size selection for new box
-        setShowBoxSizeSelection(true);
-        setAvailableSoloBoxes([]);
-        setSelectedSoloBoxId(null);
-      } else {
-        // Has existing pending solo boxes, show them as options
-        // Customer can continue filling their box with more items
-        setShowBoxSizeSelection(false);
-        setAvailableSoloBoxes(boxes);
-        // Auto-select first available box
-        if (boxes.length > 0 && !selectedSoloBoxId) {
-          setSelectedSoloBoxId(boxes[0].id);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading solo boxes:", error);
-      // On error, show size selection
-      setShowBoxSizeSelection(true);
-      setAvailableSoloBoxes([]);
-      setSelectedSoloBoxId(null);
-    } finally {
-      setLoadingSoloBoxes(false);
-    }
-  };
-
-  const loadAvailableSharedBoxes = async () => {
-    setLoadingSharedBoxes(true);
-    try {
-      const boxes = await boxService.getAvailableSharedBoxes();
-      
-      if (boxes.length === 0) {
-        // No shared boxes available, create a default one (medium size)
-        try {
-          const defaultBox = await boxService.createDefaultSharedBox();
-          const sharedBox: AvailableSharedBox = {
-            ...defaultBox,
-            max_weight: 15, // Medium size default
-            max_volume: 0.3, // Medium size default
-            current_weight: 0,
-            current_volume: 0,
-            participant_count: 0,
-            max_participants: 10,
-            is_full: false,
-          };
-          setAvailableSharedBoxes([sharedBox]);
-          setSelectedSharedBoxId(defaultBox.id);
-        } catch (error) {
-          console.error("Failed to create default shared box:", error);
-          // Create a mock default box for display
-          const timestamp = Date.now();
-          const mockBox: AvailableSharedBox = {
-            id: `default-${timestamp}`,
-            user_id: user?.id || '',
-            box_number: `SHARED-${new Date().getFullYear()}-001`,
-            box_type: 'shared',
-            status: 'in_warehouse',
-            items: [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            max_weight: 15,
-            max_volume: 0.3,
-            current_weight: 0,
-            current_volume: 0,
-            participant_count: 0,
-            max_participants: 10,
-            is_full: false,
-            tracking_id: `TRK-${timestamp.toString().slice(-8).toUpperCase()}`,
-          };
-          setAvailableSharedBoxes([mockBox]);
-          setSelectedSharedBoxId(mockBox.id);
-        }
-      } else {
-        setAvailableSharedBoxes(boxes);
-        // Auto-select first available box
-        if (boxes.length > 0 && !selectedSharedBoxId) {
-          setSelectedSharedBoxId(boxes[0].id);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading shared boxes:", error);
-      // Create a mock default box for display
-      const mockBox: AvailableSharedBox = {
-        id: `default-${Date.now()}`,
-        user_id: user?.id || '',
-        box_number: `SHARED-${new Date().getFullYear()}-001`,
-        box_type: 'shared',
-        status: 'in_warehouse',
-        items: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        max_weight: 15,
-        max_volume: 0.3,
-        current_weight: 0,
-        current_volume: 0,
-        participant_count: 0,
-        max_participants: 10,
-        is_full: false,
-      };
-      setAvailableSharedBoxes([mockBox]);
-      setSelectedSharedBoxId(mockBox.id);
-    } finally {
-      setLoadingSharedBoxes(false);
-    }
-  };
-
-  const handleAddToCart = async () => {
-    if (!product) return;
-    
+  // Open modal for add to cart
+  const handleAddToCart = () => {
     if (!isAuthenticated || !user) {
       router.push("/auth/login?redirect=/store/products/" + productId);
       return;
     }
+    setModalActionType("addToCart");
+    setShowProductModal(true);
+  };
+
+  // Open modal for buy now
+  const handleBuyNow = () => {
+    if (!isAuthenticated || !user) {
+      router.push("/auth/login?redirect=/store/products/" + productId);
+      return;
+    }
+    setModalActionType("buyNow");
+    setShowProductModal(true);
+  };
+
+  // Actually add to cart (called from modal)
+  const handleAddToCartSubmit = async (qty: number, variations: Record<string, string>) => {
+    if (!product || !user) return;
 
     // Validate product ID is a UUID (backend requirement)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -526,32 +345,12 @@ export default function ProductDetailPage() {
     setCartSuccess(false);
 
     try {
-      // Prepare variation data
-      const variationData: Record<string, string> = {};
-      if (product.variations && Object.keys(selectedVariations).length > 0) {
-        Object.entries(selectedVariations).forEach(([type, variationId]) => {
-          const variation = product.variations?.find((v) => v.id === variationId);
-          if (variation) {
-            variationData[type] = variation.value;
-          }
-        });
-      }
-
+      // Add to cart - box selection will be done on request shipping page
       await cartService.addToCart({
         user_id: user.id,
         product_id: product.id,
-        quantity: quantity,
-        box_type_preference: boxTypePreference,
-        ...(boxTypePreference === "shared" && selectedSharedBoxId && {
-          shared_box_id: selectedSharedBoxId,
-        }),
-        ...(boxTypePreference === "solo" && {
-          ...(showBoxSizeSelection ? {
-            box_size: selectedBoxSize,
-          } : selectedSoloBoxId && {
-            solo_box_id: selectedSoloBoxId,
-          }),
-        }),
+        quantity: qty,
+        // No box info needed - will be selected when requesting shipping
       });
 
       setCartSuccess(true);
@@ -573,18 +372,14 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleBuyNow = () => {
+  // Actually buy now (called from modal)
+  const handleBuyNowSubmit = (qty: number, variations: Record<string, string>) => {
     if (!product) return;
-    
-    if (!isAuthenticated || !user) {
-      router.push("/auth/login?redirect=/store/products/" + productId);
-      return;
-    }
 
     // Prepare variation data
     const variationData: Record<string, string> = {};
-    if (product.variations && Object.keys(selectedVariations).length > 0) {
-      Object.entries(selectedVariations).forEach(([type, variationId]) => {
+    if (product.variations && Object.keys(variations).length > 0) {
+      Object.entries(variations).forEach(([type, variationId]) => {
         const variation = product.variations?.find((v) => v.id === variationId);
         if (variation) {
           variationData[type] = variation.value;
@@ -592,29 +387,27 @@ export default function ProductDetailPage() {
       });
     }
 
-    // Calculate current price
-    const calculatedPrice = calculatePrice();
+    // Calculate price with selected variations
+    let basePrice = product.price;
+    if (product.variations && product.variations.length > 0) {
+      Object.values(variations).forEach((variationId) => {
+        const variation = product.variations?.find((v) => v.id === variationId);
+        if (variation && variation.priceModifier) {
+          basePrice += variation.priceModifier;
+        }
+      });
+    }
 
     // Store order data in sessionStorage for payment page
     const orderData = {
       productId: product.id,
       name: product.name,
-      price: calculatedPrice,
-      quantity: quantity,
-      boxTypePreference: boxTypePreference,
-      ...(boxTypePreference === "shared" && selectedSharedBoxId && {
-        sharedBoxId: selectedSharedBoxId,
-      }),
-      ...(boxTypePreference === "solo" && {
-        ...(showBoxSizeSelection ? {
-          boxSize: selectedBoxSize,
-        } : selectedSoloBoxId && {
-          soloBoxId: selectedSoloBoxId,
-        }),
-      }),
+      price: basePrice,
+      quantity: qty,
+      // Box selection will be done on request shipping page
       variations: Object.keys(variationData).length > 0 ? variationData : undefined,
-      selectedVariationIds: Object.values(selectedVariations).length > 0 
-        ? Object.values(selectedVariations) 
+      selectedVariationIds: Object.values(variations).length > 0 
+        ? Object.values(variations) 
         : undefined,
     };
     
@@ -685,62 +478,12 @@ export default function ProductDetailPage() {
     return variationTypes.every((type) => selectedVariations[type] !== undefined);
   };
 
-  // Check if can add to cart based on box type
-  const canAddToCart = () => {
-    if (!hasRequiredVariations() || availableStock <= 0) {
-      return false;
-    }
-    
-    // For solo boxes
-    if (boxTypePreference === "solo") {
-      // If showing existing boxes, need to select one
-      if (!showBoxSizeSelection) {
-        return selectedSoloBoxId !== null;
-      }
-      // If showing size selection, we already have selectedBoxSize (defaults to large)
-      return true;
-    }
-    
-    // For shared boxes, need to have a selected shared box
-    if (boxTypePreference === "shared") {
-      return selectedSharedBoxId !== null;
-    }
-    
-    return false;
-  };
-  
-  const canAddToCartValue = canAddToCart();
+  // Check if can add to cart (no box selection needed on product page)
+  const canAddToCart = hasRequiredVariations() && availableStock > 0;
 
-  // Calculate shipping fee based on box size and type
-  const calculateShippingFee = () => {
-    if (boxTypePreference === "shared") {
-      // For shared boxes, use shared pricing with medium size (default from backend)
-      const size = boxSizePricing.medium;
-      const pricing = size.shared;
-      const weight = (product.weight || 0) * quantity;
-      const volume = (product.dimensions 
-        ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 
-        : weight / 1000) * quantity;
-      
-      const shippingFee = pricing.base + (weight * pricing.perKg) + (volume * pricing.perCbm);
-      return Math.round(shippingFee);
-    } else {
-      // For solo boxes, only large is available
-      const size = boxSizePricing.large;
-      const pricing = size.solo;
-      const weight = (product.weight || 0) * quantity;
-      const volume = (product.dimensions 
-        ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 
-        : weight / 1000) * quantity;
-      
-      const shippingFee = pricing.base + (weight * pricing.perKg) + (volume * pricing.perCbm);
-      return Math.round(shippingFee);
-    }
-  };
-  
-  const shippingFee = calculateShippingFee();
+  // Shipping fee will be calculated on request shipping page
   const subtotal = priceInPHP * quantity;
-  const total = subtotal + shippingFee;
+  const total = subtotal; // Only item price, shipping paid later
 
   return (
     <ErrorBoundary onRetry={() => loadProduct()}>
@@ -750,6 +493,23 @@ export default function ProductDetailPage() {
         isOpen={showPriceComparison}
         onClose={() => setShowPriceComparison(false)}
       />
+
+      {/* Product Selection Modal */}
+      {product && (
+        <ProductSelectionModal
+          product={product as unknown as ProductFromTypes & { variations?: ProductVariation[] }}
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          onAddToCart={handleAddToCartSubmit}
+          onBuyNow={handleBuyNowSubmit}
+          actionType={modalActionType}
+          currentPrice={currentPrice}
+          priceInPHP={priceInPHP}
+          currencyRate={currencyRate}
+          initialQuantity={quantity}
+          initialVariations={selectedVariations}
+        />
+      )}
 
       {/* Image Zoom Modal */}
       {product.images && product.images.length > 0 && (
@@ -767,7 +527,7 @@ export default function ProductDetailPage() {
         price={priceInPHP}
         currency="PHP"
         quantity={quantity}
-        canAddToCart={canAddToCartValue}
+        canAddToCart={canAddToCart}
         addingToCart={addingToCart}
         cartSuccess={cartSuccess}
         onAddToCart={handleAddToCart}
@@ -877,19 +637,10 @@ export default function ProductDetailPage() {
             />
           </div>
           <div className="mb-6">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="mb-2">
               <p className="text-3xl font-bold text-soft-blue-600">
                 {formatCurrency(priceInPHP, "PHP")}
               </p>
-              <button
-                onClick={() => setShowPriceComparison(true)}
-                className="rounded-[4px] border border-[#FCE4EC] bg-white px-4 py-2 text-sm font-semibold text-[#FF85A2] transition-colors hover:bg-[#FFF5F7] flex items-center gap-2"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Compare Prices
-              </button>
             </div>
             <p className="text-sm font-medium text-grey-600">
               {formatCurrency(currentPrice, "KRW")}
@@ -903,14 +654,33 @@ export default function ProductDetailPage() {
 
           {/* Product Specifications - Compact Grid Layout */}
           <div className="mb-6 space-y-4">
-            {/* Description */}
+            {/* Description - Not Accordion */}
             <div>
               <h3 className="mb-2 text-base font-semibold text-grey-900">Description</h3>
               <p className="text-grey-700 leading-relaxed">{product.description}</p>
             </div>
 
-            {/* Product Details Grid - Row Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Product Details - Accordion on Mobile, Always Visible on Desktop */}
+            <div className="rounded-lg border-2 border-grey-200 bg-white">
+              {/* Mobile: Accordion */}
+              <div className="lg:hidden">
+                <button
+                  onClick={() => setProductDetailsOpen(!productDetailsOpen)}
+                  className="w-full flex items-center justify-between p-4 transition-all hover:bg-grey-50"
+                >
+                  <h3 className="text-base font-semibold text-grey-900">Product Details</h3>
+                  <svg
+                    className={`h-5 w-5 text-grey-600 transition-transform ${productDetailsOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {productDetailsOpen && (
+                  <div className="px-4 pb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Shipping Estimate */}
               <div className="flex items-start gap-3 rounded-lg border border-border bg-grey-50 p-3">
                 <div className="flex-shrink-0 mt-0.5">
@@ -980,6 +750,88 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
               )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop: Always Visible */}
+              <div className="hidden lg:block">
+                <div className="p-4">
+                  <h3 className="mb-4 text-base font-semibold text-grey-900">Product Details</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Shipping Estimate */}
+                    <div className="flex items-start gap-3 rounded-lg border border-border bg-grey-50 p-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="h-5 w-5 text-soft-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-grey-600 mb-0.5">Shipping</p>
+                        <p className="text-sm font-semibold text-grey-900 leading-tight">
+                          {shippingEstimate}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Stock Status */}
+                    <div className={`flex items-start gap-3 rounded-lg border border-border p-3 ${
+                      availableStock > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                    }`}>
+                      <div className="flex-shrink-0 mt-0.5">
+                        {availableStock > 0 ? (
+                          <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-grey-600 mb-0.5">Stock</p>
+                        <p className={`text-sm font-semibold leading-tight ${
+                          availableStock > 0 ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {availableStock > 0 ? `${availableStock} available` : "Out of stock"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Weight */}
+                    <div className="flex items-start gap-3 rounded-lg border border-border bg-grey-50 p-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="h-5 w-5 text-soft-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-grey-600 mb-0.5">Weight</p>
+                        <p className="text-sm font-semibold text-grey-900">{product.weight} kg</p>
+                      </div>
+                    </div>
+
+                    {/* Dimensions */}
+                    {product.dimensions && (
+                      <div className="flex items-start gap-3 rounded-lg border border-border bg-grey-50 p-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <svg className="h-5 w-5 text-soft-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-grey-600 mb-0.5">Dimensions</p>
+                          <p className="text-sm font-semibold text-grey-900 leading-tight">
+                            {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} cm
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1059,361 +911,118 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* Quantity Selector */}
+          {/* Quantity selector moved to modal - variations kept here for reference */}
+
+          {/* Price Comparison - Accordion */}
           <div className="mb-6">
-            <label className="mb-2 block text-base font-semibold text-grey-900">Quantity</label>
-            <div className="flex items-center gap-4">
+            <div className="rounded-lg border-2 border-soft-blue-200 bg-white">
               <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-grey-300 bg-white text-grey-700 font-bold transition-colors hover:border-soft-blue-600 hover:bg-soft-blue-50 hover:text-soft-blue-700"
+                onClick={() => setPriceComparisonOpen(!priceComparisonOpen)}
+                className="w-full flex items-center justify-between p-4 transition-all hover:bg-soft-blue-50"
               >
-                -
+                <div className="flex items-center gap-3">
+                  <svg className="h-5 w-5 text-[#FF85A2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <div className="text-left">
+                    <p className="text-base font-semibold text-grey-900">Price Comparison</p>
+                    <p className="text-xs text-grey-600">Compare with other Korean websites</p>
+                  </div>
+                </div>
+                <svg
+                  className={`h-5 w-5 text-grey-600 transition-transform ${priceComparisonOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
-              <span className="text-xl font-bold text-grey-900 min-w-[2rem] text-center">{quantity}</span>
-              <button
-                onClick={() =>
-                  setQuantity(Math.min(availableStock, quantity + 1))
-                }
-                className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-grey-300 bg-white text-grey-700 font-bold transition-colors hover:border-soft-blue-600 hover:bg-soft-blue-50 hover:text-soft-blue-700"
-              >
-                +
-              </button>
+              
+              {priceComparisonOpen && (
+                <div className="px-4 pb-4">
+                  <PriceComparisonInline 
+                    product={product as unknown as ProductFromTypes}
+                    currentPrice={currentPrice}
+                    priceInPHP={priceInPHP}
+                    onViewFull={() => setShowPriceComparison(true)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Box Type and Size Selection - Simplified */}
-          <div className="mb-6 space-y-4">
-            {/* Box Type Selection - Simplified */}
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-grey-700">Box Type</label>
-              <div className="flex gap-2">
-                {boxTypesLoading ? (
-                  <div className="flex flex-1 items-center justify-center py-3">
-                    <p className="text-xs text-muted-foreground">Loading...</p>
+          {/* Price Summary - Accordion */}
+          <div className="mb-6">
+            <div className="rounded-xl border-2 border-soft-blue-200 bg-white shadow-md">
+              <button
+                onClick={() => setPriceSummaryOpen(!priceSummaryOpen)}
+                className="w-full flex items-center justify-between p-5 transition-all hover:bg-soft-blue-50"
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="h-5 w-5 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-base font-bold text-grey-900">Price Summary</h3>
+                    <span className="text-lg font-bold text-soft-blue-600">
+                      {formatCurrency(total, "PHP")}
+                    </span>
                   </div>
-                ) : (
-                  <>
-                    {boxTypes.length > 0 ? (
-                      boxTypes.map((boxType) => {
-                        const isSolo = boxType.code === "SOLO" || boxType.code === "solo";
-                        const isShared = boxType.code === "SHARED" || boxType.code === "shared";
-                        
-                        if (isSolo || isShared) {
-                          const isSelected = (isSolo && boxTypePreference === "solo") || 
-                                           (isShared && boxTypePreference === "shared");
-                          return (
-                            <button
-                              key={boxType.code}
-                              onClick={() => handleBoxTypeSelect(isSolo ? "SOLO" : "SHARED")}
-                              className={`flex-1 rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all ${
-                                isSelected
-                                  ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-sm"
-                                  : "border-border bg-white text-grey-700 hover:border-soft-blue-300 hover:bg-soft-blue-50"
-                              }`}
-                            >
-                              {boxType.name || boxType.code}
-                            </button>
-                          );
-                        }
-                        return null;
-                      })
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleBoxTypeSelect("SOLO")}
-                          className={`flex-1 rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all ${
-                            boxTypePreference === "solo"
-                              ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-sm"
-                              : "border-border bg-white text-grey-700 hover:border-soft-blue-300 hover:bg-soft-blue-50"
-                          }`}
-                        >
-                          SOLO
-                        </button>
-                        <button
-                          onClick={() => handleBoxTypeSelect("SHARED")}
-                          className={`flex-1 rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all ${
-                            boxTypePreference === "shared"
-                              ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-sm"
-                              : "border-border bg-white text-grey-700 hover:border-soft-blue-300 hover:bg-soft-blue-50"
-                          }`}
-                        >
-                          SHARED
-                        </button>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Conditional Content Based on Box Type */}
-            {boxTypePreference === "solo" ? (
-              /* SOLO Box - Show existing boxes or size selection */
-              <div>
-                {loadingSoloBoxes ? (
-                  <div className="flex items-center justify-center py-6">
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  </div>
-                ) : showBoxSizeSelection ? (
-                  /* Box Size Selection - First time order or no existing boxes */
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-grey-700">Box Size</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(["small", "medium", "large"] as const).map((size) => {
-                        const sizeInfo = boxSizePricing[size];
-                        const pricing = sizeInfo[boxTypePreference];
-                        const isSelected = selectedBoxSize === size;
-                        const maxWeight = sizeInfo.maxWeight;
-                        const maxVolume = sizeInfo.maxVolume;
-                        
-                        // Only large is selectable, small and medium are disabled
-                        const isSelectable = size === "large";
-                        
-                        return (
-                          <button
-                            key={size}
-                            onClick={() => isSelectable && setSelectedBoxSize(size)}
-                            disabled={!isSelectable}
-                            className={`relative rounded-lg border-2 p-3 text-center transition-all ${
-                              isSelected
-                                ? "border-soft-blue-600 bg-soft-blue-50 shadow-sm"
-                                : isSelectable
-                                ? "border-border bg-white hover:border-soft-blue-300 hover:bg-soft-blue-50"
-                                : "border-grey-200 bg-grey-50 opacity-40 cursor-not-allowed"
-                            }`}
-                          >
-                            {/* Selected Checkmark */}
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5">
-                                <svg className="h-3.5 w-3.5 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                </svg>
-                              </div>
-                            )}
-                            
-                            {/* Size Label */}
-                            <div className={`mb-1 text-xs font-bold uppercase ${
-                              isSelected ? "text-soft-blue-700" : isSelectable ? "text-grey-900" : "text-grey-400"
-                            }`}>
-                              {size}
-                            </div>
-                            
-                            {/* Price */}
-                            <div className={`text-sm font-bold mb-1 ${
-                              isSelected ? "text-soft-blue-700" : isSelectable ? "text-grey-900" : "text-grey-400"
-                            }`}>
-                              {formatCurrency(pricing.base, "PHP")}
-                            </div>
-                            
-                            {/* Capacity - Compact */}
-                            <div className={`text-[10px] leading-tight ${
-                              isSelectable ? "text-grey-600" : "text-grey-400"
-                            }`}>
-                              <div className="flex items-center justify-center gap-0.5">
-                                <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                                </svg>
-                                <span>{maxWeight}kg</span>
-                              </div>
-                              <div className="flex items-center justify-center gap-0.5">
-                                <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-                                </svg>
-                                <span>{maxVolume.toFixed(1)}CBM</span>
-                              </div>
-                            </div>
-                            
-                            {/* Disabled Indicator */}
-                            {!isSelectable && (
-                              <div className="mt-1.5 text-[9px] font-medium text-grey-500">
-                                Not available
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+                </div>
+                <svg
+                  className={`h-5 w-5 text-grey-600 transition-transform ${priceSummaryOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {priceSummaryOpen && (
+                <div className="px-5 pb-5">
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-grey-800 font-medium">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+                        </svg>
+                        <span>Subtotal ({quantity} item{quantity > 1 ? 's' : ''}):</span>
+                      </div>
+                      <span className="font-bold text-grey-900">{formatCurrency(subtotal, "PHP")}</span>
+                    </div>
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-4">
+                      <p className="text-xs text-blue-800 font-medium mb-1">📦 3-Way Payment System</p>
+                      <p className="text-xs text-blue-700">
+                        Pay for items now. Shipping fee will be paid separately when you request shipping from your storage.
+                      </p>
+                    </div>
+                    <div className="border-t-2 border-grey-200 pt-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-base font-bold text-grey-900">Total to Pay:</span>
+                        <span className="text-2xl font-bold text-soft-blue-600">{formatCurrency(total, "PHP")}</span>
+                      </div>
+                      <p className="text-xs text-grey-500 mt-2">
+                        Items will be stored after payment
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  /* Existing Solo Boxes - Show customer's pending boxes */
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-grey-700">Your Pending Solo Box</label>
-                    <p className="mb-3 text-xs text-grey-600">Add items to your existing box that hasn't been delivered yet</p>
-                    {availableSoloBoxes.length > 0 ? (
-                      <div className="space-y-2">
-                        {availableSoloBoxes.map((box) => {
-                          const isSelected = selectedSoloBoxId === box.id;
-                          const currentWeight = box.current_weight || 0;
-                          const currentVolume = box.current_volume || 0;
-                          const maxWeight = box.max_weight || 30;
-                          const maxVolume = box.max_volume || 0.6;
-                          const availableWeight = maxWeight - currentWeight;
-                          const availableVolume = maxVolume - currentVolume;
-                          const boxId = box.box_number || `BOX-${box.id.slice(0, 8).toUpperCase()}`;
-                          const trackingId = box.tracking_id || box.tracking_history?.[0]?.id || `TRK-${box.id.slice(0, 8).toUpperCase()}`;
-                          
-                          return (
-                            <button
-                              key={box.id}
-                              onClick={() => setSelectedSoloBoxId(box.id)}
-                              className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
-                                isSelected
-                                  ? "border-soft-blue-600 bg-soft-blue-50 shadow-sm"
-                                  : "border-border bg-white hover:border-soft-blue-300 hover:bg-soft-blue-50"
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm font-semibold text-grey-900">{boxId}</span>
-                                    {isSelected && (
-                                      <svg className="h-4 w-4 text-soft-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                      </svg>
-                                    )}
-                                  </div>
-                                  <div className="space-y-1 text-xs text-grey-600">
-                                    <div className="flex items-center gap-2">
-                                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                                      </svg>
-                                      <span>Available: {availableWeight.toFixed(1)}kg / {availableVolume.toFixed(2)}CBM</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                                        <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
-                                      </svg>
-                                      <span>Tracking: {trackingId}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex-shrink-0">
-                                  <div className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
-                                    Available
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-border bg-grey-50 p-4 text-center">
-                        <p className="text-sm text-grey-600">No existing solo boxes</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Available Shared Box - For SHARED (Using available shared boxes) */
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-grey-700">Available Shared Box</label>
-                <p className="mb-3 text-xs text-grey-600">Join an available shared box for reduced shipping costs</p>
-                {loadingSharedBoxes ? (
-                  <div className="flex items-center justify-center py-6">
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border-2 border-soft-blue-600 bg-soft-blue-50 p-4">
-                    {availableSharedBoxes.length > 0 && selectedSharedBoxId ? (
-                      (() => {
-                        const box = availableSharedBoxes.find(b => b.id === selectedSharedBoxId) || availableSharedBoxes[0];
-                        const boxId = box.box_number || `BOX-${box.id.slice(0, 8).toUpperCase()}`;
-                        const trackingId = (box as AvailableSharedBox).tracking_id || box.tracking_history?.[0]?.id || `TRK-${box.id.slice(0, 8).toUpperCase()}`;
-                        
-                        return (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs font-medium text-grey-600 mb-1">Box ID</p>
-                                <p className="text-sm font-bold text-grey-900">{boxId}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs font-medium text-grey-600 mb-1">Tracking ID</p>
-                                <p className="text-sm font-bold text-grey-900">{trackingId}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 pt-2 border-t border-soft-blue-200">
-                              <svg className="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                              <span className="text-xs font-medium text-green-700">Available for shared shipping</span>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="text-center py-2">
-                        <p className="text-sm text-grey-600">Default shared box (Medium size)</p>
-                        <p className="text-xs text-grey-500 mt-1">Box will be created when you add to cart</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Price Summary */}
-            <div className="rounded-xl border-2 border-soft-blue-200 bg-white p-5 shadow-md">
-              <div className="mb-4 flex items-center gap-2">
-                <svg className="h-5 w-5 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
-                </svg>
-                <h3 className="text-base font-bold text-grey-900">Price Summary</h3>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-grey-800 font-medium">
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-                    </svg>
-                    <span>Subtotal ({quantity} item{quantity > 1 ? 's' : ''}):</span>
-                  </div>
-                  <span className="font-bold text-grey-900">{formatCurrency(subtotal, "PHP")}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-grey-800 font-medium">
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                      <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
-                    </svg>
-                    <span>Shipping ({boxTypePreference === "solo" ? `${selectedBoxSize} ${boxTypePreference}` : availableSharedBoxes.find(b => b.id === selectedSharedBoxId)?.box_number || "shared box"}):</span>
-                  </div>
-                  <span className="font-bold text-grey-900">{formatCurrency(shippingFee, "PHP")}</span>
-                </div>
-                <div className="border-t-2 border-grey-200 pt-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-base font-bold text-grey-900">Total Amount:</span>
-                    <span className="text-2xl font-bold text-soft-blue-600">{formatCurrency(total, "PHP")}</span>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             {product.variations && product.variations.length > 0 && !hasRequiredVariations() && (
               <p className="mb-2 text-sm text-soft-blue-600 font-medium">
                 Please select all required options (size, color, etc.)
               </p>
             )}
-            {boxTypePreference === "shared" && !selectedSharedBoxId && (
-              <p className="mb-2 text-sm text-soft-blue-600 font-medium">
-                Please select a shared box to continue
-              </p>
-            )}
-            {boxTypePreference === "solo" && !showBoxSizeSelection && !selectedSoloBoxId && (
-              <p className="mb-2 text-sm text-soft-blue-600 font-medium">
-                Please select a solo box to continue
-              </p>
-            )}
             <Button
               onClick={handleAddToCart}
-              disabled={addingToCart || !canAddToCartValue}
+              disabled={addingToCart || !canAddToCart}
               variant="outline"
               className="flex-1"
               size="lg"
@@ -1422,7 +1031,7 @@ export default function ProductDetailPage() {
             </Button>
             <Button
               onClick={handleBuyNow}
-              disabled={!canAddToCartValue}
+              disabled={!canAddToCart}
               className="flex-1"
               size="lg"
             >

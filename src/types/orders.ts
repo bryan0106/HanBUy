@@ -19,7 +19,7 @@ export interface Order {
   total: number; // Subtotal + ISF + LSF
   currency: "PHP" | "KRW";
   status: OrderStatus;
-  paymentStatus: "pending" | "partial" | "paid" | "failed" | "refunded";
+  paymentStatus: "pending" | "partial" | "paid" | "paid_stored" | "shipping_requested" | "failed" | "refunded";
   paymentMethod?: PaymentMethod;
   paymentType: "full" | "downpayment" | "installment"; // Payment type
   downpaymentAmount?: number; // Required if paymentType is "downpayment"
@@ -38,9 +38,17 @@ export interface Order {
   boxId?: string; // Assigned box (solo or shared)
   phCourierTrackingNumber?: string; // Philippines courier tracking
   phCourierName?: string; // Courier name (J&T, LBC, etc.)
+  // 3-Way Payment System
+  storageStatus?: "in_storage" | "shipping_requested" | "shipped" | "delivered"; // Item storage status
+  shippingRequestedAt?: Date; // When customer requested shipping
+  shippingPaymentStatus?: "pending" | "paid" | "cod_pending" | "cod_paid"; // Shipping payment status
+  codAmount?: number; // Cash on Delivery amount
+  walletCredit?: number; // Amount credited to wallet from excess payment
   createdAt: Date;
   updatedAt: Date;
   paidAt?: Date;
+  shippingPaidAt?: Date; // When shipping fee was paid
+  codPaidAt?: Date; // When COD was paid
 }
 
 export type OrderStatus =

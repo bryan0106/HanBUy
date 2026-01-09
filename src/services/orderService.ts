@@ -27,7 +27,7 @@ export interface Order {
   currency: 'PHP' | 'KRW';
   status: string;
   payment_status: string;
-  payment_type: 'full' | 'downpayment' | 'balance' | 'installment';
+  payment_type: 'full' | 'downpayment' | 'balance' | 'installment' | 'item_only' | 'shipping' | 'cod';
   payment_method?: any;
   downpayment_amount?: number | null;
   balance?: number | null;
@@ -44,9 +44,17 @@ export interface Order {
   box_id?: string;
   ph_courier_tracking_number?: string;
   ph_courier_name?: string;
+  // 3-Way Payment System
+  storage_status?: 'in_storage' | 'shipping_requested' | 'shipped' | 'delivered';
+  shipping_requested_at?: string;
+  shipping_payment_status?: 'pending' | 'paid' | 'cod_pending' | 'cod_paid';
+  cod_amount?: number | null;
+  wallet_credit?: number | null;
   created_at: string;
   updated_at: string;
   paid_at?: string;
+  shipping_paid_at?: string;
+  cod_paid_at?: string;
   order_items: OrderItem[];
 }
 
@@ -87,7 +95,7 @@ export interface CreateOrderRequest {
   currency: 'PHP' | 'KRW';
   status: string;
   payment_status: string;
-  payment_type: 'full' | 'downpayment';
+  payment_type: 'full' | 'downpayment' | 'item_only' | 'shipping' | 'cod';
   payment_method?: {
     type: 'qr_code' | 'bank_transfer' | 'online';
     bank: 'BPI' | 'BDO' | 'GCASH' | 'GOTYME' | 'MAYA';
@@ -176,6 +184,59 @@ export const orderService = {
       const response = await apiClient.patch<UpdateOrderStatusResponse>(`/orders/${id}/status`, {
         status,
       });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Request shipping for stored items
+   * Customer requests shipping and pays shipping fee
+   */
+  async requestShipping(orderId: string, data: {
+    box_type: 'solo' | 'shared';
+    solo_box_id?: string;
+    shared_box_id?: string;
+    box_size?: 'small' | 'medium' | 'large';
+    shipping_address: {
+      street: string;
+      city: string;
+      province: string;
+      zipCode: string;
+      country: string;
+    };
+    courier_id?: string; // Selected delivery company
+  }): Promise<Order> {
+    try {
+      const response = await apiClient.post<{ success: boolean; data: Order }>(`/orders/${orderId}/request-shipping`, data);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get customer's stored items (items paid but not yet shipped)
+   */
+  async getStoredItems(userId: string): Promise<Order[]> {
+    try {
+      const response = await apiClient.get<GetOrdersResponse>('/orders/stored', {
+        params: { user_id: userId },
+      });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Confirm local shipping payment for an order
+   * Customer pays for local shipping from Manila office to their address
+   */
+  async confirmLocalShippingPayment(orderId: string): Promise<Order> {
+    try {
+      const response = await apiClient.post<{ success: boolean; data: Order }>(`/orders/${orderId}/confirm-local-shipping`);
       return response.data.data;
     } catch (error) {
       throw handleApiError(error);

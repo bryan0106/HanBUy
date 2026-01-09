@@ -45,6 +45,7 @@
 - Handle errors with try/catch
 - Use meaningful variable names
 - Add minimal logging (console.log for debugging only)
+- **ALWAYS use `undefined` instead of `null` for optional fields** - This prevents TypeScript build errors. Use `undefined` for all optional properties, even if the type allows `null`.
 
 ## File Structure
 - Services: src/services/
@@ -77,6 +78,7 @@
 - Don't return password_hash in responses
 - Don't log passwords or password hashes
 - Don't use .then() chains (use async/await)
+- **Don't use `null` for optional fields - ALWAYS use `undefined`** - Using `null` causes TypeScript build errors
 
 ## Do
 - Fix code directly

@@ -108,23 +108,20 @@ export default function CheckoutPage() {
     const subtotalKRW = cartItems.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
     const subtotalPHP = subtotalKRW * 0.042; // Convert KRW to PHP
 
-    // Calculate ISF and LSF
-    const isf = 300.00; // International Service Fee (fixed for now)
-    const lsf = boxTypePreference === "shared" ? 150.00 : 200.00; // Local Service Fee
-    const shippingFee = isf + lsf;
-    const soloShippingFee = 200.00;
-    const sharedShippingFee = 150.00;
-    const total = subtotalPHP + shippingFee;
+    // 3-Way Payment System: Checkout only charges for items
+    // Shipping will be paid separately when customer requests shipping
+    // No shipping fees in checkout
+    const total = subtotalPHP;
 
     return {
       subtotalKRW,
       subtotalPHP,
-      isf,
-      lsf,
-      shippingFee,
-      soloShippingFee,
-      sharedShippingFee,
-      total,
+      isf: 0, // Will be calculated when shipping is requested
+      lsf: 0, // Will be calculated when shipping is requested
+      shippingFee: 0, // No shipping fee at checkout
+      soloShippingFee: 0,
+      sharedShippingFee: 0,
+      total, // Only item total
     };
   };
 
@@ -166,23 +163,24 @@ export default function CheckoutPage() {
         preorder_release_date: undefined, // TODO: Get from product if preorder
       }));
 
-      // Create order
+      // Create order - 3-Way Payment System
+      // Payment 1: Items only (stored after payment)
       const orderData = {
         user_id: user.id,
         order_number: orderNumber,
         subtotal: totals.subtotalPHP,
-        isf: totals.isf,
-        lsf: totals.lsf,
-        shipping_fee: totals.shippingFee,
-        solo_shipping_fee: totals.soloShippingFee,
-        shared_shipping_fee: totals.sharedShippingFee,
-        total: totals.total,
+        isf: 0, // Will be calculated when shipping is requested
+        lsf: 0, // Will be calculated when shipping is requested
+        shipping_fee: 0, // No shipping fee at checkout
+        solo_shipping_fee: undefined,
+        shared_shipping_fee: undefined,
+        total: totals.total, // Only item total
         currency: "PHP" as const,
         status: "pending",
         payment_status: "pending",
-        payment_type: "full" as const, // TODO: Allow user to select
-        box_type_preference: boxTypePreference,
-        shipping_address: shippingAddress,
+        payment_type: "item_only" as const, // Payment for items only
+        box_type_preference: boxTypePreference, // Preference saved but shipping paid later
+        shipping_address: shippingAddress, // Saved for future shipping request
         order_items: orderItems,
       };
 
@@ -365,7 +363,10 @@ export default function CheckoutPage() {
 
           {/* Box Type Preference */}
           <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-xl font-semibold">Box Type</h2>
+            <h2 className="mb-4 text-xl font-semibold">Box Type Preference</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Select your preferred box type. Shipping fee will be calculated and paid when you request shipping.
+            </p>
             <div className="space-y-2">
               <button
                 onClick={() => setBoxTypePreference("solo")}
@@ -377,7 +378,7 @@ export default function CheckoutPage() {
               >
                 <div className="font-semibold">Solo Box</div>
                 <div className="text-sm text-muted-foreground">
-                  Full shipping fee: {formatCurrency(totals.soloShippingFee, "PHP")}
+                  Full shipping cost • Direct delivery to your address
                 </div>
               </button>
               <button
@@ -390,7 +391,7 @@ export default function CheckoutPage() {
               >
                 <div className="font-semibold">Shared Box</div>
                 <div className="text-sm text-muted-foreground">
-                  Reduced shipping fee: {formatCurrency(totals.sharedShippingFee, "PHP")}
+                  Reduced shipping cost • Consolidated with other orders
                 </div>
               </button>
             </div>
@@ -404,30 +405,27 @@ export default function CheckoutPage() {
             
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">Items Subtotal</span>
                 <span className="font-medium">
                   {formatCurrency(totals.subtotalPHP, "PHP")}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">ISF</span>
-                <span className="font-medium">
-                  {formatCurrency(totals.isf, "PHP")}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">LSF</span>
-                <span className="font-medium">
-                  {formatCurrency(totals.lsf, "PHP")}
-                </span>
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-4">
+                <p className="text-xs text-blue-800 font-medium mb-1">📦 3-Way Payment System</p>
+                <p className="text-xs text-blue-700">
+                  Pay for items now. Shipping fee will be paid separately when you request shipping.
+                </p>
               </div>
               <div className="mt-4 border-t border-border pt-3">
                 <div className="flex justify-between">
-                  <span className="font-semibold">Total</span>
+                  <span className="font-semibold">Total to Pay</span>
                   <span className="text-xl font-bold text-soft-blue-600">
                     {formatCurrency(totals.total, "PHP")}
                   </span>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Items will be stored after payment
+                </p>
               </div>
             </div>
 
