@@ -35,14 +35,7 @@ export async function POST(request: NextRequest) {
     // Scrape the product data
     const productData = await scrapeProduct(url);
 
-    // Log what was extracted (for debugging)
-    console.log("Scraped product data:", {
-      name: productData.name ? "✓" : "✗",
-      description: productData.description ? "✓" : "✗",
-      price: productData.price > 0 ? `✓ ${productData.price}` : "✗",
-      images: productData.images.length > 0 ? `✓ ${productData.images.length} images` : "✗",
-    });
-
+    // Return scraped product data
     return NextResponse.json({
       success: true,
       data: productData,

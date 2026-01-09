@@ -36,7 +36,6 @@ export const boxService = {
 export const productService = {
   getProducts: async (category?: string): Promise<Product[]> => {
     // TEMPORARY: Use mock data directly instead of API
-    console.log("📦 Using mock data for products (temporary for testing)");
     return mockServices.getProducts(category);
     
     /* ORIGINAL API CODE (commented out for now):
@@ -64,10 +63,8 @@ export const productService = {
       }
       
       // Fallback to mock data if API fails
-      console.warn("Failed to fetch products from API, using mock data");
       return mockServices.getProducts(category);
     } catch (error) {
-      console.warn("Error fetching products from API, using mock data:", error);
       return mockServices.getProducts(category);
     }
     */
@@ -75,7 +72,6 @@ export const productService = {
   
   getProduct: async (id: string): Promise<Product | null> => {
     // TEMPORARY: Use mock data directly instead of API
-    console.log("📦 Using mock data for product (temporary for testing)");
     return mockServices.getProduct(id);
     
     /* ORIGINAL API CODE (commented out for now):
@@ -99,10 +95,8 @@ export const productService = {
       }
       
       // Fallback to mock data if API fails
-      console.warn("Failed to fetch product from API, using mock data");
       return mockServices.getProduct(id);
     } catch (error) {
-      console.warn("Error fetching product from API, using mock data:", error);
       return mockServices.getProduct(id);
     }
     */
@@ -120,7 +114,6 @@ export const invoiceService = {
   },
   downloadInvoicePDF: async (invoiceId: string): Promise<void> => {
     // Mock PDF download - in real app, this would trigger a download
-    console.log("Downloading invoice PDF:", invoiceId);
     // Simulate download
     await new Promise((resolve) => setTimeout(resolve, 500));
     alert("Invoice PDF download started (mock)");
@@ -198,17 +191,13 @@ export const bankService = {
       }
       
       // Return empty array instead of throwing - let the UI handle fallback
-      console.warn("Bank API returned no valid banks, using empty array");
       return [];
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Bank API request timed out");
         throw new Error("Request timeout: Bank API did not respond in time");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("Bank API request failed - network error");
         throw new Error("Network error: Could not connect to Bank API");
       } else {
-        console.error("Error fetching bank types:", error);
         throw error;
       }
     }
@@ -289,42 +278,26 @@ export const cartService = {
       const data = await response.json();
       
       // Log response for debugging
-      console.log('=== CART API RESPONSE ===');
-      console.log('User ID:', userId);
-      console.log('Response type:', typeof data);
-      console.log('Is array:', Array.isArray(data));
-      console.log('Response data:', JSON.stringify(data, null, 2));
-      
       // Handle different response formats
       let cartItems: CartItem[] = [];
       
       if (Array.isArray(data)) {
-        console.log('Cart items found in direct array:', data.length);
         cartItems = data;
       } else if (data && Array.isArray(data.data)) {
-        console.log('Cart items found in data.data:', data.data.length);
         cartItems = data.data;
       } else if (data && data.cartItems && Array.isArray(data.cartItems)) {
-        console.log('Cart items found in data.cartItems:', data.cartItems.length);
         cartItems = data.cartItems;
       } else if (data && data.items && Array.isArray(data.items)) {
-        console.log('Cart items found in data.items:', data.items.length);
         cartItems = data.items;
-      } else {
-        console.warn('No cart items found in response. Response keys:', Object.keys(data || {}));
       }
       
-      console.log('Final cart items count:', cartItems.length);
       return cartItems;
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Cart API request timed out");
         throw new Error("Request timeout: Cart API did not respond in time");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("Cart API request failed - network error");
         throw new Error("Network error: Could not connect to Cart API");
       } else {
-        console.error("Error fetching cart items:", error);
         throw error;
       }
     }
@@ -392,13 +365,10 @@ export const cartService = {
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Cart API request timed out");
         throw new Error("Request timeout: Cart API did not respond in time");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("Cart API request failed - network error");
         throw new Error("Network error: Could not connect to Cart API");
       } else {
-        console.error("Error adding to cart:", error);
         throw error;
       }
     }
@@ -465,17 +435,13 @@ export const boxTypeService = {
       }
       
       // Return empty array instead of throwing - let the UI handle fallback
-      console.warn("Box Type API returned no valid box types, using empty array");
       return [];
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Box Type API request timed out");
         throw new Error("Request timeout: Box Type API did not respond in time");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("Box Type API request failed - network error");
         throw new Error("Network error: Could not connect to Box Type API");
       } else {
-        console.error("Error fetching box types:", error);
         throw error;
       }
     }
@@ -524,18 +490,11 @@ async function mockLogin(email: string, password: string): Promise<LoginResponse
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedPassword = password.trim();
   
-  console.log("🔐 Mock login attempt:", { 
-    normalizedEmail, 
-    passwordLength: normalizedPassword.length,
-    adminEmail: testAccounts.admin.email.toLowerCase()
-  });
-  
   // Check admin account (accept both "admin" and "admin123" for compatibility)
   if (normalizedEmail === testAccounts.admin.email.toLowerCase()) {
     if (normalizedPassword === "admin" || normalizedPassword === testAccounts.admin.password) {
       const adminUser = testUsers.find(u => u.id === testAccounts.admin.userId);
       if (adminUser) {
-        console.log("✅ Mock login successful (Admin) - Using localhost mock data");
         return {
           user: {
             id: adminUser.id,
@@ -549,14 +508,7 @@ async function mockLogin(email: string, password: string): Promise<LoginResponse
           },
           token: "mock-jwt-token-admin",
         };
-      } else {
-        console.error("❌ Admin user not found in testUsers");
       }
-    } else {
-      console.log("❌ Admin password mismatch:", { 
-        provided: normalizedPassword, 
-        expected: ["admin", testAccounts.admin.password] 
-      });
     }
   }
   
@@ -568,7 +520,6 @@ async function mockLogin(email: string, password: string): Promise<LoginResponse
   if (customerAccount) {
     const customerUser = testUsers.find(u => u.id === customerAccount.userId);
     if (customerUser) {
-      console.log(`✅ Mock login successful (Customer: ${customerUser.name}) - Using localhost mock data`);
       return {
         user: {
           id: customerUser.id,
@@ -582,15 +533,10 @@ async function mockLogin(email: string, password: string): Promise<LoginResponse
         },
         token: "mock-jwt-token-customer",
       };
-    } else {
-      console.error(`❌ Customer user not found for account: ${customerAccount.email}`);
     }
-  } else {
-    console.log("❌ No matching customer account found");
   }
   
   // Invalid credentials
-  console.error("❌ Login failed - Invalid email or password");
   throw new Error("Invalid email or password");
 }
 
@@ -604,8 +550,6 @@ async function mockGetOrders(filters?: {
 }): Promise<OrderResponse[]> {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 300));
-  
-  console.log("✅ Mock getOrders - Using localhost mock data", { filters });
   
   // Filter orders by user_id if provided
   let filteredOrders = testOrders;
@@ -672,8 +616,6 @@ async function mockGetOrders(filters?: {
 async function mockGetOrder(orderId: string): Promise<OrderResponse> {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 300));
-  
-  console.log("✅ Mock getOrder - Using localhost mock data", { orderId });
   
   const order = testOrders.find(o => o.id === orderId);
   if (!order) {
@@ -760,8 +702,6 @@ async function mockGetCartItems(userId: string): Promise<CartItem[]> {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 200));
   
-  console.log("✅ Mock getCartItems - Using localhost mock data", { userId });
-  
   // Return empty cart for now (can be extended with test cart data)
   // In a real scenario, you might want to add test cart items
   return [];
@@ -829,16 +769,7 @@ export const authService = {
           errorMessage = response.statusText || errorMessage;
         }
         
-        // Log error details in development for debugging
-        if (process.env.NODE_ENV === "development") {
-          console.error("Login API Error:", {
-            status: response.status,
-            statusText: response.statusText,
-            errorData: errorData || "No error data",
-            url: response.url,
-            statusCode: response.status
-          });
-        }
+        // Handle error response
         
         // Handle specific error cases
         if (response.status === 401) {
@@ -883,18 +814,8 @@ export const authService = {
       };
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Login request timed out after 10 seconds");
         throw new Error("Request timeout: Login service did not respond in time. Please check if the backend server is running.");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        // Log detailed error info to console for debugging
-        console.error("❌ Login request failed - network error", {
-          attemptedUrl: url,
-          apiBaseUrl: API_BASE_URL,
-          errorType: error.name,
-          errorMessage: error.message,
-          suggestion: "Check if backend server is running and API URL is correct"
-        });
-        
         // User-friendly error message
         const isLocalhost = API_BASE_URL.includes('localhost');
         const errorMessage = isLocalhost
@@ -903,7 +824,6 @@ export const authService = {
         
         throw new Error(errorMessage);
       } else {
-        console.error("Error during login:", error);
         throw error;
       }
     }
@@ -961,13 +881,10 @@ export const userService = {
       return [];
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Users API request timed out");
         throw new Error("Request timeout: Users API did not respond in time");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("Users API request failed - network error");
         throw new Error("Network error: Could not connect to Users API");
       } else {
-        console.error("Error fetching users:", error);
         throw error;
       }
     }
@@ -1015,13 +932,10 @@ export const userService = {
       return null;
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("User API request timed out");
         throw new Error("Request timeout: User API did not respond in time");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("User API request failed - network error");
         throw new Error("Network error: Could not connect to User API");
       } else {
-        console.error("Error fetching user:", error);
         throw error;
       }
     }
@@ -1095,13 +1009,10 @@ export const userService = {
       throw new Error("Invalid response format from update user API");
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn("Update user request timed out");
         throw new Error("Request timeout: Update user API did not respond in time");
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.warn("Update user request failed - network error");
         throw new Error("Network error: Could not connect to update user API");
       } else {
-        console.error("Error updating user:", error);
         throw error;
       }
     }
@@ -1267,7 +1178,6 @@ export const orderService = {
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error("Network error: Could not connect to Order API");
       } else {
-        console.error("Error fetching order:", error);
         throw error;
       }
     }
@@ -1321,29 +1231,13 @@ export const orderService = {
       
       const data = await response.json();
       
-      // Log the response for debugging
-      console.log('Orders API response:', JSON.stringify(data, null, 2));
-      
       if (data.success && Array.isArray(data.orders)) {
-        console.log('Found orders in data.orders:', data.orders.length);
         return data.orders;
       } else if (Array.isArray(data)) {
-        console.log('Response is direct array:', data.length);
         return data;
       } else if (data.success && Array.isArray(data.data)) {
-        console.log('Found orders in data.data:', data.data.length);
         return data.data;
       }
-      
-      console.error('Invalid orders response format:', {
-        hasSuccess: 'success' in data,
-        successValue: data.success,
-        hasOrders: 'orders' in data,
-        hasData: 'data' in data,
-        isArray: Array.isArray(data),
-        responseKeys: Object.keys(data),
-        fullResponse: JSON.stringify(data, null, 2)
-      });
       
       throw new Error(
         `Invalid orders response format. ` +
@@ -1357,7 +1251,6 @@ export const orderService = {
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error("Network error: Could not connect to Order API");
       } else {
-        console.error("Error fetching orders:", error);
         throw error;
       }
     }
@@ -1404,7 +1297,6 @@ export const orderService = {
         
         try {
           const errorData = await response.json();
-          console.error('Order creation error response:', JSON.stringify(errorData, null, 2));
           
           if (errorData.error) {
             errorMessage = errorData.error;
@@ -1424,9 +1316,8 @@ export const orderService = {
           try {
             const text = await response.text();
             errorDetails = ` Response body: ${text.substring(0, 200)}`;
-            console.error('Order creation error (non-JSON):', text);
           } catch (textError) {
-            console.error('Could not read error response body');
+            // Could not read error response body
           }
         }
         
@@ -1435,31 +1326,23 @@ export const orderService = {
       
       const data = await response.json();
       
-      // Log the full response for debugging
-      console.log('Order creation response:', JSON.stringify(data, null, 2));
-      
       // Handle different response formats
       if (data.success && data.order) {
         // Format: {success: true, order: {...}}
-        console.log('Order found in data.order');
         return data.order;
       } else if (data.success && data.data) {
         // Format: {success: true, data: {...}}
         // Check if data.data is the order object or if it contains an order
         if (data.data.id || data.data.order_id || data.data.order_number) {
-          console.log('Order found in data.data');
           return data.data;
         } else if (data.data.order) {
-          console.log('Order found in data.data.order');
           return data.data.order;
         } else {
-          console.log('data.data exists but does not appear to be an order object');
           // Still return it, might be the order
           return data.data;
         }
       } else if (data.id) {
         // Format: {id: ..., ...} (direct order object)
-        console.log('Order found as direct object with id');
         return data;
       }
       
@@ -1474,7 +1357,6 @@ export const orderService = {
         fullResponse: JSON.stringify(data, null, 2)
       };
       
-      console.error('Invalid order creation response format:', errorDetails);
       throw new Error(
         `Invalid order creation response format. ` +
         `Expected {success: true, order: {...}} or {success: true, data: {...}} or {id: ...}. ` +
@@ -1488,7 +1370,6 @@ export const orderService = {
       } else if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error("Network error: Could not connect to Order API");
       } else {
-        console.error("Error creating order:", error);
         throw error;
       }
     }

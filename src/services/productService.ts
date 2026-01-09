@@ -11,9 +11,27 @@ export interface Product {
   category?: string;
   brand?: string;
   sku?: string;
-  stock: number;
+  
+  // Stock Management (Option 2: Separate Onhand Stock Field)
+  stock: number;                    // Available onhand stock
+  preorder_stock?: number;          // Preorder stock (if still accepting preorders)
+  
   status: 'active' | 'inactive' | 'out_of_stock';
-  product_type: 'onhand' | 'preorder' | 'kr_website';
+  product_type: 'onhand' | 'preorder' | 'kr_website' | 'preorder_and_onhand';
+  
+  // Flags (Option 2)
+  is_preorder_available?: boolean;  // Accepting preorders?
+  is_onhand_available?: boolean;    // Available now?
+  
+  // Preorder fields (optional, NULL for onhand-only products)
+  order_date?: string;              // When preorder started
+  order_deadline?: string;          // When preorders close
+  release_date?: string;            // Expected release date
+  deposit_percentage?: number;      // e.g., 50 for 50%
+  preorder_available_stock?: number; // Max preorders allowed
+  preorders_claimed?: number;       // How many preorders made
+  shipping_time_days?: number;      // Days from release to delivery
+  
   weight?: number;
   dimensions?: {
     length: number;

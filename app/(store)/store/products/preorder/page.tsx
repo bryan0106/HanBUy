@@ -3,25 +3,42 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { productService } from "@/services/productService";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, type Currency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";
+import { PreorderCountdown } from "@/components/store/PreorderCountdown";
+import { PreorderProgress } from "@/components/store/PreorderProgress";
+import { PreorderPaymentInfo } from "@/components/store/PreorderPaymentInfo";
 
 interface PreorderProduct {
   id: string;
   name: string;
   description: string;
   price: number;
-  currency: "KRW";
+  currency: Currency;
   images: string[];
   category: string;
   brand?: string;
   quantity: number;
-  orderDate: Date;
+  orderDate: Date; // When preorder started
+  orderDeadline: Date; // When preorders close
   releaseDate: Date;
-  stock: number;
+  
+  // Stock Management (Option 2: Separate Onhand Stock Field)
+  stock: number;                    // Available onhand stock (if available)
+  preorder_stock?: number;          // Preorder stock (if still accepting)
+  
+  // Flags (Option 2)
+  is_preorder_available?: boolean;  // Accepting preorders?
+  is_onhand_available?: boolean;    // Available now?
+  
+  // Preorder-specific fields
+  depositPercentage?: number; // e.g., 50 for 50%
+  preorderAvailableStock?: number; // Max preorders allowed
+  preordersClaimed?: number; // How many already ordered
+  shippingTimeDays?: number; // Days from release to delivery (default: 7)
 }
 
 type ViewType = "list" | "single" | "grid";
@@ -57,24 +74,37 @@ export default function PreorderProductsPage() {
         params.max_price = priceRange[1];
       }
       const response = await productService.getPreorderProducts(params);
-      // Convert API response to PreorderProduct format
+      // Convert API response to PreorderProduct format (Option 2: Separate Onhand Stock)
       const products: PreorderProduct[] = response.data.map((p: any) => ({
         id: p.id,
         name: p.name,
         description: p.description || '',
         price: p.price,
-        currency: p.currency || 'KRW',
+        currency: (p.currency === 'PHP' || p.currency === 'KRW' ? p.currency : 'KRW') as Currency,
         images: p.images || [],
         category: p.category || '',
         brand: p.brand,
         quantity: p.stock || 0,
         orderDate: p.order_date ? new Date(p.order_date) : new Date(),
+        orderDeadline: p.order_deadline ? new Date(p.order_deadline) : p.release_date ? new Date(p.release_date) : new Date(),
         releaseDate: p.release_date ? new Date(p.release_date) : new Date(),
-        stock: p.stock || 0,
+        
+        // Stock Management (Option 2)
+        stock: p.stock || 0,                    // Onhand stock
+        preorder_stock: p.preorder_stock || p.preorder_available_stock || p.stock || 100, // Preorder stock
+        
+        // Flags (Option 2)
+        is_preorder_available: p.is_preorder_available ?? (p.product_type === 'preorder' || p.product_type === 'preorder_and_onhand'),
+        is_onhand_available: p.is_onhand_available ?? (p.product_type === 'onhand' || (p.stock > 0 && p.product_type === 'preorder_and_onhand')),
+        
+        // Preorder-specific fields (with defaults if not provided)
+        depositPercentage: p.deposit_percentage || 50, // Default 50%
+        preorderAvailableStock: p.preorder_available_stock || p.preorder_stock || p.stock || 100,
+        preordersClaimed: p.preorders_claimed || 0,
+        shippingTimeDays: p.shipping_time_days || 7, // Default 7 days
       }));
       setProducts(products);
     } catch (error) {
-      console.error("Error loading preorder products:", error);
       setProducts([]);
     } finally {
       setLoading(false);
@@ -395,15 +425,14 @@ export default function PreorderProductsPage() {
               {viewType === "list" ? (
                 <div className="space-y-3 sm:space-y-4">
                   {filteredProducts.map((product) => {
-                    const priceInPHP = product.price * 0.042;
-                    const daysUntilRelease = Math.ceil(
-                      (product.releaseDate.getTime() - new Date().getTime()) /
-                        (1000 * 60 * 60 * 24)
-                    );
+                    const expectedDelivery = new Date(product.releaseDate);
+                    expectedDelivery.setDate(expectedDelivery.getDate() + (product.shippingTimeDays || 7));
+                    
                     return (
-                      <div
+                      <Link
                         key={product.id}
-                        className="rounded-lg border border-border bg-card p-3 sm:p-4"
+                        href={`/store/products/${product.id}`}
+                        className="block rounded-lg border border-border bg-card p-3 transition-colors hover:border-soft-blue-300 hover:shadow-sm sm:p-4"
                       >
                         <div className="flex gap-4">
                           {product.images && product.images.length > 0 ? (
@@ -425,33 +454,60 @@ export default function PreorderProductsPage() {
                                 {product.brand}
                               </p>
                             )}
-                            <div className="mb-2">
-                              <p className="text-base font-bold text-soft-blue-600 sm:text-lg">
-                                {formatCurrency(priceInPHP, "PHP")}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatCurrency(product.price, "KRW")}
-                              </p>
-                            </div>
-                            <div className="rounded-lg bg-warning/10 p-2 text-xs">
-                              <p className="font-medium text-warning">
-                                {daysUntilRelease} days until release
-                              </p>
+                            
+                            {/* Payment Info with Deposit */}
+                            <PreorderPaymentInfo
+                              price={product.price}
+                              currency={product.currency}
+                              depositPercentage={product.depositPercentage || 50}
+                              className="mb-2"
+                            />
+                            
+                            {/* Option 2: Available Now Badge (if product has onhand stock) */}
+                            {product.is_onhand_available && product.stock > 0 && (
+                              <div className="mb-2 rounded-lg bg-green-100 p-2 text-xs font-medium text-green-700">
+                                ✅ Available Now: {product.stock} units
+                              </div>
+                            )}
+                            
+                            {/* Countdown & Progress */}
+                            {product.is_preorder_available && (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                <PreorderCountdown
+                                  deadline={product.orderDeadline}
+                                  className="text-xs"
+                                />
+                                {product.preorderAvailableStock && (
+                                  <PreorderProgress
+                                    claimed={product.preordersClaimed || 0}
+                                    available={product.preorderAvailableStock}
+                                    className="flex-1 min-w-[120px]"
+                                  />
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Timeline */}
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              {product.is_preorder_available && (
+                                <>Release: {formatDate(product.releaseDate)} → Delivery: {formatDate(expectedDelivery)}</>
+                              )}
+                              {product.is_onhand_available && !product.is_preorder_available && (
+                                <>🚀 Ready to Ship Now</>
+                              )}
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
               ) : viewType === "single" ? (
                 <div className="space-y-4 sm:space-y-6">
                   {filteredProducts.map((product) => {
-                    const priceInPHP = product.price * 0.042;
-                    const daysUntilRelease = Math.ceil(
-                      (product.releaseDate.getTime() - new Date().getTime()) /
-                        (1000 * 60 * 60 * 24)
-                    );
+                    const expectedDelivery = new Date(product.releaseDate);
+                    expectedDelivery.setDate(expectedDelivery.getDate() + (product.shippingTimeDays || 7));
+                    
                     return (
                       <div
                         key={product.id}
@@ -475,28 +531,84 @@ export default function PreorderProductsPage() {
                             {product.brand}
                           </p>
                         )}
-                        <div className="mb-4">
-                          <p className="text-xl font-bold text-soft-blue-600">
-                            {formatCurrency(priceInPHP, "PHP")}
-                          </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {formatCurrency(product.price, "KRW")}
-                          </p>
+                        
+                        {/* Payment Info with Deposit */}
+                        <PreorderPaymentInfo
+                          price={product.price}
+                          currency={product.currency}
+                          depositPercentage={product.depositPercentage || 50}
+                          className="mb-4"
+                        />
+                        
+                        {/* Countdown Timer */}
+                        <PreorderCountdown
+                          deadline={product.orderDeadline}
+                          className="mb-4"
+                        />
+                        
+                        {/* Progress Bar */}
+                        {product.is_preorder_available && product.preorderAvailableStock && (
+                          <PreorderProgress
+                            claimed={product.preordersClaimed || 0}
+                            available={product.preorderAvailableStock}
+                            className="mb-4"
+                          />
+                        )}
+                        
+                        {/* Option 2: Available Now Badge (if product has onhand stock) */}
+                        {product.is_onhand_available && product.stock > 0 && (
+                          <div className="mb-4 rounded-lg bg-green-100 p-3 text-sm font-medium text-green-700">
+                            ✅ Available Now: {product.stock} units in stock (Ready to Ship)
+                          </div>
+                        )}
+                        
+                        {/* Timeline Info */}
+                        <div className="mb-4 rounded-lg bg-grey-50 p-3 space-y-2">
+                          {product.is_preorder_available && (
+                            <>
+                              <p className="text-sm font-medium text-foreground">
+                                ⏰ Order Deadline: {formatDate(product.orderDeadline)}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                📅 Release Date: {formatDate(product.releaseDate)}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                🚚 Expected Delivery: {formatDate(expectedDelivery)}
+                              </p>
+                            </>
+                          )}
+                          {product.is_onhand_available && (
+                            <p className="text-sm font-medium text-green-600">
+                              🚀 Ready to Ship Now ({product.stock} units available)
+                            </p>
+                          )}
                         </div>
-                        <div className="mb-4 rounded-lg bg-warning/10 p-3">
-                          <p className="text-sm font-medium text-warning">
-                            Order Deadline: {formatDate(product.orderDate)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Release Date: {formatDate(product.releaseDate)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {daysUntilRelease} days until release
-                          </p>
-                        </div>
-                        <button className="w-full rounded-lg bg-soft-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700">
-                          Pre-Order Now
-                        </button>
+                        
+                        {/* Option 2: Dual Purchase Buttons (if both available) */}
+                        {product.is_onhand_available && product.is_preorder_available && product.stock > 0 ? (
+                          <div className="space-y-2">
+                            <Link
+                              href={`/store/products/${product.id}?purchase=onhand`}
+                              className="block w-full rounded-lg bg-green-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-green-700"
+                            >
+                              Buy Now ({product.stock} in stock)
+                            </Link>
+                            <Link
+                              href={`/store/products/${product.id}?purchase=preorder`}
+                              className="block w-full rounded-lg border-2 border-soft-blue-600 bg-white px-4 py-2 text-center font-semibold text-soft-blue-600 transition-colors hover:bg-soft-blue-50"
+                            >
+                              Pre-Order Now
+                            </Link>
+                          </div>
+                        ) : (
+                          /* Single Button */
+                          <Link
+                            href={`/store/products/${product.id}`}
+                            className="block w-full rounded-lg bg-soft-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                          >
+                            {product.is_onhand_available && product.stock > 0 ? 'Buy Now' : 'Pre-Order Now'}
+                          </Link>
+                        )}
                       </div>
                     );
                   })}
@@ -504,11 +616,9 @@ export default function PreorderProductsPage() {
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredProducts.map((product) => {
-                    const priceInPHP = product.price * 0.042;
-                    const daysUntilRelease = Math.ceil(
-                      (product.releaseDate.getTime() - new Date().getTime()) /
-                        (1000 * 60 * 60 * 24)
-                    );
+                    const expectedDelivery = new Date(product.releaseDate);
+                    expectedDelivery.setDate(expectedDelivery.getDate() + (product.shippingTimeDays || 7));
+                    
                     return (
                       <div
                         key={product.id}
@@ -537,22 +647,83 @@ export default function PreorderProductsPage() {
                             {product.brand}
                           </p>
                         )}
-                        <div className="mb-2">
-                          <p className="text-base font-bold text-soft-blue-600 sm:text-lg">
-                            {formatCurrency(priceInPHP, "PHP")}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {formatCurrency(product.price, "KRW")}
-                          </p>
+                        
+                        {/* Payment Info with Deposit */}
+                        <PreorderPaymentInfo
+                          price={product.price}
+                          currency={product.currency}
+                          depositPercentage={product.depositPercentage || 50}
+                          className="mb-2"
+                        />
+                        
+                        {/* Countdown Timer - Only show if accepting preorders */}
+                        {product.is_preorder_available && (
+                          <PreorderCountdown
+                            deadline={product.orderDeadline}
+                            className="mb-2"
+                          />
+                        )}
+                        
+                        {/* Progress Bar - Only show if accepting preorders */}
+                        {product.is_preorder_available && product.preorderAvailableStock && (
+                          <PreorderProgress
+                            claimed={product.preordersClaimed || 0}
+                            available={product.preorderAvailableStock}
+                            className="mb-2"
+                          />
+                        )}
+                        
+                        {/* Option 2: Available Now Badge (if product has onhand stock) */}
+                        {product.is_onhand_available && product.stock > 0 && (
+                          <div className="mb-2 rounded-lg bg-green-100 p-2 text-xs font-medium text-green-700">
+                            ✅ Available Now: {product.stock} units in stock
+                          </div>
+                        )}
+                        
+                        {/* Timeline Info */}
+                        <div className="mb-3 space-y-1 rounded-lg bg-grey-50 p-2 text-xs">
+                          {product.is_preorder_available && (
+                            <>
+                              <p className="text-muted-foreground">
+                                📅 Release: {formatDate(product.releaseDate)}
+                              </p>
+                              <p className="text-muted-foreground">
+                                🚚 Expected: {formatDate(expectedDelivery)}
+                              </p>
+                            </>
+                          )}
+                          {product.is_onhand_available && (
+                            <p className="text-green-600 font-medium">
+                              🚀 Ready to Ship Now
+                            </p>
+                          )}
                         </div>
-                        <div className="mb-3 rounded-lg bg-warning/10 p-2 text-xs">
-                          <p className="font-medium text-warning">
-                            {daysUntilRelease} days until release
-                          </p>
-                        </div>
-                        <button className="w-full rounded-lg bg-soft-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700">
-                          Pre-Order Now
-                        </button>
+                        
+                        {/* Option 2: Dual Purchase Buttons (if both available) */}
+                        {product.is_onhand_available && product.is_preorder_available && product.stock > 0 ? (
+                          <div className="space-y-2">
+                            <Link
+                              href={`/store/products/${product.id}?purchase=onhand`}
+                              className="block w-full rounded-lg bg-green-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-green-700"
+                            >
+                              Buy Now ({product.stock} in stock)
+                            </Link>
+                            <Link
+                              href={`/store/products/${product.id}?purchase=preorder`}
+                              className="block w-full rounded-lg border-2 border-soft-blue-600 bg-white px-4 py-2 text-center font-semibold text-soft-blue-600 transition-colors hover:bg-soft-blue-50"
+                            >
+                              Pre-Order Now
+                            </Link>
+                          </div>
+                        ) : (
+                          /* Single Button (only preorder or only onhand) */
+                          <Link
+                            href={`/store/products/${product.id}`}
+                            className="block w-full rounded-lg bg-soft-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                          >
+                            {product.is_onhand_available && product.stock > 0 ? 'Buy Now' : 'Pre-Order Now'}
+                          </Link>
+                        )}
                       </div>
                     );
                   })}
