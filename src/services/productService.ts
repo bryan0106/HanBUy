@@ -1,5 +1,6 @@
 import apiClient from '@/lib/apiClient';
 import { handleApiError } from '@/utils/errorHandler';
+import type { ProductVariation } from '@/types';
 
 export interface Product {
   id: string;
@@ -40,6 +41,19 @@ export interface Product {
   };
   created_at?: string;
   updated_at?: string;
+  
+  // Product variations (size, color, etc.)
+  variations?: ProductVariation[];
+  
+  // Reviews summary
+  reviews_count?: number;
+  average_rating?: number;
+  
+  // Currency rate info
+  currency_rate?: {
+    krw_to_php: number;
+    updated_at: string;
+  };
 }
 
 export interface GetProductsParams {

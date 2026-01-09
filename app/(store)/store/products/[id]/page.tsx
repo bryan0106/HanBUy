@@ -6,6 +6,8 @@ import { productService, type Product } from "@/services/productService";
 import { cartService } from "@/services/cartService";
 import { orderService } from "@/services/orderService";
 import { utilityService, type BoxType } from "@/services/utilityService";
+import { currencyService } from "@/services/currencyService";
+import { boxService, type AvailableSharedBox } from "@/services/boxService";
 import { formatCurrency } from "@/lib/currency";
 import type { Product as ProductFromTypes, ProductVariation, ProductReview } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -13,6 +15,11 @@ import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { getProductReviews, getAverageRating } from "@/lib/mockData";
 import { PriceComparison } from "@/components/store/PriceComparison";
+import { ProductImageSkeleton, ProductInfoSkeleton, ReviewSkeleton } from "@/components/ui/skeleton";
+import { ImageZoom } from "@/components/store/ImageZoom";
+import { StickyCartBar } from "@/components/store/StickyCartBar";
+import { SocialShare } from "@/components/store/SocialShare";
+import { ErrorBoundary } from "@/components/store/ErrorBoundary";
 
 // Extended Product type that includes variations for this component
 type ProductWithVariations = Product & {
@@ -33,7 +40,16 @@ export default function ProductDetailPage() {
   const [boxTypes, setBoxTypes] = useState<BoxType[]>([]);
   const [boxTypesLoading, setBoxTypesLoading] = useState(true);
   const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
-  const [selectedBoxSize, setSelectedBoxSize] = useState<"small" | "medium" | "large">("medium");
+  const [selectedBoxSize, setSelectedBoxSize] = useState<"small" | "medium" | "large">("large");
+  // Shared box states
+  const [availableSharedBoxes, setAvailableSharedBoxes] = useState<AvailableSharedBox[]>([]);
+  const [selectedSharedBoxId, setSelectedSharedBoxId] = useState<string | null>(null);
+  const [loadingSharedBoxes, setLoadingSharedBoxes] = useState(false);
+  // Solo box states
+  const [availableSoloBoxes, setAvailableSoloBoxes] = useState<AvailableSharedBox[]>([]);
+  const [selectedSoloBoxId, setSelectedSoloBoxId] = useState<string | null>(null);
+  const [loadingSoloBoxes, setLoadingSoloBoxes] = useState(false);
+  const [showBoxSizeSelection, setShowBoxSizeSelection] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
@@ -57,6 +73,14 @@ export default function ProductDetailPage() {
   const [hasPurchased, setHasPurchased] = useState(false);
   const [hasAlreadyReviewed, setHasAlreadyReviewed] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(true);
+  // Image zoom state
+  const [showImageZoom, setShowImageZoom] = useState(false);
+  // Currency rate state
+  const [currencyRate, setCurrencyRate] = useState<number>(0.042);
+  const [currencyLoading, setCurrencyLoading] = useState(true);
+  // Error state
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Box size pricing (PHP) - Define before use in useEffect
   const boxSizePricing = {
@@ -83,7 +107,35 @@ export default function ProductDetailPage() {
   useEffect(() => {
     loadProduct();
     loadBoxTypes();
+    loadCurrencyRate();
   }, [productId]);
+
+  // Load boxes when box type is selected or user changes
+  useEffect(() => {
+    if (boxTypePreference === "shared" && !loadingSharedBoxes) {
+      loadAvailableSharedBoxes();
+    } else if (boxTypePreference === "solo" && !loadingSoloBoxes) {
+      if (user?.id) {
+        loadAvailableSoloBoxes();
+      } else {
+        // No user, show size selection
+        setShowBoxSizeSelection(true);
+      }
+    }
+  }, [boxTypePreference, user?.id]);
+
+  const loadCurrencyRate = async () => {
+    setCurrencyLoading(true);
+    try {
+      const rate = await currencyService.getKRWtoPHPRate();
+      setCurrencyRate(rate);
+    } catch (error) {
+      console.warn("Failed to load currency rate, using default");
+      setCurrencyRate(0.042);
+    } finally {
+      setCurrencyLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated && user && product) {
@@ -94,8 +146,11 @@ export default function ProductDetailPage() {
     }
   }, [isAuthenticated, user, product]);
 
-  const loadProduct = async () => {
-    setLoading(true);
+  const loadProduct = async (retry = false) => {
+    if (!retry) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await productService.getProductById(productId);
       setProduct(data as any);
@@ -127,8 +182,19 @@ export default function ProductDetailPage() {
         
         setRelatedProducts(mixed);
       }
-    } catch (error) {
+      setRetryCount(0);
+    } catch (error: any) {
       console.error("Error loading product:", error);
+      const errorMessage = error?.message || "Failed to load product. Please try again.";
+      setError(errorMessage);
+      
+      // Auto-retry up to 3 times
+      if (retryCount < 3) {
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          loadProduct(true);
+        }, 2000);
+      }
     } finally {
       setReviewsLoading(false);
       setLoading(false);
@@ -232,21 +298,334 @@ export default function ProductDetailPage() {
     }
   }, [product, quantity]);
 
-  if (loading) {
+  if (loading && !product) {
+    return (
+      <ErrorBoundary onRetry={() => loadProduct()}>
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid gap-8 lg:grid-cols-2">
+            <ProductImageSkeleton />
+            <ProductInfoSkeleton />
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  if (error && !product && retryCount >= 3) {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
-        <p className="text-muted-foreground">Loading product...</p>
+        <div className="mx-auto max-w-md rounded-lg border border-border bg-card p-8 shadow-lg">
+          <p className="mb-4 text-lg font-semibold text-error">{error}</p>
+          <Button onClick={() => { setRetryCount(0); loadProduct(); }} variant="default">
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
 
-  if (!product) {
+  if (!product && !loading) {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <p className="text-muted-foreground">Product not found.</p>
+        <Link href="/store/products" className="mt-4 inline-block text-soft-blue-600 hover:underline">
+          Browse Products
+        </Link>
       </div>
     );
   }
+
+  // Swipe handlers for mobile image navigation
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd || !product) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && product.images && selectedImageIndex < product.images.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1);
+    }
+    if (isRightSwipe && selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1);
+    }
+  };
+
+  const handleBoxTypeSelect = async (boxType: "SOLO" | "SHARED") => {
+    const newPreference = boxType.toLowerCase() as "solo" | "shared";
+    setBoxTypePreference(newPreference);
+    
+    // If switching to shared, load available shared boxes
+    if (newPreference === "shared") {
+      await loadAvailableSharedBoxes();
+      // Reset solo box selection
+      setSelectedSoloBoxId(null);
+      setShowBoxSizeSelection(false);
+    } else {
+      // If switching to solo, load available solo boxes
+      await loadAvailableSoloBoxes();
+      // Reset shared box selection
+      setSelectedSharedBoxId(null);
+    }
+  };
+
+  const loadAvailableSoloBoxes = async () => {
+    if (!user?.id) {
+      // No user, show size selection
+      setShowBoxSizeSelection(true);
+      return;
+    }
+
+    setLoadingSoloBoxes(true);
+    try {
+      // Get customer's own pending solo boxes (not yet delivered)
+      // Customer can add more items to fill their existing box
+      const boxes = await boxService.getAvailableSoloBoxes(user.id);
+      
+      if (boxes.length === 0) {
+        // No existing pending solo boxes, show size selection for new box
+        setShowBoxSizeSelection(true);
+        setAvailableSoloBoxes([]);
+        setSelectedSoloBoxId(null);
+      } else {
+        // Has existing pending solo boxes, show them as options
+        // Customer can continue filling their box with more items
+        setShowBoxSizeSelection(false);
+        setAvailableSoloBoxes(boxes);
+        // Auto-select first available box
+        if (boxes.length > 0 && !selectedSoloBoxId) {
+          setSelectedSoloBoxId(boxes[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading solo boxes:", error);
+      // On error, show size selection
+      setShowBoxSizeSelection(true);
+      setAvailableSoloBoxes([]);
+      setSelectedSoloBoxId(null);
+    } finally {
+      setLoadingSoloBoxes(false);
+    }
+  };
+
+  const loadAvailableSharedBoxes = async () => {
+    setLoadingSharedBoxes(true);
+    try {
+      const boxes = await boxService.getAvailableSharedBoxes();
+      
+      if (boxes.length === 0) {
+        // No shared boxes available, create a default one (medium size)
+        try {
+          const defaultBox = await boxService.createDefaultSharedBox();
+          const sharedBox: AvailableSharedBox = {
+            ...defaultBox,
+            max_weight: 15, // Medium size default
+            max_volume: 0.3, // Medium size default
+            current_weight: 0,
+            current_volume: 0,
+            participant_count: 0,
+            max_participants: 10,
+            is_full: false,
+          };
+          setAvailableSharedBoxes([sharedBox]);
+          setSelectedSharedBoxId(defaultBox.id);
+        } catch (error) {
+          console.error("Failed to create default shared box:", error);
+          // Create a mock default box for display
+          const timestamp = Date.now();
+          const mockBox: AvailableSharedBox = {
+            id: `default-${timestamp}`,
+            user_id: user?.id || '',
+            box_number: `SHARED-${new Date().getFullYear()}-001`,
+            box_type: 'shared',
+            status: 'in_warehouse',
+            items: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            max_weight: 15,
+            max_volume: 0.3,
+            current_weight: 0,
+            current_volume: 0,
+            participant_count: 0,
+            max_participants: 10,
+            is_full: false,
+            tracking_id: `TRK-${timestamp.toString().slice(-8).toUpperCase()}`,
+          };
+          setAvailableSharedBoxes([mockBox]);
+          setSelectedSharedBoxId(mockBox.id);
+        }
+      } else {
+        setAvailableSharedBoxes(boxes);
+        // Auto-select first available box
+        if (boxes.length > 0 && !selectedSharedBoxId) {
+          setSelectedSharedBoxId(boxes[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading shared boxes:", error);
+      // Create a mock default box for display
+      const mockBox: AvailableSharedBox = {
+        id: `default-${Date.now()}`,
+        user_id: user?.id || '',
+        box_number: `SHARED-${new Date().getFullYear()}-001`,
+        box_type: 'shared',
+        status: 'in_warehouse',
+        items: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        max_weight: 15,
+        max_volume: 0.3,
+        current_weight: 0,
+        current_volume: 0,
+        participant_count: 0,
+        max_participants: 10,
+        is_full: false,
+      };
+      setAvailableSharedBoxes([mockBox]);
+      setSelectedSharedBoxId(mockBox.id);
+    } finally {
+      setLoadingSharedBoxes(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    
+    if (!isAuthenticated || !user) {
+      router.push("/auth/login?redirect=/store/products/" + productId);
+      return;
+    }
+
+    // Validate product ID is a UUID (backend requirement)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(product.id)) {
+      console.error("Product ID is not a valid UUID:", product.id);
+      alert("This product cannot be added to cart. Product ID format is invalid.");
+      return;
+    }
+
+    // Validate user ID is a UUID
+    if (!uuidRegex.test(user.id)) {
+      console.error("User ID is not a valid UUID:", user.id);
+      alert("Invalid user session. Please log in again.");
+      return;
+    }
+
+    setAddingToCart(true);
+    setCartSuccess(false);
+
+    try {
+      // Prepare variation data
+      const variationData: Record<string, string> = {};
+      if (product.variations && Object.keys(selectedVariations).length > 0) {
+        Object.entries(selectedVariations).forEach(([type, variationId]) => {
+          const variation = product.variations?.find((v) => v.id === variationId);
+          if (variation) {
+            variationData[type] = variation.value;
+          }
+        });
+      }
+
+      await cartService.addToCart({
+        user_id: user.id,
+        product_id: product.id,
+        quantity: quantity,
+        box_type_preference: boxTypePreference,
+        ...(boxTypePreference === "shared" && selectedSharedBoxId && {
+          shared_box_id: selectedSharedBoxId,
+        }),
+        ...(boxTypePreference === "solo" && {
+          ...(showBoxSizeSelection ? {
+            box_size: selectedBoxSize,
+          } : selectedSoloBoxId && {
+            solo_box_id: selectedSoloBoxId,
+          }),
+        }),
+      });
+
+      setCartSuccess(true);
+      setTimeout(() => setCartSuccess(false), 3000);
+    } catch (error: any) {
+      console.error("Error adding to cart:", error);
+      const errorMessage = error?.message || "Failed to add item to cart. Please try again.";
+      
+      // Show more specific error messages
+      if (errorMessage.includes("uuid") || errorMessage.includes("UUID")) {
+        alert("Invalid product ID format. Please refresh the page and try again.");
+      } else if (errorMessage.includes("404") || errorMessage.includes("not found")) {
+        alert("Product not found. Please refresh the page and try again.");
+      } else {
+        alert(errorMessage);
+      }
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = () => {
+    if (!product) return;
+    
+    if (!isAuthenticated || !user) {
+      router.push("/auth/login?redirect=/store/products/" + productId);
+      return;
+    }
+
+    // Prepare variation data
+    const variationData: Record<string, string> = {};
+    if (product.variations && Object.keys(selectedVariations).length > 0) {
+      Object.entries(selectedVariations).forEach(([type, variationId]) => {
+        const variation = product.variations?.find((v) => v.id === variationId);
+        if (variation) {
+          variationData[type] = variation.value;
+        }
+      });
+    }
+
+    // Calculate current price
+    const calculatedPrice = calculatePrice();
+
+    // Store order data in sessionStorage for payment page
+    const orderData = {
+      productId: product.id,
+      name: product.name,
+      price: calculatedPrice,
+      quantity: quantity,
+      boxTypePreference: boxTypePreference,
+      ...(boxTypePreference === "shared" && selectedSharedBoxId && {
+        sharedBoxId: selectedSharedBoxId,
+      }),
+      ...(boxTypePreference === "solo" && {
+        ...(showBoxSizeSelection ? {
+          boxSize: selectedBoxSize,
+        } : selectedSoloBoxId && {
+          soloBoxId: selectedSoloBoxId,
+        }),
+      }),
+      variations: Object.keys(variationData).length > 0 ? variationData : undefined,
+      selectedVariationIds: Object.values(selectedVariations).length > 0 
+        ? Object.values(selectedVariations) 
+        : undefined,
+    };
+    
+    sessionStorage.setItem("temp_order", JSON.stringify(orderData));
+    
+    // Navigate to payment page
+    router.push(`/store/payment?orderId=temp-order-${Date.now()}`);
+  };
+
+  // Early return if no product
+  if (!product) return null;
 
   // Calculate price with variations
   const calculatePrice = () => {
@@ -263,7 +642,7 @@ export default function ProductDetailPage() {
   };
 
   const currentPrice = calculatePrice();
-  const priceInPHP = currentPrice * 0.042; // Mock conversion
+  const priceInPHP = currentPrice * currencyRate;
   const shippingEstimate = "7-14 days (Sea) / 3-5 days (Air)";
   
   // Get available stock for selected variations
@@ -305,170 +684,97 @@ export default function ProductDetailPage() {
     // Check if at least one variation of each type is selected
     return variationTypes.every((type) => selectedVariations[type] !== undefined);
   };
-  
-  const canAddToCart = hasRequiredVariations() && availableStock > 0;
 
-  // Swipe handlers for mobile image navigation
-  const minSwipeDistance = 50;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+  // Check if can add to cart based on box type
+  const canAddToCart = () => {
+    if (!hasRequiredVariations() || availableStock <= 0) {
+      return false;
+    }
     
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe && product.images && selectedImageIndex < product.images.length - 1) {
-      setSelectedImageIndex(selectedImageIndex + 1);
+    // For solo boxes
+    if (boxTypePreference === "solo") {
+      // If showing existing boxes, need to select one
+      if (!showBoxSizeSelection) {
+        return selectedSoloBoxId !== null;
+      }
+      // If showing size selection, we already have selectedBoxSize (defaults to large)
+      return true;
     }
-    if (isRightSwipe && selectedImageIndex > 0) {
-      setSelectedImageIndex(selectedImageIndex - 1);
+    
+    // For shared boxes, need to have a selected shared box
+    if (boxTypePreference === "shared") {
+      return selectedSharedBoxId !== null;
     }
+    
+    return false;
   };
-
   
+  const canAddToCartValue = canAddToCart();
+
   // Calculate shipping fee based on box size and type
   const calculateShippingFee = () => {
-    const size = boxSizePricing[selectedBoxSize];
-    const pricing = size[boxTypePreference];
-    const weight = (product.weight || 0) * quantity;
-    const volume = (product.dimensions 
-      ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 
-      : weight / 1000) * quantity; // Convert to CBM
-    
-    const shippingFee = pricing.base + (weight * pricing.perKg) + (volume * pricing.perCbm);
-    return Math.round(shippingFee);
+    if (boxTypePreference === "shared") {
+      // For shared boxes, use shared pricing with medium size (default from backend)
+      const size = boxSizePricing.medium;
+      const pricing = size.shared;
+      const weight = (product.weight || 0) * quantity;
+      const volume = (product.dimensions 
+        ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 
+        : weight / 1000) * quantity;
+      
+      const shippingFee = pricing.base + (weight * pricing.perKg) + (volume * pricing.perCbm);
+      return Math.round(shippingFee);
+    } else {
+      // For solo boxes, only large is available
+      const size = boxSizePricing.large;
+      const pricing = size.solo;
+      const weight = (product.weight || 0) * quantity;
+      const volume = (product.dimensions 
+        ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 
+        : weight / 1000) * quantity;
+      
+      const shippingFee = pricing.base + (weight * pricing.perKg) + (volume * pricing.perCbm);
+      return Math.round(shippingFee);
+    }
   };
   
   const shippingFee = calculateShippingFee();
   const subtotal = priceInPHP * quantity;
   const total = subtotal + shippingFee;
 
-  const handleBoxTypeSelect = (boxType: "SOLO" | "SHARED") => {
-    setBoxTypePreference(boxType.toLowerCase() as "solo" | "shared");
-  };
-
-  const handleAddToCart = async () => {
-    if (!isAuthenticated || !user) {
-      router.push("/auth/login?redirect=/store/products/" + productId);
-      return;
-    }
-
-    if (!product) return;
-
-    // Validate product ID is a UUID (backend requirement)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(product.id)) {
-      console.error("Product ID is not a valid UUID:", product.id);
-      alert("This product cannot be added to cart. Product ID format is invalid.");
-      return;
-    }
-
-    // Validate user ID is a UUID
-    if (!uuidRegex.test(user.id)) {
-      console.error("User ID is not a valid UUID:", user.id);
-      alert("Invalid user session. Please log in again.");
-      return;
-    }
-
-    setAddingToCart(true);
-    setCartSuccess(false);
-
-    try {
-      // Prepare variation data
-      const variationData: Record<string, string> = {};
-      if (product.variations && Object.keys(selectedVariations).length > 0) {
-        Object.entries(selectedVariations).forEach(([type, variationId]) => {
-          const variation = product.variations?.find((v) => v.id === variationId);
-          if (variation) {
-            variationData[type] = variation.value;
-          }
-        });
-      }
-
-      await cartService.addToCart({
-        user_id: user.id,
-        product_id: product.id,
-        quantity: quantity,
-        box_type_preference: boxTypePreference,
-      });
-
-      setCartSuccess(true);
-      setTimeout(() => setCartSuccess(false), 3000);
-    } catch (error: any) {
-      console.error("Error adding to cart:", error);
-      const errorMessage = error?.message || "Failed to add item to cart. Please try again.";
-      
-      // Show more specific error messages
-      if (errorMessage.includes("uuid") || errorMessage.includes("UUID")) {
-        alert("Invalid product ID format. Please refresh the page and try again.");
-      } else if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-        alert("Product not found. Please refresh the page and try again.");
-      } else {
-        alert(errorMessage);
-      }
-    } finally {
-      setAddingToCart(false);
-    }
-  };
-
-  const handleBuyNow = () => {
-    if (!isAuthenticated || !user) {
-      router.push("/auth/login?redirect=/store/products/" + productId);
-      return;
-    }
-
-    // Prepare variation data
-    const variationData: Record<string, string> = {};
-    if (product.variations && Object.keys(selectedVariations).length > 0) {
-      Object.entries(selectedVariations).forEach(([type, variationId]) => {
-        const variation = product.variations?.find((v) => v.id === variationId);
-        if (variation) {
-          variationData[type] = variation.value;
-        }
-      });
-    }
-
-    // Store order data in sessionStorage for payment page
-    const orderData = {
-      productId: product.id,
-      name: product.name,
-      price: currentPrice,
-      quantity: quantity,
-      boxTypePreference: boxTypePreference,
-      variations: Object.keys(variationData).length > 0 ? variationData : undefined,
-      selectedVariationIds: Object.values(selectedVariations).length > 0 
-        ? Object.values(selectedVariations) 
-        : undefined,
-    };
-    
-    sessionStorage.setItem("temp_order", JSON.stringify(orderData));
-    
-    // Navigate to payment page
-    router.push(`/store/payment?orderId=temp-order-${Date.now()}`);
-  };
-
   return (
-    <>
+    <ErrorBoundary onRetry={() => loadProduct()}>
       {/* Price Comparison Modal */}
-      {product && (
-        <PriceComparison
-          product={product as unknown as ProductFromTypes}
-          isOpen={showPriceComparison}
-          onClose={() => setShowPriceComparison(false)}
+      <PriceComparison
+        product={product as unknown as ProductFromTypes}
+        isOpen={showPriceComparison}
+        onClose={() => setShowPriceComparison(false)}
+      />
+
+      {/* Image Zoom Modal */}
+      {product.images && product.images.length > 0 && (
+        <ImageZoom
+          images={product.images}
+          currentIndex={selectedImageIndex}
+          isOpen={showImageZoom}
+          onClose={() => setShowImageZoom(false)}
+          onIndexChange={setSelectedImageIndex}
         />
       )}
 
-      <div className="container mx-auto px-4 py-8">
+      {/* Sticky Cart Bar (Mobile) */}
+      <StickyCartBar
+        price={priceInPHP}
+        currency="PHP"
+        quantity={quantity}
+        canAddToCart={canAddToCartValue}
+        addingToCart={addingToCart}
+        cartSuccess={cartSuccess}
+        onAddToCart={handleAddToCart}
+        onBuyNow={handleBuyNow}
+      />
+
+      <div className="container mx-auto px-4 py-8 pb-20 lg:pb-8">
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Product Images */}
         <div>
@@ -476,10 +782,11 @@ export default function ProductDetailPage() {
             <div className="space-y-4">
               {/* Main Image - Swipeable on Mobile */}
               <div 
-                className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-white md:cursor-default"
+                className="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-border bg-white md:cursor-pointer"
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
+                onClick={() => setShowImageZoom(true)}
               >
                 <img
                   src={product.images[selectedImageIndex]}
@@ -559,9 +866,16 @@ export default function ProductDetailPage() {
               {product.brand}
             </p>
           )}
-          <h1 className="mb-4 text-4xl font-bold text-grey-900">
-            {product.name}
-          </h1>
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <h1 className="text-3xl font-bold text-grey-900 sm:text-4xl">
+              {product.name}
+            </h1>
+            <SocialShare
+              productName={product.name}
+              productUrl={`/store/products/${product.id}`}
+              productImage={product.images?.[0]}
+            />
+          </div>
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
               <p className="text-3xl font-bold text-soft-blue-600">
@@ -587,39 +901,85 @@ export default function ProductDetailPage() {
             </p>
           </div>
 
+          {/* Product Specifications - Compact Grid Layout */}
           <div className="mb-6 space-y-4">
+            {/* Description */}
             <div>
               <h3 className="mb-2 text-base font-semibold text-grey-900">Description</h3>
               <p className="text-grey-700 leading-relaxed">{product.description}</p>
             </div>
 
-            <div>
-              <h3 className="mb-2 text-base font-semibold text-grey-900">Shipping Estimate</h3>
-              <p className="text-grey-700 font-medium">
-                {shippingEstimate} from Korea to Philippines
-              </p>
-            </div>
-
-            <div>
-              <h3 className="mb-2 text-base font-semibold text-grey-900">Weight</h3>
-              <p className="text-grey-700 font-medium">{product.weight} kg</p>
-            </div>
-
-            {product.dimensions && (
-              <div>
-                <h3 className="mb-2 text-base font-semibold text-grey-900">Dimensions</h3>
-                <p className="text-grey-700 font-medium">
-                  {product.dimensions.length}cm × {product.dimensions.width}cm ×{" "}
-                  {product.dimensions.height}cm
-                </p>
+            {/* Product Details Grid - Row Layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Shipping Estimate */}
+              <div className="flex items-start gap-3 rounded-lg border border-border bg-grey-50 p-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <svg className="h-5 w-5 text-soft-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-grey-600 mb-0.5">Shipping</p>
+                  <p className="text-sm font-semibold text-grey-900 leading-tight">
+                    {shippingEstimate}
+                  </p>
+                </div>
               </div>
-            )}
 
-            <div>
-              <h3 className="mb-2 text-base font-semibold text-grey-900">Stock</h3>
-              <p className="text-grey-700 font-semibold">
-                {availableStock > 0 ? `${availableStock} available` : "Out of stock"}
-              </p>
+              {/* Stock Status */}
+              <div className={`flex items-start gap-3 rounded-lg border border-border p-3 ${
+                availableStock > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+              }`}>
+                <div className="flex-shrink-0 mt-0.5">
+                  {availableStock > 0 ? (
+                    <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-grey-600 mb-0.5">Stock</p>
+                  <p className={`text-sm font-semibold leading-tight ${
+                    availableStock > 0 ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    {availableStock > 0 ? `${availableStock} available` : "Out of stock"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Weight */}
+              <div className="flex items-start gap-3 rounded-lg border border-border bg-grey-50 p-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <svg className="h-5 w-5 text-soft-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-grey-600 mb-0.5">Weight</p>
+                  <p className="text-sm font-semibold text-grey-900">{product.weight} kg</p>
+                </div>
+              </div>
+
+              {/* Dimensions */}
+              {product.dimensions && (
+                <div className="flex items-start gap-3 rounded-lg border border-border bg-grey-50 p-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg className="h-5 w-5 text-soft-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-grey-600 mb-0.5">Dimensions</p>
+                    <p className="text-sm font-semibold text-grey-900 leading-tight">
+                      {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} cm
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -721,15 +1081,15 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Box Type and Size Selection */}
+          {/* Box Type and Size Selection - Simplified */}
           <div className="mb-6 space-y-4">
-            {/* Box Type Selection */}
+            {/* Box Type Selection - Simplified */}
             <div>
-              <label className="mb-3 block text-base font-bold text-grey-900">Box Type</label>
-              <div className="flex gap-3">
+              <label className="mb-2 block text-sm font-semibold text-grey-700">Box Type</label>
+              <div className="flex gap-2">
                 {boxTypesLoading ? (
-                  <div className="flex flex-1 items-center justify-center py-4">
-                    <p className="text-sm text-muted-foreground">Loading box types...</p>
+                  <div className="flex flex-1 items-center justify-center py-3">
+                    <p className="text-xs text-muted-foreground">Loading...</p>
                   </div>
                 ) : (
                   <>
@@ -745,24 +1105,13 @@ export default function ProductDetailPage() {
                             <button
                               key={boxType.code}
                               onClick={() => handleBoxTypeSelect(isSolo ? "SOLO" : "SHARED")}
-                              className={`flex-1 rounded-xl border-2 p-4 text-sm font-bold transition-all ${
+                              className={`flex-1 rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all ${
                                 isSelected
-                                  ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-md"
-                                  : "border-border bg-white text-grey-900 hover:border-soft-blue-300 hover:bg-soft-blue-50"
+                                  ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-sm"
+                                  : "border-border bg-white text-grey-700 hover:border-soft-blue-300 hover:bg-soft-blue-50"
                               }`}
                             >
-                              <div className="flex items-center justify-center gap-2">
-                                {isSolo ? (
-                                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                                  </svg>
-                                ) : (
-                                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zM8 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H9a1 1 0 01-1-1V4zM15 3a1 1 0 00-1 1v12a1 1 0 001 1h2a1 1 0 001-1V4a1 1 0 00-1-1h-2z" />
-                                  </svg>
-                                )}
-                                <span>{boxType.name || boxType.code}</span>
-                              </div>
+                              {boxType.name || boxType.code}
                             </button>
                           );
                         }
@@ -770,36 +1119,25 @@ export default function ProductDetailPage() {
                       })
                     ) : (
                       <>
-                        {/* Fallback: Show default buttons if API fails or returns no data */}
                         <button
                           onClick={() => handleBoxTypeSelect("SOLO")}
-                          className={`flex-1 rounded-xl border-2 p-4 text-sm font-semibold transition-all ${
+                          className={`flex-1 rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all ${
                             boxTypePreference === "solo"
-                              ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-md"
+                              ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-sm"
                               : "border-border bg-white text-grey-700 hover:border-soft-blue-300 hover:bg-soft-blue-50"
                           }`}
                         >
-                          <div className="flex items-center justify-center gap-2">
-                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                            </svg>
-                            <span>SOLO</span>
-                          </div>
+                          SOLO
                         </button>
                         <button
                           onClick={() => handleBoxTypeSelect("SHARED")}
-                          className={`flex-1 rounded-xl border-2 p-4 text-sm font-semibold transition-all ${
+                          className={`flex-1 rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all ${
                             boxTypePreference === "shared"
-                              ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-md"
+                              ? "border-soft-blue-600 bg-soft-blue-600 text-white shadow-sm"
                               : "border-border bg-white text-grey-700 hover:border-soft-blue-300 hover:bg-soft-blue-50"
                           }`}
                         >
-                          <div className="flex items-center justify-center gap-2">
-                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zM8 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H9a1 1 0 01-1-1V4zM15 3a1 1 0 00-1 1v12a1 1 0 001 1h2a1 1 0 001-1V4a1 1 0 00-1-1h-2z" />
-                            </svg>
-                            <span>SHARED</span>
-                          </div>
+                          SHARED
                         </button>
                       </>
                     )}
@@ -808,121 +1146,214 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            {/* Box Size Selection */}
-            <div>
-              <label className="mb-3 block text-base font-bold text-grey-900">Box Size</label>
-              <div className="grid grid-cols-3 gap-3">
-                {(["small", "medium", "large"] as const).map((size) => {
-                  const sizeInfo = boxSizePricing[size];
-                  const pricing = sizeInfo[boxTypePreference];
-                  const isSelected = selectedBoxSize === size;
-                  const maxWeight = sizeInfo.maxWeight;
-                  const maxVolume = sizeInfo.maxVolume;
-                  
-                  // Check if this size can accommodate the product
-                  const totalWeight = (product.weight || 0) * quantity;
-                  const totalVolume = product.dimensions 
-                    ? (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 1000000 * quantity
-                    : totalWeight / 1000;
-                  
-                  const canFit = totalWeight <= maxWeight && totalVolume <= maxVolume;
-                  const isRecommended = size === "medium" && canFit; // Medium is default recommendation
-                  
-                  // Size icons
-                  const sizeIcons = {
-                    small: (
-                      <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 4a1 1 0 011-1h14a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm2 1v10h12V5H4z" />
-                      </svg>
-                    ),
-                    medium: (
-                      <svg className="h-7 w-7" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 4a1 1 0 011-1h14a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm2 1v10h12V5H4z" />
-                      </svg>
-                    ),
-                    large: (
-                      <svg className="h-8 w-8" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 4a1 1 0 011-1h14a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm2 1v10h12V5H4z" />
-                      </svg>
-                    ),
-                  };
-                  
-                  return (
-                    <button
-                      key={size}
-                      onClick={() => setSelectedBoxSize(size)}
-                      disabled={!canFit}
-                      className={`relative rounded-xl border-2 p-4 text-center transition-all ${
-                        isSelected
-                          ? "border-soft-blue-600 bg-soft-blue-50 shadow-md scale-105"
-                          : canFit
-                          ? "border-border bg-white hover:border-soft-blue-300 hover:bg-soft-blue-50 hover:shadow-sm"
-                          : "border-grey-200 bg-grey-50 opacity-50 cursor-not-allowed"
-                      }`}
-                    >
-                      {isRecommended && !isSelected && (
-                        <span className="absolute -top-2 -right-2 rounded-full bg-soft-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
-                          ⭐ Recommended
-                        </span>
-                      )}
-                      
-                      {/* Icon */}
-                      <div className={`mb-2 flex justify-center ${
-                        isSelected ? "text-soft-blue-600" : canFit ? "text-grey-700" : "text-grey-400"
-                      }`}>
-                        {sizeIcons[size]}
+            {/* Conditional Content Based on Box Type */}
+            {boxTypePreference === "solo" ? (
+              /* SOLO Box - Show existing boxes or size selection */
+              <div>
+                {loadingSoloBoxes ? (
+                  <div className="flex items-center justify-center py-6">
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  </div>
+                ) : showBoxSizeSelection ? (
+                  /* Box Size Selection - First time order or no existing boxes */
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-grey-700">Box Size</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["small", "medium", "large"] as const).map((size) => {
+                        const sizeInfo = boxSizePricing[size];
+                        const pricing = sizeInfo[boxTypePreference];
+                        const isSelected = selectedBoxSize === size;
+                        const maxWeight = sizeInfo.maxWeight;
+                        const maxVolume = sizeInfo.maxVolume;
+                        
+                        // Only large is selectable, small and medium are disabled
+                        const isSelectable = size === "large";
+                        
+                        return (
+                          <button
+                            key={size}
+                            onClick={() => isSelectable && setSelectedBoxSize(size)}
+                            disabled={!isSelectable}
+                            className={`relative rounded-lg border-2 p-3 text-center transition-all ${
+                              isSelected
+                                ? "border-soft-blue-600 bg-soft-blue-50 shadow-sm"
+                                : isSelectable
+                                ? "border-border bg-white hover:border-soft-blue-300 hover:bg-soft-blue-50"
+                                : "border-grey-200 bg-grey-50 opacity-40 cursor-not-allowed"
+                            }`}
+                          >
+                            {/* Selected Checkmark */}
+                            {isSelected && (
+                              <div className="absolute top-1.5 right-1.5">
+                                <svg className="h-3.5 w-3.5 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            )}
+                            
+                            {/* Size Label */}
+                            <div className={`mb-1 text-xs font-bold uppercase ${
+                              isSelected ? "text-soft-blue-700" : isSelectable ? "text-grey-900" : "text-grey-400"
+                            }`}>
+                              {size}
+                            </div>
+                            
+                            {/* Price */}
+                            <div className={`text-sm font-bold mb-1 ${
+                              isSelected ? "text-soft-blue-700" : isSelectable ? "text-grey-900" : "text-grey-400"
+                            }`}>
+                              {formatCurrency(pricing.base, "PHP")}
+                            </div>
+                            
+                            {/* Capacity - Compact */}
+                            <div className={`text-[10px] leading-tight ${
+                              isSelectable ? "text-grey-600" : "text-grey-400"
+                            }`}>
+                              <div className="flex items-center justify-center gap-0.5">
+                                <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                                </svg>
+                                <span>{maxWeight}kg</span>
+                              </div>
+                              <div className="flex items-center justify-center gap-0.5">
+                                <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                                </svg>
+                                <span>{maxVolume.toFixed(1)}CBM</span>
+                              </div>
+                            </div>
+                            
+                            {/* Disabled Indicator */}
+                            {!isSelectable && (
+                              <div className="mt-1.5 text-[9px] font-medium text-grey-500">
+                                Not available
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* Existing Solo Boxes - Show customer's pending boxes */
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-grey-700">Your Pending Solo Box</label>
+                    <p className="mb-3 text-xs text-grey-600">Add items to your existing box that hasn't been delivered yet</p>
+                    {availableSoloBoxes.length > 0 ? (
+                      <div className="space-y-2">
+                        {availableSoloBoxes.map((box) => {
+                          const isSelected = selectedSoloBoxId === box.id;
+                          const currentWeight = box.current_weight || 0;
+                          const currentVolume = box.current_volume || 0;
+                          const maxWeight = box.max_weight || 30;
+                          const maxVolume = box.max_volume || 0.6;
+                          const availableWeight = maxWeight - currentWeight;
+                          const availableVolume = maxVolume - currentVolume;
+                          const boxId = box.box_number || `BOX-${box.id.slice(0, 8).toUpperCase()}`;
+                          const trackingId = box.tracking_id || box.tracking_history?.[0]?.id || `TRK-${box.id.slice(0, 8).toUpperCase()}`;
+                          
+                          return (
+                            <button
+                              key={box.id}
+                              onClick={() => setSelectedSoloBoxId(box.id)}
+                              className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
+                                isSelected
+                                  ? "border-soft-blue-600 bg-soft-blue-50 shadow-sm"
+                                  : "border-border bg-white hover:border-soft-blue-300 hover:bg-soft-blue-50"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-sm font-semibold text-grey-900">{boxId}</span>
+                                    {isSelected && (
+                                      <svg className="h-4 w-4 text-soft-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                  <div className="space-y-1 text-xs text-grey-600">
+                                    <div className="flex items-center gap-2">
+                                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                                      </svg>
+                                      <span>Available: {availableWeight.toFixed(1)}kg / {availableVolume.toFixed(2)}CBM</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                                        <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
+                                      </svg>
+                                      <span>Tracking: {trackingId}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex-shrink-0">
+                                  <div className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
+                                    Available
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                      
-                      {/* Size Label */}
-                      <div className={`mb-1 text-xs font-bold uppercase ${
-                        isSelected ? "text-soft-blue-700" : canFit ? "text-grey-900" : "text-grey-500"
-                      }`}>
-                        {size}
+                    ) : (
+                      <div className="rounded-lg border border-border bg-grey-50 p-4 text-center">
+                        <p className="text-sm text-grey-600">No existing solo boxes</p>
                       </div>
-                      
-                      {/* Price */}
-                      <div className={`mb-2 text-base font-bold ${
-                        isSelected ? "text-soft-blue-700" : canFit ? "text-grey-900" : "text-grey-500"
-                      }`}>
-                        {formatCurrency(pricing.base, "PHP")}
-                      </div>
-                      
-                      {/* Capacity Info */}
-                      <div className={`text-xs leading-tight font-medium ${
-                        canFit ? "text-grey-700" : "text-grey-500"
-                      }`}>
-                        <div className="flex items-center justify-center gap-1 mb-0.5">
-                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                          </svg>
-                          <span>Up to {maxWeight}kg</span>
-                        </div>
-                        <div className="flex items-center justify-center gap-1">
-                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-                          </svg>
-                          <span>{maxVolume.toFixed(1)}CBM</span>
-                        </div>
-                      </div>
-                      
-                      {!canFit && (
-                        <div className="mt-2 text-[10px] font-semibold text-error">
-                          ✕ Too small
-                        </div>
-                      )}
-                      
-                      {isSelected && (
-                        <div className="absolute top-2 right-2">
-                          <svg className="h-4 w-4 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              /* Available Shared Box - For SHARED (Using available shared boxes) */
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-grey-700">Available Shared Box</label>
+                <p className="mb-3 text-xs text-grey-600">Join an available shared box for reduced shipping costs</p>
+                {loadingSharedBoxes ? (
+                  <div className="flex items-center justify-center py-6">
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border-2 border-soft-blue-600 bg-soft-blue-50 p-4">
+                    {availableSharedBoxes.length > 0 && selectedSharedBoxId ? (
+                      (() => {
+                        const box = availableSharedBoxes.find(b => b.id === selectedSharedBoxId) || availableSharedBoxes[0];
+                        const boxId = box.box_number || `BOX-${box.id.slice(0, 8).toUpperCase()}`;
+                        const trackingId = (box as AvailableSharedBox).tracking_id || box.tracking_history?.[0]?.id || `TRK-${box.id.slice(0, 8).toUpperCase()}`;
+                        
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-medium text-grey-600 mb-1">Box ID</p>
+                                <p className="text-sm font-bold text-grey-900">{boxId}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs font-medium text-grey-600 mb-1">Tracking ID</p>
+                                <p className="text-sm font-bold text-grey-900">{trackingId}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 pt-2 border-t border-soft-blue-200">
+                              <svg className="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-xs font-medium text-green-700">Available for shared shipping</span>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="text-center py-2">
+                        <p className="text-sm text-grey-600">Default shared box (Medium size)</p>
+                        <p className="text-xs text-grey-500 mt-1">Box will be created when you add to cart</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Price Summary */}
             <div className="rounded-xl border-2 border-soft-blue-200 bg-white p-5 shadow-md">
@@ -949,7 +1380,7 @@ export default function ProductDetailPage() {
                       <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
                       <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
                     </svg>
-                    <span>Shipping ({selectedBoxSize} {boxTypePreference}):</span>
+                    <span>Shipping ({boxTypePreference === "solo" ? `${selectedBoxSize} ${boxTypePreference}` : availableSharedBoxes.find(b => b.id === selectedSharedBoxId)?.box_number || "shared box"}):</span>
                   </div>
                   <span className="font-bold text-grey-900">{formatCurrency(shippingFee, "PHP")}</span>
                 </div>
@@ -970,9 +1401,19 @@ export default function ProductDetailPage() {
                 Please select all required options (size, color, etc.)
               </p>
             )}
+            {boxTypePreference === "shared" && !selectedSharedBoxId && (
+              <p className="mb-2 text-sm text-soft-blue-600 font-medium">
+                Please select a shared box to continue
+              </p>
+            )}
+            {boxTypePreference === "solo" && !showBoxSizeSelection && !selectedSoloBoxId && (
+              <p className="mb-2 text-sm text-soft-blue-600 font-medium">
+                Please select a solo box to continue
+              </p>
+            )}
             <Button
               onClick={handleAddToCart}
-              disabled={addingToCart || !canAddToCart}
+              disabled={addingToCart || !canAddToCartValue}
               variant="outline"
               className="flex-1"
               size="lg"
@@ -981,7 +1422,7 @@ export default function ProductDetailPage() {
             </Button>
             <Button
               onClick={handleBuyNow}
-              disabled={!canAddToCart}
+              disabled={!canAddToCartValue}
               className="flex-1"
               size="lg"
             >
@@ -1058,8 +1499,10 @@ export default function ProductDetailPage() {
         {activeReviewTab === "reviews" && (
           <>
             {reviewsLoading ? (
-              <div className="text-center py-8">
-                <p className="text-grey-600">Loading reviews...</p>
+              <div className="space-y-6">
+                {[1, 2, 3].map((i) => (
+                  <ReviewSkeleton key={i} />
+                ))}
               </div>
             ) : reviews.length === 0 ? (
               <div className="rounded-[4px] border border-[#FCE4EC] bg-[#FFF5F7] p-8 text-center">
@@ -1499,7 +1942,7 @@ export default function ProductDetailPage() {
         </div>
       )}
       </div>
-    </>
+    </ErrorBoundary>
   );
 }
 

@@ -116,6 +116,26 @@ export interface GetBoxPenaltyResponse {
   data: BoxPenalty[];
 }
 
+export interface AvailableSharedBox extends Box {
+  current_weight?: number;
+  current_volume?: number;
+  max_weight?: number;
+  max_volume?: number;
+  participant_count?: number;
+  max_participants?: number;
+  is_full?: boolean;
+  available_space?: {
+    weight: number;
+    volume: number;
+  };
+  tracking_id?: string; // Tracking ID for the shared box
+}
+
+export interface GetAvailableSharedBoxesResponse {
+  success: boolean;
+  data: AvailableSharedBox[];
+}
+
 export const boxService = {
   /**
    * Get user boxes with optional filters
@@ -173,6 +193,54 @@ export const boxService = {
   async getBoxPenalty(id: string): Promise<BoxPenalty[]> {
     try {
       const response = await apiClient.get<GetBoxPenaltyResponse>(`/boxes/${id}/penalty`);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get available shared boxes (open and not full)
+   * Shared boxes from admin/other customers that customers can join
+   */
+  async getAvailableSharedBoxes(): Promise<AvailableSharedBox[]> {
+    try {
+      const response = await apiClient.get<GetAvailableSharedBoxesResponse>('/boxes/shared/available');
+      return response.data.data;
+    } catch (error) {
+      // If endpoint doesn't exist yet, return empty array
+      console.warn('Available shared boxes endpoint not available:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get user's available solo boxes (pending, not full, not delivered)
+   * Customer's own boxes that they can continue filling with more items
+   */
+  async getAvailableSoloBoxes(userId: string): Promise<AvailableSharedBox[]> {
+    try {
+      const response = await apiClient.get<GetAvailableSharedBoxesResponse>('/boxes/solo/available', {
+        params: { user_id: userId },
+      });
+      return response.data.data;
+    } catch (error) {
+      // If endpoint doesn't exist yet, return empty array
+      console.warn('Available solo boxes endpoint not available:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Create a default shared box (starter box)
+   * Used when no shared boxes are available
+   */
+  async createDefaultSharedBox(): Promise<Box> {
+    try {
+      const response = await apiClient.post<CreateBoxResponse>('/boxes/shared/default', {
+        box_type: 'shared',
+        items: [],
+      });
       return response.data.data;
     } catch (error) {
       throw handleApiError(error);

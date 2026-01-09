@@ -37,6 +37,8 @@ export interface AddToCartRequest {
   product_id: string;
   quantity: number;
   box_type_preference?: 'solo' | 'shared';
+  shared_box_id?: string; // Required when box_type_preference is 'shared'
+  box_size?: 'small' | 'medium' | 'large'; // Required when box_type_preference is 'solo'
 }
 
 export interface AddToCartResponse {
