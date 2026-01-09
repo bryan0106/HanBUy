@@ -27,8 +27,42 @@ export default function OnhandProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const response = await productService.getOnhandProducts();
-      setProducts(response.data as any[]);
+      const params: any = {
+        page: 1,
+        limit: 50,
+      };
+      if (selectedCategory !== 'all') {
+        params.category = selectedCategory;
+      }
+      if (selectedBrand !== 'all') {
+        params.brand = selectedBrand;
+      }
+      if (priceRange[0] > 0 || priceRange[1] < 100000) {
+        params.min_price = priceRange[0];
+        params.max_price = priceRange[1];
+      }
+      const response = await productService.getOnhandProducts(params);
+      // Map API response to match Product type from @/types
+      const mappedProducts: Product[] = response.data.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        price: p.price,
+        currency: p.currency as 'KRW',
+        images: p.images || [],
+        category: p.category || '',
+        brand: p.brand,
+        sku: p.sku || '',
+        stock: p.stock,
+        weight: p.weight || 0,
+        dimensions: p.dimensions,
+        seoTitle: undefined,
+        seoDescription: undefined,
+        variations: undefined,
+        createdAt: p.created_at ? new Date(p.created_at) : new Date(),
+        updatedAt: p.updated_at ? new Date(p.updated_at) : new Date(),
+      }));
+      setProducts(mappedProducts);
     } catch (error) {
       console.error("Error loading onhand products:", error);
       setProducts([]);

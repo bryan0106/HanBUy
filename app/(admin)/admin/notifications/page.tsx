@@ -42,41 +42,29 @@ export default function NotificationsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   useEffect(() => {
-    loadNotifications();
+    // Disabled: Notifications API calls removed for now
+    // loadNotifications();
+    setLoading(false);
   }, [statusFilter, typeFilter]);
 
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const params: { status?: string; type?: string } = {};
+      // Disabled: Notifications API calls removed for now
+      // const params: { status?: string; type?: string } = {};
       
-      if (statusFilter !== "all") {
-        params.status = statusFilter;
-      }
-      if (typeFilter !== "all") {
-        params.type = typeFilter;
-      }
+      // if (statusFilter !== "all") {
+      //   params.status = statusFilter;
+      // }
+      // if (typeFilter !== "all") {
+      //   params.type = typeFilter;
+      // }
       
-      const response = await apiClient.get<AdminNotificationResponse>("/admin/notifications", { params });
+      // const response = await apiClient.get<AdminNotificationResponse>("/admin/notifications", { params });
       
-      // Map API response to component format
-      const mappedNotifications: Notification[] = response.data.data.map((notif) => ({
-        id: notif.id,
-        recipientName: notif.recipient_name || "Unknown",
-        recipientEmail: notif.recipient_email || "",
-        type: notif.type,
-        title: notif.title,
-        message: notif.message,
-        channels: notif.channels || [],
-        status: notif.status,
-        sentAt: notif.sent_at ? new Date(notif.sent_at) : undefined,
-        createdAt: new Date(notif.created_at),
-      }));
-      
-      setNotifications(mappedNotifications);
+      // Set empty notifications (API calls disabled)
+      setNotifications([]);
     } catch (error) {
-      console.error("Failed to load notifications:", error);
-      handleApiError(error);
       setNotifications([]);
     } finally {
       setLoading(false);

@@ -3,11 +3,6 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://hanbuy-api.onrender.com/api";
 
-// Log API URL in development (remove in production)
-if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-  console.log("🔗 Backend API URL:", API_BASE_URL);
-}
-
 /**
  * Check if running on localhost
  */

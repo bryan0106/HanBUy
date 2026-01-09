@@ -29,7 +29,9 @@ export default function StoreNotificationsPage() {
       return;
     }
     if (!authLoading && isAuthenticated) {
-      loadNotifications();
+      // Disabled: Notifications API calls removed for now
+      // loadNotifications();
+      setLoading(false);
     }
   }, [isAuthenticated, authLoading, router, filter]);
 
@@ -82,29 +84,20 @@ export default function StoreNotificationsPage() {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const params: { read?: boolean; limit?: number } = {};
+      // Disabled: Notifications API calls removed for now
+      // const params: { read?: boolean; limit?: number } = {};
       
-      if (filter === "unread") {
-        params.read = false;
-      } else if (filter === "read") {
-        params.read = true;
-      }
+      // if (filter === "unread") {
+      //   params.read = false;
+      // } else if (filter === "read") {
+      //   params.read = true;
+      // }
       
-      const response = await notificationService.getNotifications(params);
+      // const response = await notificationService.getNotifications(params);
       
-      // Map API response to component format
-      const mappedNotifications: Notification[] = response.data.map((notif) => ({
-        id: notif.id,
-        title: notif.title,
-        message: notif.message,
-        read: notif.read,
-        createdAt: notif.created_at,
-        link: generateNotificationLink(notif.type, notif.title, notif.message, notif.metadata),
-      }));
-      
-      setNotifications(mappedNotifications);
+      // Set empty notifications (API calls disabled)
+      setNotifications([]);
     } catch (error) {
-      console.error("Failed to load notifications:", error);
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -112,24 +105,17 @@ export default function StoreNotificationsPage() {
   };
 
   const markAsRead = async (id: string) => {
-    try {
-      await notificationService.markNotificationRead(id);
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
-    } catch (error) {
-      console.error("Failed to mark notification as read:", error);
-    }
+    // Disabled: Notifications API calls removed for now
+    // Just update UI optimistically
+    setNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
   };
 
   const markAllAsRead = async () => {
-    try {
-      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
-      await Promise.all(unreadIds.map(id => notificationService.markNotificationRead(id)));
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch (error) {
-      console.error("Failed to mark all notifications as read:", error);
-    }
+    // Disabled: Notifications API calls removed for now
+    // Just update UI optimistically
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const filteredNotifications = notifications.filter((notif) => {

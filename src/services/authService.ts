@@ -92,14 +92,10 @@ export const authService = {
       const normalizedEmail = email.trim().toLowerCase();
       const trimmedPassword = password.trim();
       
-      console.log('📤 Sending login request...');
       const response = await apiClient.post<any>('/auth/login', {
         email: normalizedEmail,
         password: trimmedPassword,
       });
-
-      // Simple logging
-      console.log('✅ Login successful');
 
       const data: LoginResponseRaw = response.data;
 
@@ -165,19 +161,12 @@ export const authService = {
       if (typeof window !== 'undefined' && token && user) {
         localStorage.setItem('hanbuy_token', token.trim());
         localStorage.setItem('hanbuy_user', JSON.stringify(user));
-        console.log('✅ Token stored - user logged in');
       }
 
 
       return normalizedResponse;
     } catch (error) {
-      console.error('❌ Login service error:', error);
       const apiError = handleApiError(error);
-      console.error('❌ Processed error:', {
-        message: apiError.message,
-        status: apiError.status,
-        code: apiError.code
-      });
       throw apiError;
     }
   },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { productService } from "@/services/productService";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { categories } from "@/lib/mockData";
@@ -40,25 +41,44 @@ export default function PreorderProductsPage() {
 
   const loadProducts = async () => {
     setLoading(true);
-    // TODO: Fetch preorder items from API
-    const mockData: PreorderProduct[] = [
-      {
-        id: "pre-1",
-        name: "Limited Edition K-Beauty Set",
-        description: "Exclusive pre-order item",
-        price: 50000,
-        currency: "KRW",
-        images: ["https://tse3.mm.bing.net/th/id/OIP.fBce0nBeC1DZohHVUx6XhwAAAA?pid=Api&P=0&h=220"],
-        category: "skincare",
-        brand: "K-Beauty",
-        quantity: 50,
-        orderDate: new Date("2024-12-15"),
-        releaseDate: new Date("2025-01-15"),
-        stock: 30,
-      },
-    ];
-    setProducts(mockData);
-    setLoading(false);
+    try {
+      const params: any = {
+        page: 1,
+        limit: 50,
+      };
+      if (selectedCategory !== 'all') {
+        params.category = selectedCategory;
+      }
+      if (selectedBrand !== 'all') {
+        params.brand = selectedBrand;
+      }
+      if (priceRange[0] > 0 || priceRange[1] < 100000) {
+        params.min_price = priceRange[0];
+        params.max_price = priceRange[1];
+      }
+      const response = await productService.getPreorderProducts(params);
+      // Convert API response to PreorderProduct format
+      const products: PreorderProduct[] = response.data.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        price: p.price,
+        currency: p.currency || 'KRW',
+        images: p.images || [],
+        category: p.category || '',
+        brand: p.brand,
+        quantity: p.stock || 0,
+        orderDate: p.order_date ? new Date(p.order_date) : new Date(),
+        releaseDate: p.release_date ? new Date(p.release_date) : new Date(),
+        stock: p.stock || 0,
+      }));
+      setProducts(products);
+    } catch (error) {
+      console.error("Error loading preorder products:", error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));

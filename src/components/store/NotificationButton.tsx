@@ -24,7 +24,8 @@ export function NotificationButton() {
 
   useEffect(() => {
     setMounted(true);
-    loadNotifications();
+    // Disabled: Notifications API calls removed for now
+    // loadNotifications();
   }, []);
 
   useEffect(() => {
@@ -90,43 +91,19 @@ export function NotificationButton() {
   };
 
   const loadNotifications = async () => {
-    try {
-      setLoading(true);
-      const response = await notificationService.getNotifications({ limit: 10 });
-      
-      // Map API response to component format
-      const mappedNotifications: Notification[] = response.data.map((notif) => ({
-        id: notif.id,
-        title: notif.title,
-        message: notif.message,
-        read: notif.read,
-        createdAt: notif.created_at,
-        link: generateNotificationLink(notif.type, notif.title, notif.message, notif.metadata),
-      }));
-      
-      setNotifications(mappedNotifications);
-      setUnreadCount(mappedNotifications.filter(n => !n.read).length);
-    } catch (error) {
-      console.error("Failed to load notifications:", error);
-      // On error, set empty array
-      setNotifications([]);
-      setUnreadCount(0);
-    } finally {
-      setLoading(false);
-    }
+    // Disabled: Notifications API calls removed for now
+    setLoading(false);
+    setNotifications([]);
+    setUnreadCount(0);
   };
 
   const markAsRead = async (id: string) => {
-    try {
-      await notificationService.markNotificationRead(id);
-      // Optimistically update UI
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Failed to mark notification as read:", error);
-    }
+    // Disabled: Notifications API calls removed for now
+    // Just update UI optimistically
+    setNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
+    setUnreadCount(prev => Math.max(0, prev - 1));
   };
 
   const unreadNotifications = notifications.filter(n => !n.read);

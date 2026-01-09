@@ -25,22 +25,27 @@ export interface Product {
 }
 
 export interface GetProductsParams {
+  page?: number; // 1-1000, default: 1
+  limit?: number; // 1-100, default: 50
   category?: string;
-  status?: 'active' | 'inactive' | 'out_of_stock';
-  product_type?: 'onhand' | 'preorder' | 'kr_website';
-  page?: number;
-  limit?: number;
-  search?: string;
+  brand?: string;
+  search?: string; // Search in name/description
+  min_price?: number;
+  max_price?: number;
+  in_stock?: boolean; // onhand only
+  sort?: 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc' | 'created_desc' | 'created_asc' | 'stock_desc';
 }
 
 export interface GetProductsResponse {
   success: boolean;
   data: Product[];
-  pagination?: {
+  pagination: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   };
 }
 
@@ -87,8 +92,9 @@ export const productService = {
 
   /**
    * Get onhand items only
+   * Query params: page, limit, category, brand, search, min_price, max_price, in_stock, sort
    */
-  async getOnhandProducts(params?: { page?: number; limit?: number }): Promise<GetProductsResponse> {
+  async getOnhandProducts(params?: GetProductsParams): Promise<GetProductsResponse> {
     try {
       const response = await apiClient.get<GetProductsResponse>('/products/onhand', { params });
       return response.data;
@@ -99,8 +105,9 @@ export const productService = {
 
   /**
    * Get preorder items only
+   * Query params: page, limit, category, brand, search, min_price, max_price, sort
    */
-  async getPreorderProducts(params?: { page?: number; limit?: number }): Promise<GetProductsResponse> {
+  async getPreorderProducts(params?: Omit<GetProductsParams, 'in_stock'>): Promise<GetProductsResponse> {
     try {
       const response = await apiClient.get<GetProductsResponse>('/products/preorder', { params });
       return response.data;

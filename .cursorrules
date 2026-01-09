@@ -7,11 +7,37 @@
 - NEVER return password_hash in API responses
 - Always normalize email: email.toLowerCase().trim()
 - Always trim password before comparison
+- Token expires in 7 days
+- Add Authorization: Bearer ${token} header to all protected requests
 
 ## API Response Format
 - Success: { success: true, user: {...}, token: "..." }
 - Error: { success: false, error: "...", message: "..." }
 - User object NEVER includes password_hash
+- Products: { success: true, data: [...], pagination: { page, limit, total, totalPages, hasNextPage, hasPrevPage } }
+
+## API Endpoints
+
+### Authentication
+- POST /api/auth/login - Body: { email, password } (plain text)
+- POST /api/auth/logout - Headers: Authorization: Bearer {token}
+- POST /api/auth/set-password - Utility endpoint
+
+### Products
+- GET /api/products/onhand?page=1&limit=50&category=...&brand=...&search=...&min_price=...&max_price=...&in_stock=true&sort=price_asc
+- GET /api/products/preorder?page=1&limit=50&category=...&brand=...&search=...&min_price=...&max_price=...&sort=price_asc
+
+### Query Parameters
+- page: 1-1000 (default: 1)
+- limit: 1-100 (default: 50)
+- category, brand, search: optional strings
+- min_price, max_price: optional numbers
+- in_stock: optional boolean (onhand only)
+- sort: price_asc|price_desc|name_asc|name_desc|created_desc|created_asc|stock_desc
+
+### Pagination
+- Always check pagination.hasNextPage and pagination.hasPrevPage
+- Show page numbers using pagination.totalPages
 
 ## Code Style
 - Use TypeScript
@@ -32,6 +58,7 @@
 - Base URL: process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api'
 - Token stored in localStorage as 'hanbuy_token'
 - User stored in localStorage as 'hanbuy_user'
+- Always include Content-Type: application/json header
 
 ## Error Handling
 - 401: Invalid credentials → Show "Invalid email or password"
@@ -39,11 +66,10 @@
 - 400: Validation error → Show specific field errors
 - 500: Server error → Show generic error message
 
-## Testing
-- Test with real API endpoints
-- Verify password_hash is never in response
-- Test email normalization
-- Test error cases (401, 403, 400)
+## CORS
+- Allowed origins: localhost:3000, localhost:3001, han-b-uy.vercel.app, .onrender.com, .railway.app
+- Credentials: enabled
+- Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS
 
 ## Don't
 - Don't create documentation files unless explicitly asked
@@ -59,4 +85,6 @@
 - Handle all error cases
 - Store token and user after login
 - Clear storage on 401 errors
+- Use pagination for large lists
+- Check Cache-Control header for caching
 

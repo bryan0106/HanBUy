@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { productService } from "@/services/productService";
+import { mockServices } from "@/lib/mockData";
 import { formatCurrency } from "@/lib/currency";
 import { LikeButton } from "@/components/store/LikeButton";
 import type { Product } from "@/types";
@@ -85,11 +85,13 @@ export default function HomePage() {
   const loadHomePageData = async () => {
     setLoading(true);
     try {
-      const response = await productService.getProducts();
+      // Use mock data for homepage (UI not finalized yet)
+      const mockProducts = await import('@/lib/mockData').then(m => m.mockServices.getProducts());
       // Featured products (first 8 products)
-      setFeaturedProducts(response.data.slice(0, 8) as any[]);
+      setFeaturedProducts(mockProducts.slice(0, 8) as any[]);
     } catch (error) {
       console.error("Error loading homepage data:", error);
+      setFeaturedProducts([]);
     } finally {
       setLoading(false);
     }

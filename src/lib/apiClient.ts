@@ -35,20 +35,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    // Log error details in development
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-      if (!error.response) {
-        console.error('🌐 Network Error:', {
-          message: error.message,
-          code: error.code,
-          config: {
-            url: error.config?.url,
-            baseURL: error.config?.baseURL,
-            method: error.config?.method,
-          }
-        });
-      }
-    }
+    // Silently handle errors
 
     // Handle 401 Unauthorized - Clear token and redirect to login
     if (error.response?.status === 401) {
@@ -70,9 +57,5 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Log API URL in development
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  console.log('🔗 Backend API URL:', API_BASE_URL);
-}
 
 export default apiClient;

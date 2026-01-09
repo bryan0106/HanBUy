@@ -51,9 +51,7 @@ export function useAuth() {
     setLoading(true);
     setError(null);
     try {
-      console.log("🔐 useAuth: Attempting login...");
       const response = await authService.login(email, password);
-      console.log("✅ useAuth: Login successful, response:", response);
       
       if (!response || !response.user) {
         throw new Error("Login response missing user data");
@@ -62,8 +60,6 @@ export function useAuth() {
       if (!response.token) {
         throw new Error("Login response missing token");
       }
-      
-      console.log("✅ useAuth: Setting user state:", response.user);
       
       // Simple: Store token and user, set state, done
       if (typeof window !== 'undefined') {
@@ -78,13 +74,6 @@ export function useAuth() {
     } catch (err) {
       const apiError = handleApiError(err);
       const errorMessage = apiError.message || 'Login failed. Please try again.';
-      console.error("❌ useAuth: Login failed:", {
-        message: errorMessage,
-        status: apiError.status,
-        code: apiError.code,
-        originalError: err,
-        errorType: err instanceof Error ? err.constructor.name : typeof err
-      });
       setError(errorMessage);
       setLoading(false);
       // Throw a proper Error instance with the message
@@ -100,7 +89,7 @@ export function useAuth() {
     try {
       await authService.logout();
     } catch (err) {
-      console.error("Error during logout:", err);
+      // Silently handle logout errors
     } finally {
       setUser(null);
       setLoading(false);
