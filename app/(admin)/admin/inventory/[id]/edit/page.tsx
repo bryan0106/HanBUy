@@ -7,6 +7,9 @@ import { categories } from "@/lib/mockData";
 import { productService } from "@/services/productService";
 import type { Product } from "@/services/productService";
 import toast from "react-hot-toast";
+import { ProductVariationsModal } from "@/components/admin/ProductVariationsModal";
+import { PriceComparisonModal } from "@/components/admin/PriceComparisonModal";
+import type { ProductVariation } from "@/types";
 
 export default function EditInventoryItemPage() {
   const router = useRouter();
@@ -17,6 +20,16 @@ export default function EditInventoryItemPage() {
   const [error, setError] = useState("");
   const loadingRef = useRef(false);
   const hasLoadedRef = useRef(false);
+  const [showVariationsModal, setShowVariationsModal] = useState(false);
+  const [showPriceComparisonModal, setShowPriceComparisonModal] = useState(false);
+  const [variations, setVariations] = useState<ProductVariation[]>([]);
+  const [competitors, setCompetitors] = useState<Array<{
+    website: string;
+    url: string;
+    price: number;
+    currency: "KRW";
+    lastChecked: string;
+  }>>([]);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -70,7 +83,7 @@ export default function EditInventoryItemPage() {
         description: product.description || "",
         price: product.price || 0,
         currency: (product.currency === "KRW" || product.currency === "PHP" ? product.currency : "KRW") as "KRW" | "PHP",
-        images: product.images || [],
+        images: Array.isArray(product.images) ? product.images : [],
         category: product.category || "",
         brand: product.brand || "",
         sku: product.sku || "",
@@ -90,6 +103,41 @@ export default function EditInventoryItemPage() {
         release_date: releaseDate,
         dimensions: product.dimensions || { length: 0, width: 0, height: 0 },
       });
+
+      // Load variations if available
+      if (product.variations && Array.isArray(product.variations) && product.variations.length > 0) {
+        setVariations(product.variations);
+      } else {
+        // Try to load variations separately if not included in product response
+        try {
+          const loadedVariations = await productService.getProductVariations(productId);
+          if (loadedVariations && Array.isArray(loadedVariations) && loadedVariations.length > 0) {
+            setVariations(loadedVariations);
+          }
+        } catch (error) {
+          console.log("No variations found for this product");
+          setVariations([]); // Ensure it's always an array
+        }
+      }
+
+      // Load price comparisons
+      try {
+        const loadedComparisons = await productService.getPriceComparisons(productId);
+        if (loadedComparisons && Array.isArray(loadedComparisons) && loadedComparisons.length > 0) {
+          setCompetitors(loadedComparisons.map(c => ({
+            website: c.website,
+            url: c.url,
+            price: c.price,
+            currency: c.currency as "KRW",
+            lastChecked: c.lastChecked,
+          })));
+        } else {
+          setCompetitors([]); // Ensure it's always an array
+        }
+      } catch (error) {
+        console.log("No price comparison data found for this product");
+        setCompetitors([]); // Ensure it's always an array
+      }
       
       if (loadingToast) {
         toast.dismiss(loadingToast);
@@ -140,31 +188,62 @@ export default function EditInventoryItemPage() {
       // Make sure to use correct fields: product_type and status
       const payload: any = {
         name: formData.name.trim(),
-        description: formData.description.trim() || null,
+        description: formData.description.trim() || undefined,
         price: formData.price,
         currency: formData.currency,
         images: formData.images,
-        category: formData.category || null,
-        brand: formData.brand.trim() || null,
-        sku: formData.sku.trim() || null,
+        category: formData.category || undefined,
+        brand: formData.brand.trim() || undefined,
+        sku: formData.sku.trim() || undefined,
         stock: formData.stock,
         status: formData.status, // Must be "active", "inactive", or "out_of_stock"
         product_type: formData.product_type, // Can be "onhand", "preorder", or "kr_website"
-        weight: formData.weight || null,
-        dimensions: formData.dimensions.length > 0 || formData.dimensions.width > 0 || formData.dimensions.height > 0
+        weight: formData.weight || undefined,
+        dimensions: (formData.dimensions && (formData.dimensions.length > 0 || formData.dimensions.width > 0 || formData.dimensions.height > 0))
           ? formData.dimensions
-          : null,
+          : undefined,
       };
 
       // Add preorder-specific fields if product_type is preorder
       if (formData.product_type === "preorder") {
-        payload.order_date = formData.order_date ? new Date(formData.order_date).toISOString() : null;
-        payload.release_date = formData.release_date ? new Date(formData.release_date).toISOString() : null;
+        payload.order_date = formData.order_date ? new Date(formData.order_date).toISOString() : undefined;
+        payload.release_date = formData.release_date ? new Date(formData.release_date).toISOString() : undefined;
       }
 
       console.log("Updating product with payload:", payload);
       updateToast = toast.loading("Updating product...");
       await productService.updateProduct(productId, payload);
+
+      // Update variations separately if any
+      if (variations.length > 0) {
+        try {
+          await productService.batchUpdateVariations(productId, variations);
+          toast.success(`${variations.length} variation(s) updated`);
+        } catch (err) {
+          console.error("Failed to update variations:", err);
+          toast.error("Product updated but failed to update variations");
+        }
+      }
+
+      // Update price comparisons separately if any
+      if (competitors.length > 0) {
+        try {
+          await productService.batchUpdatePriceComparisons(
+            productId,
+            competitors.map(c => ({
+              website: c.website,
+              url: c.url,
+              price: c.price,
+              currency: c.currency,
+            }))
+          );
+          toast.success(`${competitors.length} price comparison(s) updated`);
+        } catch (err) {
+          console.error("Failed to update price comparisons:", err);
+          toast.error("Product updated but failed to update price comparisons");
+        }
+      }
+
       toast.dismiss(updateToast);
       toast.success("Product updated successfully!");
       // Add query parameter to trigger refresh on inventory page
@@ -346,6 +425,40 @@ export default function EditInventoryItemPage() {
                   <option value="out_of_stock">Out of Stock</option>
                 </select>
               </div>
+            </div>
+
+            {/* Variations and Price Comparison Buttons */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setShowVariationsModal(true)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-3 font-semibold transition-colors hover:bg-grey-50"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                Manage Variations
+                {variations.length > 0 && (
+                  <span className="rounded-full bg-soft-blue-600 px-2 py-0.5 text-xs text-white">
+                    {variations.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPriceComparisonModal(true)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-3 font-semibold transition-colors hover:bg-grey-50"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Price Comparison
+                {competitors.length > 0 && (
+                  <span className="rounded-full bg-soft-blue-600 px-2 py-0.5 text-xs text-white">
+                    {competitors.length}
+                  </span>
+                )}
+              </button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -552,6 +665,30 @@ export default function EditInventoryItemPage() {
           </div>
         </div>
       </form>
+
+      {/* Modals */}
+      <ProductVariationsModal
+        isOpen={showVariationsModal}
+        onClose={() => setShowVariationsModal(false)}
+        variations={variations}
+        productId={productId} // Pass productId for existing products - will save via API
+        onSave={(newVariations) => {
+          setVariations(newVariations);
+          // Toast is shown in the modal after successful save
+        }}
+      />
+      <PriceComparisonModal
+        isOpen={showPriceComparisonModal}
+        onClose={() => setShowPriceComparisonModal(false)}
+        productId={productId} // Pass productId for existing products - will save via API
+        productName={formData.name || "Product"}
+        ourPrice={formData.price}
+        competitors={competitors}
+        onSave={(newCompetitors) => {
+          setCompetitors(newCompetitors);
+          // Toast is shown in the modal after successful save
+        }}
+      />
     </div>
   );
 }

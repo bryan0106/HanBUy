@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { categories } from "@/lib/mockData";
 import toast from "react-hot-toast";
+import { ProductVariationsModal } from "@/components/admin/ProductVariationsModal";
+import { PriceComparisonModal } from "@/components/admin/PriceComparisonModal";
+import type { ProductVariation } from "@/types";
 
 interface ScrapedData {
   name: string;
@@ -30,6 +33,16 @@ export default function NewInventoryItemPage() {
   const [scraping, setScraping] = useState(false);
   const [error, setError] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showVariationsModal, setShowVariationsModal] = useState(false);
+  const [showPriceComparisonModal, setShowPriceComparisonModal] = useState(false);
+  const [variations, setVariations] = useState<ProductVariation[]>([]);
+  const [competitors, setCompetitors] = useState<Array<{
+    website: string;
+    url: string;
+    price: number;
+    currency: "KRW";
+    lastChecked: string;
+  }>>([]);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -134,31 +147,62 @@ export default function NewInventoryItemPage() {
       // Prepare payload according to product table structure
       const payload: any = {
         name: formData.name.trim(),
-        description: formData.description.trim() || null,
+        description: formData.description.trim() || undefined,
         price: formData.price,
         currency: formData.currency,
         images: formData.images,
-        category: formData.category || null,
-        brand: formData.brand.trim() || null,
-        sku: formData.sku.trim() || null,
+        category: formData.category || undefined,
+        brand: formData.brand.trim() || undefined,
+        sku: formData.sku.trim() || undefined,
         stock: formData.stock,
         status: formData.status,
         product_type: formData.product_type,
-        weight: formData.weight || null,
+        weight: formData.weight || undefined,
         dimensions: formData.dimensions.length > 0 || formData.dimensions.width > 0 || formData.dimensions.height > 0
           ? formData.dimensions
-          : null,
+          : undefined,
       };
 
       // Add preorder-specific fields if product_type is preorder
       if (formData.product_type === "preorder") {
-        payload.order_date = formData.order_date ? new Date(formData.order_date).toISOString() : null;
-        payload.release_date = formData.release_date ? new Date(formData.release_date).toISOString() : null;
+        payload.order_date = formData.order_date ? new Date(formData.order_date).toISOString() : undefined;
+        payload.release_date = formData.release_date ? new Date(formData.release_date).toISOString() : undefined;
       }
 
       createToast = toast.loading("Creating product...");
       const { productService } = await import("@/services/productService");
-      await productService.createProduct(payload);
+      const createdProduct = await productService.createProduct(payload);
+      
+      // Save variations separately if any
+      if (variations.length > 0 && createdProduct.id) {
+        try {
+          await productService.batchUpdateVariations(createdProduct.id, variations);
+          toast.success(`${variations.length} variation(s) added`);
+        } catch (err) {
+          console.error("Failed to save variations:", err);
+          toast.error("Product created but failed to save variations");
+        }
+      }
+
+      // Save price comparisons separately if any
+      if (competitors.length > 0 && createdProduct.id) {
+        try {
+          await productService.batchUpdatePriceComparisons(
+            createdProduct.id,
+            competitors.map(c => ({
+              website: c.website,
+              url: c.url,
+              price: c.price,
+              currency: c.currency,
+            }))
+          );
+          toast.success(`${competitors.length} price comparison(s) added`);
+        } catch (err) {
+          console.error("Failed to save price comparisons:", err);
+          toast.error("Product created but failed to save price comparisons");
+        }
+      }
+
       toast.dismiss(createToast);
       toast.success(`"${formData.name}" created successfully!`);
       // Add query parameter to trigger refresh on inventory page
@@ -369,6 +413,40 @@ export default function NewInventoryItemPage() {
               </div>
             </div>
 
+            {/* Variations and Price Comparison Buttons */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setShowVariationsModal(true)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-3 font-semibold transition-colors hover:bg-grey-50"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                Manage Variations
+                {variations.length > 0 && (
+                  <span className="rounded-full bg-soft-blue-600 px-2 py-0.5 text-xs text-white">
+                    {variations.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPriceComparisonModal(true)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-3 font-semibold transition-colors hover:bg-grey-50"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Price Comparison
+                {competitors.length > 0 && (
+                  <span className="rounded-full bg-soft-blue-600 px-2 py-0.5 text-xs text-white">
+                    {competitors.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-medium">Stock Quantity *</label>
@@ -558,6 +636,30 @@ export default function NewInventoryItemPage() {
           </div>
         </div>
       </form>
+
+      {/* Modals */}
+      <ProductVariationsModal
+        isOpen={showVariationsModal}
+        onClose={() => setShowVariationsModal(false)}
+        variations={variations}
+        productId={undefined} // No productId for new products - will be saved after product creation
+        onSave={(newVariations) => {
+          setVariations(newVariations);
+          toast.success(`${newVariations.length} variation(s) added`);
+        }}
+      />
+      <PriceComparisonModal
+        isOpen={showPriceComparisonModal}
+        onClose={() => setShowPriceComparisonModal(false)}
+        productId={undefined} // No productId for new products - will be saved after product creation
+        productName={formData.name || "New Product"}
+        ourPrice={formData.price}
+        competitors={competitors}
+        onSave={(newCompetitors) => {
+          setCompetitors(newCompetitors);
+          toast.success(`${newCompetitors.length} competitor price(s) added`);
+        }}
+      />
     </div>
   );
 }

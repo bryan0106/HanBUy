@@ -196,4 +196,435 @@ export const productService = {
       throw handleApiError(error);
     }
   },
+
+  // ============================================
+  // Product Variations Methods
+  // ============================================
+
+  /**
+   * Get all variations for a product
+   */
+  async getProductVariations(productId: string): Promise<ProductVariation[]> {
+    try {
+      const response = await apiClient.get<{ success: boolean; data: any[] }>(
+        `/products/${productId}/variations`
+      );
+      
+      // Transform snake_case to camelCase
+      const variations = (response.data?.data || []).map((v: any) => ({
+        id: v.id,
+        name: v.name,
+        type: v.type,
+        value: v.value,
+        priceModifier: v.price_modifier ?? v.priceModifier ?? 0,
+        stock: v.stock ?? 0,
+        sku: v.sku,
+        imageUrl: v.image_url ?? v.imageUrl,
+      }));
+      
+      return variations;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get single variation
+   */
+  async getVariation(productId: string, variationId: string): Promise<ProductVariation> {
+    try {
+      const response = await apiClient.get<{ success: boolean; data: any }>(
+        `/products/${productId}/variations/${variationId}`
+      );
+      
+      // Transform snake_case to camelCase
+      const data = response.data.data;
+      return {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        value: data.value,
+        priceModifier: data.price_modifier ?? data.priceModifier ?? 0,
+        stock: data.stock ?? 0,
+        sku: data.sku,
+        imageUrl: data.image_url ?? data.imageUrl,
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Create a variation
+   */
+  async createVariation(productId: string, variationData: Partial<ProductVariation>): Promise<ProductVariation> {
+    try {
+      // Transform camelCase to snake_case for backend API
+      const dataToSend = {
+        name: variationData.name,
+        type: variationData.type,
+        value: variationData.value,
+        price_modifier: variationData.priceModifier ?? 0,
+        stock: variationData.stock ?? 0,
+        sku: variationData.sku || undefined,
+        image_url: variationData.imageUrl || undefined,
+      };
+
+      const response = await apiClient.post<{ success: boolean; data: any }>(
+        `/products/${productId}/variations`,
+        dataToSend
+      );
+      
+      // Transform snake_case back to camelCase
+      const data = response.data.data;
+      return {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        value: data.value,
+        priceModifier: data.price_modifier ?? data.priceModifier ?? 0,
+        stock: data.stock ?? 0,
+        sku: data.sku,
+        imageUrl: data.image_url ?? data.imageUrl,
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Update a variation
+   */
+  async updateVariation(
+    productId: string,
+    variationId: string,
+    variationData: Partial<ProductVariation>
+  ): Promise<ProductVariation> {
+    try {
+      // Transform camelCase to snake_case for backend API
+      const dataToSend: any = {};
+      if (variationData.name !== undefined) dataToSend.name = variationData.name;
+      if (variationData.type !== undefined) dataToSend.type = variationData.type;
+      if (variationData.value !== undefined) dataToSend.value = variationData.value;
+      if (variationData.priceModifier !== undefined) dataToSend.price_modifier = variationData.priceModifier;
+      if (variationData.stock !== undefined) dataToSend.stock = variationData.stock;
+      if (variationData.sku !== undefined) dataToSend.sku = variationData.sku || undefined;
+      if (variationData.imageUrl !== undefined) dataToSend.image_url = variationData.imageUrl || undefined;
+
+      const response = await apiClient.put<{ success: boolean; data: any }>(
+        `/products/${productId}/variations/${variationId}`,
+        dataToSend
+      );
+      
+      // Transform snake_case back to camelCase
+      const data = response.data.data;
+      return {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        value: data.value,
+        priceModifier: data.price_modifier ?? data.priceModifier ?? 0,
+        stock: data.stock ?? 0,
+        sku: data.sku,
+        imageUrl: data.image_url ?? data.imageUrl,
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Delete a variation
+   */
+  async deleteVariation(productId: string, variationId: string): Promise<void> {
+    try {
+      await apiClient.delete(`/products/${productId}/variations/${variationId}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Batch update variations (create/update multiple at once)
+   */
+  async batchUpdateVariations(
+    productId: string,
+    variations: Partial<ProductVariation>[]
+  ): Promise<{ created: number; updated: number; variations: ProductVariation[] }> {
+    try {
+      // Transform camelCase to snake_case for backend API
+      const variationsToSend = variations.map((v) => ({
+        ...(v.id && !v.id.startsWith("temp-") ? { id: v.id } : {}),
+        name: v.name,
+        type: v.type,
+        value: v.value,
+        price_modifier: v.priceModifier ?? 0,
+        stock: v.stock ?? 0,
+        sku: v.sku || undefined,
+        image_url: v.imageUrl || undefined,
+      }));
+
+      const response = await apiClient.post<{
+        success: boolean;
+        data: { created: number; updated: number; variations: any[] };
+      }>(`/products/${productId}/variations/batch`, { variations: variationsToSend });
+      
+      // Transform snake_case back to camelCase for frontend
+      const transformedVariations = response.data.data.variations.map((v: any) => ({
+        id: v.id,
+        name: v.name,
+        type: v.type,
+        value: v.value,
+        priceModifier: v.price_modifier ?? v.priceModifier ?? 0,
+        stock: v.stock ?? 0,
+        sku: v.sku,
+        imageUrl: v.image_url ?? v.imageUrl,
+      }));
+
+      return {
+        created: response.data.data.created,
+        updated: response.data.data.updated,
+        variations: transformedVariations,
+      };
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  // ============================================
+  // Price Comparison Methods
+  // ============================================
+
+  /**
+   * Get all price comparisons for a product
+   */
+  async getPriceComparisons(productId: string, includeInactive = false): Promise<Array<{
+    id: string;
+    product_id: string;
+    website: string;
+    url: string;
+    price: number;
+    currency: string;
+    lastChecked: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  }>> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: Array<{
+          id: string;
+          product_id: string;
+          website: string;
+          url: string;
+          price: number;
+          currency: string;
+          lastChecked: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        }>;
+      }>(`/products/${productId}/price-comparisons`, {
+        params: { include_inactive: includeInactive },
+      });
+      return response.data?.data || [];
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get single price comparison
+   */
+  async getPriceComparison(productId: string, comparisonId: string): Promise<{
+    id: string;
+    product_id: string;
+    website: string;
+    url: string;
+    price: number;
+    currency: string;
+    lastChecked: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: {
+          id: string;
+          product_id: string;
+          website: string;
+          url: string;
+          price: number;
+          currency: string;
+          lastChecked: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+      }>(`/products/${productId}/price-comparisons/${comparisonId}`);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Create a price comparison
+   */
+  async createPriceComparison(
+    productId: string,
+    comparisonData: {
+      website: string;
+      url: string;
+      price: number;
+      currency?: string;
+    }
+  ): Promise<{
+    id: string;
+    product_id: string;
+    website: string;
+    url: string;
+    price: number;
+    currency: string;
+    lastChecked: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  }> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        data: {
+          id: string;
+          product_id: string;
+          website: string;
+          url: string;
+          price: number;
+          currency: string;
+          lastChecked: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+      }>(`/products/${productId}/price-comparisons`, comparisonData);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Update a price comparison
+   */
+  async updatePriceComparison(
+    productId: string,
+    comparisonId: string,
+    comparisonData: {
+      website?: string;
+      url?: string;
+      price?: number;
+      currency?: string;
+      lastChecked?: string;
+    }
+  ): Promise<{
+    id: string;
+    product_id: string;
+    website: string;
+    url: string;
+    price: number;
+    currency: string;
+    lastChecked: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  }> {
+    try {
+      const response = await apiClient.put<{
+        success: boolean;
+        data: {
+          id: string;
+          product_id: string;
+          website: string;
+          url: string;
+          price: number;
+          currency: string;
+          lastChecked: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+      }>(`/products/${productId}/price-comparisons/${comparisonId}`, comparisonData);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Delete a price comparison
+   */
+  async deletePriceComparison(productId: string, comparisonId: string): Promise<void> {
+    try {
+      await apiClient.delete(`/products/${productId}/price-comparisons/${comparisonId}`);
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Batch update price comparisons (create/update multiple at once)
+   */
+  async batchUpdatePriceComparisons(
+    productId: string,
+    comparisons: Array<{
+      id?: string;
+      website: string;
+      url: string;
+      price: number;
+      currency?: string;
+    }>
+  ): Promise<{
+    created: number;
+    updated: number;
+    comparisons: Array<{
+      id: string;
+      product_id: string;
+      website: string;
+      url: string;
+      price: number;
+      currency: string;
+      lastChecked: string;
+      is_active: boolean;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        data: {
+          created: number;
+          updated: number;
+          comparisons: Array<{
+            id: string;
+            product_id: string;
+            website: string;
+            url: string;
+            price: number;
+            currency: string;
+            lastChecked: string;
+            is_active: boolean;
+            created_at: string;
+            updated_at: string;
+          }>;
+        };
+      }>(`/products/${productId}/price-comparisons/batch`, { comparisons });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
 };
