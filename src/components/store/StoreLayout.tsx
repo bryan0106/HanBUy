@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -60,11 +61,18 @@ export function StoreLayout({ children }: StoreLayoutProps) {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Navigation Bar - Flat Design */}
-      <header className="sticky top-0 z-40 border-b border-[#FCE4EC] bg-white">
+      <header className="sticky top-0 z-40 border-b border-[#FCE4EC] bg-[#f8e3ec]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           {/* Logo - Left */}
-          <Link href="/store" className="text-xl font-bold text-[#2C2C2C] sm:text-2xl shrink-0">
-            HanBuy
+          <Link href="/store" className="shrink-0">
+            <Image
+              src="/download.jpg"
+              alt="HanBuy Logo"
+              width={120}
+              height={40}
+              className="h-8 w-auto sm:h-10"
+              priority
+            />
           </Link>
 
           {/* Navigation Links - Centered */}
@@ -130,7 +138,7 @@ export function StoreLayout({ children }: StoreLayoutProps) {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="border-t border-border bg-white md:hidden">
+          <div className="border-t border-border bg-[#f8e3ec] md:hidden">
             <nav className="container mx-auto px-4 py-4">
               <ul className="space-y-2">
                 {navItems.map((item) => {
@@ -171,8 +179,14 @@ export function StoreLayout({ children }: StoreLayoutProps) {
           <div className="grid grid-cols-2 gap-6 sm:gap-8 md:grid-cols-4">
             {/* HanBuy Brand - Full width on mobile */}
             <div className="col-span-2 md:col-span-1">
-              <Link href="/store" className="inline-block">
-                <h3 className="mb-3 text-lg font-bold text-grey-900 sm:mb-4">HanBuy</h3>
+              <Link href="/store" className="inline-block mb-3 sm:mb-4">
+                <Image
+                  src="/download.jpg"
+                  alt="HanBuy Logo"
+                  width={120}
+                  height={40}
+                  className="h-8 w-auto sm:h-10"
+                />
               </Link>
               <p className="text-xs leading-relaxed text-grey-700 sm:text-sm">
                 Korea-to-Philippines E-commerce and Consolidation Logistics Platform

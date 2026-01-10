@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
+import Image from "next/image";
 import { Spinner } from "@/components/ui/spinner";
 
 function LoginForm() {
@@ -86,6 +87,16 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-grey-50">
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 shadow-lg">
         <div className="mb-6 text-center">
+          <Link href="/store" className="inline-block mb-4">
+            <Image
+              src="/download.jpg"
+              alt="HanBuy Logo"
+              width={140}
+              height={46}
+              className="h-10 w-auto mx-auto"
+              priority
+            />
+          </Link>
           <h1 className="mb-2 text-3xl font-bold text-foreground">Welcome Back</h1>
           <p className="text-muted-foreground">
             Sign in to access the store

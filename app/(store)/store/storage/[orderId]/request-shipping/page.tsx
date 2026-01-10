@@ -25,7 +25,6 @@ export default function RequestShippingPage() {
   const orderId = params.orderId as string;
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [boxTypes, setBoxTypes] = useState<BoxType[]>([]);
   const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
@@ -422,14 +421,8 @@ export default function RequestShippingPage() {
     }
   };
 
-  const handleRequestShipping = async () => {
-    if (!order || !user?.id) return;
-
-    // Validate courier selection for SOLO boxes only (shared boxes select courier later)
-    if (boxTypePreference === "solo" && !selectedCourier) {
-      alert("Please select a delivery company to continue.");
-      return;
-    }
+  const handleContinueToPayment = () => {
+    if (!order) return;
 
     // Validate shared box selection
     if (boxTypePreference === "shared" && !selectedSharedBoxId) {
@@ -437,35 +430,15 @@ export default function RequestShippingPage() {
       return;
     }
 
-    setProcessing(true);
-    try {
-      await orderService.requestShipping(order.id, {
-        box_type: boxTypePreference,
-        ...(boxTypePreference === "shared" && selectedSharedBoxId && {
-          shared_box_id: selectedSharedBoxId,
-        }),
-        ...(boxTypePreference === "solo" && {
-          ...(showBoxSizeSelection ? {
-            box_size: selectedBoxSize,
-          } : selectedSoloBoxId && {
-            solo_box_id: selectedSoloBoxId,
-          }),
-          ...(selectedCourier && {
-            courier_id: selectedCourier, // Courier for SOLO boxes (direct delivery)
-          }),
-        }),
-        shipping_address: shippingAddress,
-      });
-
-      // Redirect to payment page for shipping fee (box payment)
-      // For shared boxes, after payment they will select courier (3rd payment)
-      router.push(`/store/payment?orderId=${order.id}&type=shipping`);
-    } catch (error) {
-      console.error("Error requesting shipping:", error);
-      alert("Failed to request shipping. Please try again.");
-    } finally {
-      setProcessing(false);
+    // Validate solo box address if needed
+    if (boxTypePreference === "solo" && (!shippingAddress.street.trim() || !shippingAddress.city.trim() || !shippingAddress.province.trim() || !shippingAddress.zipCode.trim())) {
+      alert("Please enter your complete delivery address.");
+      return;
     }
+
+    // Calculate shipping fee and redirect to payment page
+    const shippingFee = calculateShipping();
+    router.push(`/store/payment?orderId=${order.id}&type=shipping&amount=${shippingFee}`);
   };
 
   if (loading || !order) {
@@ -492,36 +465,32 @@ export default function RequestShippingPage() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Order Summary */}
-        <div className="rounded-lg border border-border bg-white p-6">
-          <h2 className="text-xl font-semibold text-grey-900 mb-4">Order Summary</h2>
-          <div className="space-y-3 mb-4">
+        <div className="rounded-lg border border-border bg-white p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-grey-900 mb-4">Order Summary</h2>
+          <div className="space-y-2 sm:space-y-3 mb-4">
             {order.order_items?.map((item) => (
-              <div key={item.id} className="flex items-center gap-3">
+              <div key={item.id} className="flex items-start gap-3 p-3 rounded-lg border border-grey-200 bg-grey-50 sm:bg-transparent sm:border-0 sm:p-0">
+                {/* Image - Hidden on mobile, shown on desktop */}
                 {item.image_url && (
                   <img
                     src={item.image_url}
                     alt={item.product_name}
-                    className="h-16 w-16 rounded-lg object-cover"
+                    className="hidden sm:block h-16 w-16 rounded-lg object-cover shrink-0"
                   />
                 )}
-                <div className="flex-1">
-                  <p className="font-medium text-grey-900">{item.product_name}</p>
-                  <p className="text-sm text-grey-600">Qty: {item.quantity}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-grey-900 text-sm sm:text-base">{item.product_name}</p>
+                  <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-grey-600">
+                    <span>Qty: {item.quantity}</span>
+                  </div>
                 </div>
-                <p className="font-semibold text-grey-900">
-                  {formatCurrency(item.total, order.currency)}
-                </p>
               </div>
             ))}
           </div>
           <div className="border-t border-border pt-4">
-            <div className="flex justify-between mb-2">
-              <span className="text-grey-600">Subtotal:</span>
-              <span className="font-semibold">{formatCurrency(order.subtotal, order.currency)}</span>
-            </div>
             <div className="flex justify-between text-lg font-bold">
               <span>Total Items:</span>
-              <span>{formatCurrency(order.subtotal, order.currency)}</span>
+              <span>{order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || 0}</span>
             </div>
             <p className="text-xs text-grey-500 mt-2">Items already paid and stored</p>
           </div>
@@ -533,39 +502,7 @@ export default function RequestShippingPage() {
           <div className="rounded-lg border border-border bg-white p-6">
             <h2 className="text-xl font-semibold text-grey-900 mb-4">Shipping Option</h2>
             
-            {/* Info Box - SOLO vs SHARED Comparison */}
-            <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className={`rounded-lg p-3 ${boxTypePreference === "solo" ? "bg-soft-blue-100 border-2 border-soft-blue-300" : "bg-white border border-blue-200"}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className="h-5 w-5 text-soft-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                    <h3 className="font-semibold text-grey-900">SOLO Box</h3>
-                  </div>
-                  <ul className="text-xs text-grey-700 space-y-1">
-                    <li>✓ Direct delivery to your address</li>
-                    <li>✓ Full shipping cost (you pay all)</li>
-                    <li>✓ Faster delivery</li>
-                    <li>✓ Your items only</li>
-                  </ul>
-                </div>
-                <div className={`rounded-lg p-3 ${boxTypePreference === "shared" ? "bg-purple-100 border-2 border-purple-300" : "bg-white border border-blue-200"}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <h3 className="font-semibold text-grey-900">SHARED Box</h3>
-                  </div>
-                  <ul className="text-xs text-grey-700 space-y-1">
-                    <li>✓ Shared shipping cost (cheaper)</li>
-                    <li>✓ Consolidated with other customers</li>
-                    <li>✓ Delivered to Manila office first</li>
-                    <li>✓ COD available for local delivery</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+        
 
             <div className="mb-4">
               <label className="mb-2 block text-sm font-semibold text-grey-700">Select Box Type</label>
@@ -825,97 +762,60 @@ export default function RequestShippingPage() {
             )}
           </div>
 
-          {/* Shipping Address */}
-          <div className="rounded-lg border border-border bg-white p-6">
-            <h2 className="text-xl font-semibold text-grey-900 mb-4">Delivery Address</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-grey-700">Street Address</label>
-                <input
-                  type="text"
-                  value={shippingAddress.street}
-                  onChange={(e) => setShippingAddress({ ...shippingAddress, street: e.target.value })}
-                  className="w-full rounded-lg border border-border px-4 py-2"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-grey-700">City</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.city}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                    className="w-full rounded-lg border border-border px-4 py-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-grey-700">Province</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.province}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, province: e.target.value })}
-                    className="w-full rounded-lg border border-border px-4 py-2"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-grey-700">Zip Code</label>
-                <input
-                  type="text"
-                  value={shippingAddress.zipCode}
-                  onChange={(e) => setShippingAddress({ ...shippingAddress, zipCode: e.target.value })}
-                  className="w-full rounded-lg border border-border px-4 py-2"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Delivery Company Selection - Only for SOLO boxes (direct delivery) */}
-          {couriers.length > 0 && boxTypePreference === "solo" && (
+          {/* Shipping Address - Only for SOLO boxes */}
+          {boxTypePreference === "solo" && (
             <div className="rounded-lg border border-border bg-white p-6">
-              <h2 className="text-xl font-semibold text-grey-900 mb-4">Delivery Company</h2>
-              <p className="mb-4 text-sm text-grey-600">
-                Choose your preferred delivery company for direct delivery to your address.
+              <h2 className="text-xl font-semibold text-grey-900 mb-4">Delivery Address</h2>
+              <p className="text-sm text-grey-600 mb-4">
+                Enter your delivery address for direct shipping.
               </p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {couriers.map((courier) => (
-                  <button
-                    key={courier.id}
-                    onClick={() => setSelectedCourier(courier.id)}
-                    className={`rounded-lg border-2 p-4 text-left transition-all ${
-                      selectedCourier === courier.id
-                        ? "border-soft-blue-600 bg-soft-blue-50 shadow-md"
-                        : "border-border bg-white hover:border-soft-blue-300 hover:bg-soft-blue-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-grey-900">{courier.name}</h4>
-                      {selectedCourier === courier.id && (
-                        <svg className="h-5 w-5 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                    {courier.description && (
-                      <p className="text-xs text-grey-600 mb-2">{courier.description}</p>
-                    )}
-                    {courier.estimatedDays && (
-                      <div className="flex items-center gap-1 text-xs text-grey-500">
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>Est. {courier.estimatedDays} day{courier.estimatedDays > 1 ? 's' : ''}</span>
-                      </div>
-                    )}
-                  </button>
-                ))}
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-grey-700">Street Address</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.street}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, street: e.target.value })}
+                    className="w-full rounded-lg border border-border px-4 py-2"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-grey-700">City</label>
+                    <input
+                      type="text"
+                      value={shippingAddress.city}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                      className="w-full rounded-lg border border-border px-4 py-2"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-grey-700">Province</label>
+                    <input
+                      type="text"
+                      value={shippingAddress.province}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, province: e.target.value })}
+                      className="w-full rounded-lg border border-border px-4 py-2"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-grey-700">Zip Code</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.zipCode}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, zipCode: e.target.value })}
+                    className="w-full rounded-lg border border-border px-4 py-2"
+                    required
+                  />
+                </div>
               </div>
             </div>
           )}
+
 
           {/* Info for SHARED boxes */}
           {boxTypePreference === "shared" && (
@@ -957,12 +857,11 @@ export default function RequestShippingPage() {
           </div>
 
           <Button
-            onClick={handleRequestShipping}
-            disabled={processing}
+            onClick={handleContinueToPayment}
             className="w-full"
             size="lg"
           >
-            {processing ? "Processing..." : "Continue to Payment"}
+            Continue to Payment
           </Button>
         </div>
       </div>

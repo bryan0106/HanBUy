@@ -14,6 +14,7 @@ export default function CODPage() {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [codOrders, setCodOrders] = useState<Order[]>([]);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -70,6 +71,16 @@ export default function CODPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleOrder = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
   };
 
   // Mock COD orders for testing
@@ -227,48 +238,48 @@ export default function CODPage() {
 
       {/* Summary Cards */}
       {codOrders.length > 0 && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-orange-100 p-2">
-                <svg className="h-5 w-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="rounded-lg border border-border bg-white p-2 shadow-sm sm:p-4">
+            <div className="flex items-center gap-1.5 sm:gap-3">
+              <div className="rounded-lg bg-orange-100 p-1 sm:p-2">
+                <svg className="h-4 w-4 text-orange-600 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                 </svg>
               </div>
-              <div>
-                <p className="text-xs font-medium text-grey-600">Pending Shipping</p>
-                <p className="text-lg font-bold text-grey-900">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium text-grey-600 sm:text-xs">Pending Shipping</p>
+                <p className="text-sm font-bold text-grey-900 sm:text-lg">
                   {codOrders.filter(o => o.shipping_payment_status === "cod_pending").length}
                 </p>
               </div>
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-green-100 p-2">
-                <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+          <div className="rounded-lg border border-border bg-white p-2 shadow-sm sm:p-4">
+            <div className="flex items-center gap-1.5 sm:gap-3">
+              <div className="rounded-lg bg-green-100 p-1 sm:p-2">
+                <svg className="h-4 w-4 text-green-600 sm:h-5 sm:w-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
               </div>
-              <div>
-                <p className="text-xs font-medium text-grey-600">Paid Shipping</p>
-                <p className="text-lg font-bold text-grey-900">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium text-grey-600 sm:text-xs">Paid Shipping</p>
+                <p className="text-sm font-bold text-grey-900 sm:text-lg">
                   {codOrders.filter(o => o.shipping_payment_status === "cod_paid").length}
                 </p>
               </div>
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-purple-100 p-2">
-                <svg className="h-5 w-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+          <div className="rounded-lg border border-border bg-white p-2 shadow-sm sm:p-4">
+            <div className="flex items-center gap-1.5 sm:gap-3">
+              <div className="rounded-lg bg-purple-100 p-1 sm:p-2">
+                <svg className="h-4 w-4 text-purple-600 sm:h-5 sm:w-5" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
                 </svg>
               </div>
-              <div>
-                <p className="text-xs font-medium text-grey-600">Total Shipping Amount</p>
-                <p className="text-lg font-bold text-orange-600">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium text-grey-600 sm:text-xs">Total Shipping Amount</p>
+                <p className="text-sm font-bold text-orange-600 sm:text-lg">
                   {formatCurrency(
                     codOrders
                       .filter(o => o.shipping_payment_status === "cod_pending")
@@ -320,105 +331,117 @@ export default function CODPage() {
           {codOrders.map((order) => {
             const totalItems = order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
             const isPaid = order.shipping_payment_status === "cod_paid";
+            const isExpanded = expandedOrders.has(order.id);
             
             return (
               <div key={order.id} className="rounded-lg border-2 border-border bg-white shadow-sm transition-shadow hover:shadow-md">
-                {/* Order Header */}
-                <div className={`border-b border-border px-6 py-4 ${isPaid ? "bg-green-50" : "bg-orange-50"}`}>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-bold text-grey-900">
-                          Order #{order.order_number}
-                        </h3>
-                        {isPaid ? (
-                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                            <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            Shipping Paid
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">
-                            <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
-                            Shipping Pending
-                          </span>
-                        )}
+                {/* Order Header - Clickable */}
+                <button
+                  onClick={() => toggleOrder(order.id)}
+                  className={`w-full border-b border-border px-4 py-3 sm:px-6 sm:py-4 text-left transition-colors hover:bg-grey-100 ${isPaid ? "bg-green-50" : "bg-orange-50"}`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    {/* Top Row: Order Number and Status Badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-xs font-medium text-grey-600 sm:text-sm">Order</span>
+                        <span className="text-sm font-bold text-grey-900 sm:text-lg truncate">
+                          #{order.order_number}
+                        </span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-grey-600">
-                        <div className="flex items-center gap-1.5">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {isPaid ? (
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 sm:text-xs shrink-0">
+                          <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Shipping Paid
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-700 sm:text-xs shrink-0">
+                          <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          Shipping Pending
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Bottom Row: Item count, shipping fee, and chevron */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-grey-600 sm:text-sm flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                           </svg>
                           <span>{totalItems} {totalItems === 1 ? 'item' : 'items'}</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="hidden sm:inline">•</span>
+                        <div className="flex items-center gap-1">
+                          <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
                           <span>Shared Box</span>
                         </div>
-                        {order.shipping_paid_at && (
-                          <div className="flex items-center gap-1.5">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            <span>Shipping Paid</span>
-                          </div>
-                        )}
                       </div>
-                    </div>
-                    <div className="text-left sm:text-right">
-                      <p className="text-xs font-medium text-grey-600 mb-1">Local Shipping Fee</p>
-                      <p className="text-2xl font-bold text-orange-600">
-                        {formatCurrency(order.cod_amount || 0, order.currency)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Order Items */}
-                <div className="p-6">
-                  <div className="mb-4 space-y-3">
-                    {order.order_items?.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4 rounded-lg border border-grey-200 bg-grey-50 p-4">
-                        {item.image_url ? (
-                          <img
-                            src={item.image_url}
-                            alt={item.product_name}
-                            className="h-20 w-20 shrink-0 rounded-lg object-cover border border-grey-200"
-                          />
-                        ) : (
-                          <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200 border border-grey-300 flex items-center justify-center">
-                            <svg className="h-8 w-8 text-grey-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-grey-900 mb-1">{item.product_name}</p>
-                          <div className="flex flex-wrap items-center gap-3 text-sm text-grey-600">
-                            <span className="flex items-center gap-1">
-                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                              </svg>
-                              Qty: {item.quantity}
-                            </span>
-                            <span>•</span>
-                            <span>{formatCurrency(item.unit_price, order.currency)} each</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-grey-600 mb-1">Item Total</p>
-                          <p className="text-lg font-bold text-grey-900">
-                            {formatCurrency(item.total, order.currency)}
+                      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-xs font-medium text-grey-600 mb-0.5">Local Shipping Fee</p>
+                          <p className="text-lg font-bold text-orange-600 sm:text-xl">
+                            {formatCurrency(order.cod_amount || 0, order.currency)}
                           </p>
                         </div>
+                        <div className="text-right sm:hidden">
+                          <p className="text-[10px] font-medium text-grey-600 mb-0.5">Shipping</p>
+                          <p className="text-sm font-bold text-orange-600">
+                            {formatCurrency(order.cod_amount || 0, order.currency)}
+                          </p>
+                        </div>
+                        <svg
+                          className={`h-4 w-4 sm:h-5 sm:w-5 text-grey-600 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
-                    ))}
+                    </div>
                   </div>
+                </button>
+
+                {/* Order Items - Collapsible */}
+                {isExpanded && (
+                  <div className="p-4 sm:p-6">
+                    <div className="mb-4 space-y-3">
+                      {order.order_items?.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 rounded-lg border border-grey-200 bg-white p-3 sm:p-4">
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.product_name}
+                              className="h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-lg object-cover border border-grey-200"
+                            />
+                          ) : (
+                            <div className="h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-lg bg-grey-200 border border-grey-300 flex items-center justify-center">
+                              <svg className="h-6 w-6 sm:h-8 sm:w-8 text-grey-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-grey-900 text-sm sm:text-base mb-1">{item.product_name}</p>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-grey-600">
+                              <span className="flex items-center gap-1">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Qty: {item.quantity}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
                   {/* Payment Summary */}
                   <div className="mb-4 rounded-lg bg-grey-50 border border-grey-200 p-4">
@@ -458,43 +481,44 @@ export default function CODPage() {
                     </div>
                   </div>
 
-                  {/* Action Button */}
-                  {!isPaid ? (
-                    <div className="flex items-center justify-between rounded-lg bg-orange-50 border border-orange-200 p-4">
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-grey-900 mb-1">Ready for Local Shipping Payment</p>
-                        <p className="text-xs text-grey-600">
-                          Your items have arrived at Manila office. Pay local shipping fee to proceed with delivery to your address.
-                        </p>
-                      </div>
-                      <Link href={`/store/payment?orderId=${order.id}&type=local_shipping`}>
-                        <Button
-                          size="lg"
-                          className="ml-4 whitespace-nowrap bg-orange-600 hover:bg-orange-700"
-                        >
-                          <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                          </svg>
-                          Pay Shipping Fee
-                        </Button>
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-                      <div className="flex items-center gap-2">
-                        <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
+                    {/* Action Button */}
+                    {!isPaid ? (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-lg bg-orange-50 border border-orange-200 p-4">
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-green-800">Local Shipping Paid</p>
-                          <p className="text-xs text-green-700">
-                            Your order is out for delivery. You will receive it soon at your address.
+                          <p className="text-sm font-semibold text-grey-900 mb-1">Ready for Local Shipping Payment</p>
+                          <p className="text-xs text-grey-600">
+                            Your items have arrived at Manila office. Pay local shipping fee to proceed with delivery to your address.
                           </p>
                         </div>
+                        <Link href={`/store/payment?orderId=${order.id}&type=local_shipping`} className="w-full sm:w-auto">
+                          <Button
+                            size="lg"
+                            className="w-full sm:w-auto whitespace-nowrap bg-orange-600 hover:bg-orange-700"
+                          >
+                            <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                            </svg>
+                            Pay Shipping Fee
+                          </Button>
+                        </Link>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                        <div className="flex items-center gap-2">
+                          <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-green-800">Local Shipping Paid</p>
+                            <p className="text-xs text-green-700">
+                              Your order is out for delivery. You will receive it soon at your address.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

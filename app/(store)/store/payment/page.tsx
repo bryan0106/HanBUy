@@ -38,6 +38,7 @@ function PaymentPageContent() {
   const orderId = searchParams.get("orderId");
   const paymentTypeParam = searchParams.get("type"); // "balance", "shipping", "item_only", "local_shipping"
   const walletAmountParam = searchParams.get("walletAmount");
+  const amountParam = searchParams.get("amount"); // Shipping fee amount from URL
 
   // Helper function to get default banks
   const getDefaultBanks = (): BankType[] => [
@@ -96,7 +97,10 @@ function PaymentPageContent() {
           
           if (paymentTypeParam === "shipping") {
             // For shipping payment (Korea → Manila), calculate shipping fee
-            const shippingFee = fetchedOrder.solo_shipping_fee || fetchedOrder.shared_shipping_fee || 0;
+            // Use amount from URL if provided, otherwise from order
+            const shippingFee = amountParam 
+              ? parseFloat(amountParam) 
+              : fetchedOrder.solo_shipping_fee || fetchedOrder.shared_shipping_fee || 0;
             const orderSummary: OrderSummary = {
               subtotal: 0,
               isf: 0,
@@ -381,13 +385,15 @@ function PaymentPageContent() {
           {paymentTypeParam === "local_shipping"
             ? "Pay Local Shipping"
             : paymentTypeParam === "shipping" 
-            ? "Pay Shipping Fee" 
+            ? "Step 2: Pay Shipping Fee" 
             : paymentType === "balance" 
             ? "Pay Balance" 
             : "Payment"}
         </h1>
         <p className="mt-2 text-muted-foreground">
-          {paymentType === "balance"
+          {paymentTypeParam === "shipping"
+            ? "Pay shipping fee for your box from Korea to Manila"
+            : paymentType === "balance"
             ? "Pay your remaining balance for this order"
             : "Complete your payment to confirm your order"}
         </p>

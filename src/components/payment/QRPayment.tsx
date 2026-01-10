@@ -242,80 +242,106 @@ export function QRPayment({
         </p>
       </div>
 
-      <button
-        onClick={async () => {
-          if (!proofFile) {
-            alert("Please upload proof of payment before confirming");
-            return;
-          }
+      <div className="mt-6 space-y-3">
+        {!proofFile && (
+          <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3">
+            <p className="text-xs text-yellow-800">
+              ⚠️ <strong>Important:</strong> Please upload proof of payment after completing your transaction. This helps us verify your payment faster.
+            </p>
+          </div>
+        )}
+        
+        <button
+          onClick={async () => {
+            // If proof file is selected, upload it first
+            if (proofFile) {
+              setUploading(true);
+              try {
+                // Convert file to base64
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                  const base64String = reader.result as string;
+                  
+                  // Get Google Apps Script URL from environment
+                  const scriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL;
+                  
+                  if (!scriptUrl) {
+                    console.warn("Google Apps Script URL not configured. Skipping upload.");
+                    setUploadSuccess(true);
+                    setUploading(false);
+                    onPaymentComplete?.();
+                    return;
+                  }
 
-          setUploading(true);
-          try {
-            // Convert file to base64
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-              const base64String = reader.result as string;
-              
-              // Get Google Apps Script URL from environment
-              const scriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL;
-              
-              if (!scriptUrl) {
-                console.warn("Google Apps Script URL not configured. Skipping upload.");
-                setUploadSuccess(true);
+                  // Prepare data to send
+                  const data = {
+                    orderId: orderId,
+                    orderNumber: `ORD-${orderId.slice(-6)}`, // Generate order number from ID
+                    amount: formatCurrency(amount, "PHP"),
+                    paymentType: paymentType,
+                    customerEmail: customerEmail || "N/A",
+                    customerName: customerName || "N/A",
+                    imageBase64: base64String,
+                    fileName: proofFile.name
+                  };
+
+                  // Send to Google Apps Script
+                  const response = await fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                    mode: 'no-cors' // Required for Google Apps Script
+                  });
+
+                  // Note: With no-cors, we can't read the response
+                  // But the request will be sent
+                  setUploadSuccess(true);
+                  setUploading(false);
+                  
+                  // Wait a bit to show success message
+                  setTimeout(() => {
+                    onPaymentComplete?.();
+                  }, 1000);
+                };
+                
+                reader.readAsDataURL(proofFile);
+              } catch (error) {
+                console.error("Error uploading proof:", error);
+                alert("Failed to upload proof of payment. You can still proceed, but please contact support with your proof.");
                 setUploading(false);
+                // Still allow payment to proceed
                 onPaymentComplete?.();
-                return;
               }
-
-              // Prepare data to send
-              const data = {
-                orderId: orderId,
-                orderNumber: `ORD-${orderId.slice(-6)}`, // Generate order number from ID
-                amount: formatCurrency(amount, "PHP"),
-                paymentType: paymentType,
-                customerEmail: customerEmail || "N/A",
-                customerName: customerName || "N/A",
-                imageBase64: base64String,
-                fileName: proofFile.name
-              };
-
-              // Send to Google Apps Script
-              const response = await fetch(scriptUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-                mode: 'no-cors' // Required for Google Apps Script
-              });
-
-              // Note: With no-cors, we can't read the response
-              // But the request will be sent
-              setUploadSuccess(true);
-              setUploading(false);
+            } else {
+              // No proof file - allow payment to proceed but show warning
+              const proceed = window.confirm(
+                "You haven't uploaded proof of payment yet. You can upload it later, but verification may be delayed.\n\n" +
+                "Do you want to proceed without uploading proof now?"
+              );
               
-              // Wait a bit to show success message
-              setTimeout(() => {
+              if (proceed) {
                 onPaymentComplete?.();
-              }, 1000);
-            };
-            
-            reader.readAsDataURL(proofFile);
-          } catch (error) {
-            console.error("Error uploading proof:", error);
-            alert("Failed to upload proof of payment. Please try again.");
-            setUploading(false);
-          }
-        }}
-        disabled={uploading || !proofFile}
-        className={`mt-6 w-full rounded-lg px-4 py-3 font-semibold text-white transition-colors ${
-          uploading || !proofFile
-            ? 'bg-grey-400 cursor-not-allowed'
-            : 'bg-soft-blue-600 hover:bg-soft-blue-700'
-        }`}
-      >
-        {uploading ? "Uploading..." : uploadSuccess ? "✓ Sent! Processing..." : "Confirm Payment"}
-      </button>
+              }
+            }
+          }}
+          disabled={uploading}
+          className={`w-full rounded-lg px-4 py-3 font-semibold text-white transition-colors ${
+            uploading
+              ? 'bg-grey-400 cursor-not-allowed'
+              : 'bg-soft-blue-600 hover:bg-soft-blue-700'
+          }`}
+        >
+          {uploading ? "Uploading Proof..." : uploadSuccess ? "✓ Proof Sent! Processing..." : proofFile ? "Confirm Payment & Upload Proof" : "Confirm Payment (Upload Proof Later)"}
+        </button>
+        
+        {!proofFile && (
+          <p className="text-xs text-center text-muted-foreground">
+            You can upload proof of payment later from your order details page
+          </p>
+        )}
+      </div>
     </div>
   );
 }

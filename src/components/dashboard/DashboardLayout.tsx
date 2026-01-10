@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { DASHBOARD_NAV_ITEMS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -25,8 +26,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Sidebar */}
       <aside className="relative flex w-64 flex-col border-r border-border bg-white">
         <div className="flex h-16 items-center justify-between border-b border-border px-6">
-          <Link href="/" className="text-xl font-bold text-primary">
-            HanBuy
+          <Link href="/" className="shrink-0">
+            <Image
+              src="/download.jpg"
+              alt="HanBuy Logo"
+              width={120}
+              height={40}
+              className="h-8 w-auto sm:h-10"
+              priority
+            />
           </Link>
         </div>
         {user && (

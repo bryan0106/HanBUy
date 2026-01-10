@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -58,8 +59,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-6">
-          <Link href="/admin" className="text-xl font-bold text-primary" onClick={handleNavClick}>
-            Admin Panel
+          <Link href="/admin" onClick={handleNavClick} className="shrink-0">
+            <Image
+              src="/download.jpg"
+              alt="HanBuy Logo"
+              width={120}
+              height={40}
+              className="h-8 w-auto sm:h-10"
+              priority
+            />
           </Link>
           <button
             onClick={() => setMobileMenuOpen(false)}
@@ -155,8 +163,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               />
             </svg>
           </button>
-          <Link href="/admin" className="text-lg font-bold text-primary">
-            Admin Panel
+          <Link href="/admin" className="shrink-0">
+            <Image
+              src="/download.jpg"
+              alt="HanBuy Logo"
+              width={100}
+              height={32}
+              className="h-7 w-auto"
+              priority
+            />
           </Link>
           <div className="w-10" /> {/* Spacer for centering */}
         </div>
