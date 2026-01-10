@@ -1,7 +1,8 @@
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 
 // Get base URL from environment variable
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api';
+// Production default: https://hanbuyapi.onrender.com/api (no hyphen)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hanbuyapi.onrender.com/api';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -48,10 +49,21 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    // Silently handle errors
-
     // Handle 401 Unauthorized - Clear token and redirect to login
     if (error.response?.status === 401) {
+      const requestUrl = error.config?.url || '';
+      const isLoginRequest = requestUrl.includes('/auth/login');
+      
+      // Log 401 errors for login requests to help debug
+      if (isLoginRequest && typeof window !== 'undefined') {
+        const errorData = error.response?.data as any;
+        console.error('Login failed (401):', {
+          url: `${error.config?.baseURL}${requestUrl}`,
+          error: errorData?.error || errorData?.message || 'Invalid credentials',
+          // Don't log sensitive data
+        });
+      }
+      
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
         const isAuthPage = currentPath === '/auth/login' || currentPath === '/auth/register' || currentPath === '/admin/login';
