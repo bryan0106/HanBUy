@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useWallet } from "@/hooks/useWallet";
 import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/currency";
 
 export default function StoreAccountPage() {
   const { user, logout, isAuthenticated, loading } = useAuth();
+  const { balance, transactions, loading: walletLoading, fetchTransactions } = useWallet(user?.id);
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"profile" | "settings" | "security">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "settings" | "security" | "wallet">("profile");
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -71,6 +74,16 @@ export default function StoreAccountPage() {
             }`}
           >
             Security
+          </button>
+          <button
+            onClick={() => setActiveTab("wallet")}
+            className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors sm:text-base ${
+              activeTab === "wallet"
+                ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Wallet
           </button>
         </div>
       </div>
@@ -260,6 +273,67 @@ export default function StoreAccountPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wallet Tab */}
+      {activeTab === "wallet" && (
+        <div className="space-y-6">
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Wallet Balance</h2>
+            {walletLoading ? (
+              <p className="text-muted-foreground">Loading wallet...</p>
+            ) : (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-6">
+                <p className="text-sm text-green-800 font-medium mb-2">Available Balance</p>
+                <p className="text-3xl font-bold text-green-900">
+                  {formatCurrency(balance, "PHP")}
+                </p>
+                <p className="text-xs text-green-700 mt-2">
+                  Use your wallet balance when making payments. Excess payments will be automatically credited to your wallet.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Transaction History</h2>
+            {walletLoading ? (
+              <p className="text-muted-foreground">Loading transactions...</p>
+            ) : transactions.length === 0 ? (
+              <p className="text-muted-foreground">No transactions yet</p>
+            ) : (
+              <div className="space-y-3">
+                {transactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between rounded-lg border border-border bg-background p-4"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium">{transaction.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(transaction.created_at).toLocaleDateString()}
+                      </p>
+                      {transaction.reference_type && (
+                        <p className="text-xs text-muted-foreground">
+                          {transaction.reference_type === "order" && "Order"}
+                          {transaction.reference_type === "payment" && "Payment"}
+                          {transaction.reference_type === "refund" && "Refund"}
+                          {transaction.reference_type === "adjustment" && "Adjustment"}
+                        </p>
+                      )}
+                    </div>
+                    <div className={`text-lg font-bold ${
+                      transaction.type === "credit" ? "text-green-600" : "text-red-600"
+                    }`}>
+                      {transaction.type === "credit" ? "+" : "-"}
+                      {formatCurrency(transaction.amount, transaction.currency)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,5 +1,7 @@
 import apiClient from '@/lib/apiClient';
 import { handleApiError } from '@/utils/errorHandler';
+import { shouldUseMockData } from '@/utils/env';
+import { mockCartService } from '@/lib/mockOrdersData';
 
 export interface CartItem {
   id: string;
@@ -67,6 +69,11 @@ export const cartService = {
    * Get cart items for a user
    */
   async getCartItems(userId: string): Promise<CartItem[]> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockCartService.getCartItems(userId);
+    }
+
     try {
       const response = await apiClient.get<GetCartResponse>('/cart', {
         params: { user_id: userId },
@@ -81,6 +88,11 @@ export const cartService = {
    * Add item to cart
    */
   async addToCart(data: AddToCartRequest): Promise<CartItem> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockCartService.addToCart(data);
+    }
+
     try {
       const response = await apiClient.post<AddToCartResponse>('/cart', data);
       return response.data.data;
@@ -93,6 +105,11 @@ export const cartService = {
    * Update cart item quantity
    */
   async updateCartItem(cartItemId: string, quantity: number): Promise<CartItem> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockCartService.updateCartItem(cartItemId, quantity);
+    }
+
     try {
       const response = await apiClient.put<UpdateCartItemResponse>(`/cart/${cartItemId}`, {
         quantity,
@@ -107,6 +124,11 @@ export const cartService = {
    * Remove item from cart
    */
   async removeCartItem(cartItemId: string): Promise<void> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockCartService.removeCartItem(cartItemId);
+    }
+
     try {
       await apiClient.delete<DeleteCartItemResponse>(`/cart/${cartItemId}`);
     } catch (error) {

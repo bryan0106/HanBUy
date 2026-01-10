@@ -425,9 +425,15 @@ export default function RequestShippingPage() {
   const handleRequestShipping = async () => {
     if (!order || !user?.id) return;
 
-    // Validate courier selection for SOLO boxes only
+    // Validate courier selection for SOLO boxes only (shared boxes select courier later)
     if (boxTypePreference === "solo" && !selectedCourier) {
       alert("Please select a delivery company to continue.");
+      return;
+    }
+
+    // Validate shared box selection
+    if (boxTypePreference === "shared" && !selectedSharedBoxId) {
+      alert("Please select a shared box to continue.");
       return;
     }
 
@@ -451,7 +457,8 @@ export default function RequestShippingPage() {
         shipping_address: shippingAddress,
       });
 
-      // Redirect to payment page for shipping fee
+      // Redirect to payment page for shipping fee (box payment)
+      // For shared boxes, after payment they will select courier (3rd payment)
       router.push(`/store/payment?orderId=${order.id}&type=shipping`);
     } catch (error) {
       console.error("Error requesting shipping:", error);

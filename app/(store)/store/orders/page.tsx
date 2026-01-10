@@ -33,6 +33,7 @@ export default function StoreOrdersPage() {
   const [activeTab, setActiveTab] = useState<"cart" | "orders" | "receive" | "rate" | "payments">("cart");
   const [orderDetails, setOrderDetails] = useState<Record<string, any>>({});
   const [loadingOrderDetails, setLoadingOrderDetails] = useState<Record<string, boolean>>({});
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -95,12 +96,36 @@ export default function StoreOrdersPage() {
         );
         
         setCartItems(cartItemsWithImages);
+        // Select all items by default when cart loads
+        if (cartItemsWithImages.length > 0) {
+          setSelectedItems(new Set(cartItemsWithImages.map(item => item.id)));
+        } else {
+          setSelectedItems(new Set());
+        }
       } catch (cartError) {
         console.error("Error loading cart:", cartError);
         setCartItems([]);
+        setSelectedItems(new Set());
       }
     }
   };
+
+  // Update selected items when cart items change (remove invalid selections)
+  useEffect(() => {
+    if (cartItems.length > 0 && selectedItems.size > 0) {
+      // Remove selections for items that no longer exist in cart
+      const currentItemIds = new Set(cartItems.map(item => item.id));
+      const validSelectedItems = new Set(
+        Array.from(selectedItems).filter(id => currentItemIds.has(id))
+      );
+      if (validSelectedItems.size !== selectedItems.size) {
+        setSelectedItems(validSelectedItems);
+      }
+    } else if (cartItems.length === 0) {
+      setSelectedItems(new Set());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems]);
 
   const loadData = async () => {
     setLoading(true);
@@ -308,12 +333,51 @@ export default function StoreOrdersPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Select All Checkbox */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.size === cartItems.length && cartItems.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedItems(new Set(cartItems.map(item => item.id)));
+                      } else {
+                        setSelectedItems(new Set());
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-grey-300 text-[#FF85A2] focus:ring-[#FF85A2] focus:ring-2"
+                  />
+                  <span className="text-sm font-medium text-foreground">
+                    Select All ({selectedItems.size} of {cartItems.length} selected)
+                  </span>
+                </label>
+              </div>
+              
               {cartItems.map((item) => (
                 <div
                   key={item.id}
                   className="rounded-lg border border-border bg-card p-4"
                 >
                   <div className="flex gap-4">
+                    {/* Checkbox */}
+                    <div className="flex items-start pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedItems);
+                          if (e.target.checked) {
+                            newSelected.add(item.id);
+                          } else {
+                            newSelected.delete(item.id);
+                          }
+                          setSelectedItems(newSelected);
+                        }}
+                        className="h-4 w-4 rounded border-grey-300 text-[#FF85A2] focus:ring-[#FF85A2] focus:ring-2"
+                      />
+                    </div>
+                    
                     {item.image_url || (item.product && item.product.images && item.product.images.length > 0) ? (
                       <img
                         src={item.image_url || (item.product?.images?.[0] || '')}
@@ -327,16 +391,16 @@ export default function StoreOrdersPage() {
                       <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground">{item.product_name}</h3>
+                      <Link
+                        href={`/store/products/${item.product_id}`}
+                        className="font-semibold text-foreground hover:text-[#FF85A2] hover:underline transition-colors"
+                      >
+                        {item.product_name}
+                      </Link>
                       <p className="text-xs text-muted-foreground mt-1">
                         {item.product_type === "preorder" ? "Pre-Order" : 
                          item.product_type === "kr_website" ? "KR Website" : "Onhand"}
                       </p>
-                      {item.box_type_preference && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Box: {item.box_type_preference}
-                        </p>
-                      )}
                       <div className="mt-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">Qty:</span>
@@ -358,16 +422,27 @@ export default function StoreOrdersPage() {
                   <span className="text-lg font-semibold">Total:</span>
                   <span className="text-2xl font-bold text-soft-blue-600">
                     {formatCurrency(
-                      cartItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0),
+                      cartItems
+                        .filter(item => selectedItems.has(item.id))
+                        .reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0),
                       "PHP"
                     )}
                   </span>
                 </div>
                 <Link
-                  href="/store/checkout"
-                  className="block w-full rounded-lg bg-soft-blue-600 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                  href={`/store/checkout${selectedItems.size > 0 ? `?items=${Array.from(selectedItems).join(',')}` : ''}`}
+                  className={`block w-full rounded-lg px-6 py-3 text-center font-semibold text-white transition-colors ${
+                    selectedItems.size > 0
+                      ? 'bg-soft-blue-600 hover:bg-soft-blue-700'
+                      : 'bg-grey-400 cursor-not-allowed'
+                  }`}
+                  onClick={(e) => {
+                    if (selectedItems.size === 0) {
+                      e.preventDefault();
+                    }
+                  }}
                 >
-                  Proceed to Checkout
+                  Proceed to Checkout ({selectedItems.size} {selectedItems.size === 1 ? 'item' : 'items'})
                 </Link>
               </div>
             </div>

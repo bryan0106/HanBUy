@@ -29,6 +29,8 @@ export interface ConfirmPaymentRequest {
     bank: 'BPI' | 'BDO' | 'GCASH' | 'GOTYME' | 'MAYA';
   };
   payment_proof: File;
+  use_wallet?: boolean;
+  wallet_amount?: number;
 }
 
 export interface ConfirmPaymentResponse {
@@ -39,6 +41,7 @@ export interface ConfirmPaymentResponse {
     amount: number;
     status: 'pending' | 'verified' | 'rejected';
     verified_at?: string;
+    wallet_credit?: number; // Amount credited to wallet if payment exceeds order total
   };
   message?: string;
 }
@@ -83,6 +86,13 @@ export const paymentService = {
       formData.append('amount', data.amount.toString());
       formData.append('payment_method', JSON.stringify(data.payment_method));
       formData.append('payment_proof', data.payment_proof);
+      
+      if (data.use_wallet !== undefined) {
+        formData.append('use_wallet', data.use_wallet.toString());
+      }
+      if (data.wallet_amount !== undefined) {
+        formData.append('wallet_amount', data.wallet_amount.toString());
+      }
 
       const response = await apiClient.post<ConfirmPaymentResponse>(
         '/payments/confirm',

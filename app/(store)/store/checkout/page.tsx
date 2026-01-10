@@ -4,34 +4,24 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
+import { useWallet } from "@/hooks/useWallet";
 import { cartService } from "@/services/cartService";
 import { orderService } from "@/services/orderService";
 import { productService } from "@/services/productService";
 import type { CartItem } from "@/services/cartService";
 import { Button } from "@/components/ui/button";
 
-interface ShippingAddress {
-  street: string;
-  city: string;
-  province: string;
-  zipCode: string;
-  country: string;
-}
-
 export default function CheckoutPage() {
   const router = useRouter();
   const { isAuthenticated, loading: authLoading, user } = useAuth();
+  const { balance: walletBalance, loading: walletLoading } = useWallet(user?.id);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
-    street: "",
-    city: "",
-    province: "",
-    zipCode: "",
-    country: "Philippines",
-  });
-  const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
+  const [customerMessage, setCustomerMessage] = useState<string>("");
+  const [isMessageOpen, setIsMessageOpen] = useState<boolean>(false);
+  const [useWalletBalance, setUseWalletBalance] = useState(false);
+  const [walletAmount, setWalletAmount] = useState<number>(0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -86,17 +76,6 @@ export default function CheckoutPage() {
       );
 
       setCartItems(cartItemsWithImages);
-
-      // Load user address if available
-      if (user?.address) {
-        setShippingAddress({
-          street: user.address.street || "",
-          city: user.address.city || "",
-          province: user.address.province || "",
-          zipCode: user.address.zipCode || "",
-          country: user.address.country || "Philippines",
-        });
-      }
     } catch (error) {
       console.error("Error loading cart:", error);
     } finally {
@@ -131,12 +110,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Validate shipping address
-    if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.province || !shippingAddress.zipCode) {
-      alert("Please fill in all shipping address fields");
-      return;
-    }
-
     if (cartItems.length === 0) {
       alert("Your cart is empty");
       router.push("/store/orders");
@@ -163,8 +136,11 @@ export default function CheckoutPage() {
         preorder_release_date: undefined, // TODO: Get from product if preorder
       }));
 
-      // Create order - 3-Way Payment System
-      // Payment 1: Items only (stored after payment)
+      // Create order - New Payment Flow
+      // Payment 1: Items only (will be stored after payment)
+      // Check if order has preorder items
+      const hasPreorder = orderItems.some(item => item.product_type === 'preorder');
+      
       const orderData = {
         user_id: user.id,
         order_number: orderNumber,
@@ -179,9 +155,20 @@ export default function CheckoutPage() {
         status: "pending",
         payment_status: "pending",
         payment_type: "item_only" as const, // Payment for items only
-        box_type_preference: boxTypePreference, // Preference saved but shipping paid later
-        shipping_address: shippingAddress, // Saved for future shipping request
+        box_type_preference: "solo" as const, // Default to solo, can be changed when requesting shipping
+        shipping_address: {
+          street: "",
+          city: "",
+          province: "",
+          zipCode: "",
+          country: "Philippines",
+        }, // Will be filled when requesting shipping
+        storage_status: "pending" as const, // Will be 'in_storage' after payment (onhand) or 'pending_approval' (preorder)
+        ...(hasPreorder && {
+          preorder_status: "pending_approval" as const,
+        }),
         order_items: orderItems,
+        customer_message: customerMessage.trim() || undefined,
       };
 
       console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
@@ -190,8 +177,11 @@ export default function CheckoutPage() {
 
       console.log('Order created successfully:', createdOrder);
 
-      // Redirect to payment page with order ID
-      router.push(`/store/payment?orderId=${createdOrder.id}`);
+      // Redirect to payment page with order ID and wallet info
+      const paymentUrl = useWalletBalance && actualWalletAmount > 0
+        ? `/store/payment?orderId=${createdOrder.id}&walletAmount=${actualWalletAmount}`
+        : `/store/payment?orderId=${createdOrder.id}`;
+      router.push(paymentUrl);
     } catch (error: any) {
       console.error("Error creating order:", error);
       console.error("Error stack:", error.stack);
@@ -243,6 +233,11 @@ export default function CheckoutPage() {
   }
 
   const totals = calculateTotals();
+  
+  // Calculate wallet usage
+  const maxWalletUsage = Math.min(walletBalance, totals.total);
+  const actualWalletAmount = useWalletBalance ? Math.min(walletAmount, maxWalletUsage) : 0;
+  const remainingAmount = Math.max(0, totals.total - actualWalletAmount);
 
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
@@ -296,106 +291,46 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* Shipping Address */}
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-xl font-semibold">Shipping Address</h2>
-            <div className="space-y-4">
+          {/* Customer Message Accordion */}
+          <div className="rounded-lg border border-border bg-card">
+            <button
+              onClick={() => setIsMessageOpen(!isMessageOpen)}
+              className="w-full flex items-center justify-between p-4 text-left hover:bg-grey-50 transition-colors"
+            >
               <div>
-                <label className="mb-2 block text-sm font-medium">Street Address</label>
-                <input
-                  type="text"
-                  value={shippingAddress.street}
-                  onChange={(e) => setShippingAddress({ ...shippingAddress, street: e.target.value })}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2"
-                  placeholder="123 Main Street"
-                  required
+                <h2 className="text-lg font-semibold">Order Message (Optional)</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Leave a message about your order
+                </p>
+              </div>
+              <svg
+                className={`h-5 w-5 text-muted-foreground transition-transform ${isMessageOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {isMessageOpen && (
+              <div className="px-4 pb-4 border-t border-border">
+                <p className="mt-4 mb-3 text-sm text-muted-foreground">
+                  Leave a message about your order if you have any special instructions or requests.
+                </p>
+                <textarea
+                  value={customerMessage}
+                  onChange={(e) => setCustomerMessage(e.target.value)}
+                  placeholder="E.g., Please handle with care, special packaging instructions, etc."
+                  className="w-full rounded-lg border border-border bg-background px-4 py-3 min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                  maxLength={500}
                 />
+                <p className="mt-2 text-xs text-muted-foreground text-right">
+                  {customerMessage.length}/500 characters
+                </p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium">City</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.city}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2"
-                    placeholder="Manila"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Province</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.province}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, province: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2"
-                    placeholder="Metro Manila"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Zip Code</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.zipCode}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, zipCode: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2"
-                    placeholder="1000"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Country</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.country}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, country: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Box Type Preference */}
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-xl font-semibold">Box Type Preference</h2>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Select your preferred box type. Shipping fee will be calculated and paid when you request shipping.
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={() => setBoxTypePreference("solo")}
-                className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
-                  boxTypePreference === "solo"
-                    ? "border-soft-blue-600 bg-soft-blue-50 text-soft-blue-700"
-                    : "border-border bg-background hover:bg-grey-50"
-                }`}
-              >
-                <div className="font-semibold">Solo Box</div>
-                <div className="text-sm text-muted-foreground">
-                  Full shipping cost • Direct delivery to your address
-                </div>
-              </button>
-              <button
-                onClick={() => setBoxTypePreference("shared")}
-                className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
-                  boxTypePreference === "shared"
-                    ? "border-soft-blue-600 bg-soft-blue-50 text-soft-blue-700"
-                    : "border-border bg-background hover:bg-grey-50"
-                }`}
-              >
-                <div className="font-semibold">Shared Box</div>
-                <div className="text-sm text-muted-foreground">
-                  Reduced shipping cost • Consolidated with other orders
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Order Summary */}
@@ -410,6 +345,98 @@ export default function CheckoutPage() {
                   {formatCurrency(totals.subtotalPHP, "PHP")}
                 </span>
               </div>
+              {/* Wallet Balance Display */}
+              <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">💰 Wallet Balance</p>
+                    <p className="text-lg font-bold text-green-900">
+                      {formatCurrency(walletBalance, "PHP")}
+                    </p>
+                  </div>
+                </div>
+                {walletBalance > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1">
+                        <input
+                          type="checkbox"
+                          checked={useWalletBalance}
+                          onChange={(e) => {
+                            setUseWalletBalance(e.target.checked);
+                            if (e.target.checked) {
+                              setWalletAmount(Math.min(walletBalance, totals.total));
+                            } else {
+                              setWalletAmount(0);
+                            }
+                          }}
+                          className="rounded border-border text-[#FF85A2] focus:ring-[#FF85A2]"
+                        />
+                        <span className="text-sm text-green-700">
+                          Use wallet balance to reduce payment
+                        </span>
+                      </label>
+                      <button
+                        onClick={() => {
+                          if (!useWalletBalance) {
+                            setUseWalletBalance(true);
+                            setWalletAmount(Math.min(walletBalance, totals.total));
+                          } else {
+                            setUseWalletBalance(false);
+                            setWalletAmount(0);
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          useWalletBalance
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-[#FF85A2] text-white hover:bg-[#FF85A2]/90'
+                        }`}
+                      >
+                        {useWalletBalance ? 'Remove' : 'Use Balance'}
+                      </button>
+                    </div>
+                    {useWalletBalance && (
+                      <div className="mt-3 space-y-2">
+                        <div>
+                          <label className="block text-xs text-green-700 mb-1">
+                            Amount to use from wallet (max: {formatCurrency(maxWalletUsage, "PHP")})
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={maxWalletUsage}
+                            step="0.01"
+                            value={walletAmount}
+                            onChange={(e) => {
+                              const value = Math.max(0, Math.min(maxWalletUsage, parseFloat(e.target.value) || 0));
+                              setWalletAmount(value);
+                            }}
+                            className="w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div className="text-xs text-green-600 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Order Total:</span>
+                            <span>{formatCurrency(totals.total, "PHP")}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Wallet Payment:</span>
+                            <span>-{formatCurrency(actualWalletAmount, "PHP")}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold border-t border-green-300 pt-1 mt-1">
+                            <span>Remaining to Pay:</span>
+                            <span>{formatCurrency(remainingAmount, "PHP")}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-green-700 mt-1">
+                    No wallet balance available
+                  </p>
+                )}
+              </div>
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-4">
                 <p className="text-xs text-blue-800 font-medium mb-1">📦 3-Way Payment System</p>
                 <p className="text-xs text-blue-700">
@@ -419,10 +446,15 @@ export default function CheckoutPage() {
               <div className="mt-4 border-t border-border pt-3">
                 <div className="flex justify-between">
                   <span className="font-semibold">Total to Pay</span>
-                  <span className="text-xl font-bold text-soft-blue-600">
-                    {formatCurrency(totals.total, "PHP")}
+                  <span className="text-xl font-bold text-[#FF85A2]">
+                    {formatCurrency(remainingAmount, "PHP")}
                   </span>
                 </div>
+                {useWalletBalance && actualWalletAmount > 0 && (
+                  <div className="mt-1 text-xs text-green-600">
+                    (Wallet: -{formatCurrency(actualWalletAmount, "PHP")})
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mt-2">
                   Items will be stored after payment
                 </p>

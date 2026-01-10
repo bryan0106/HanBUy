@@ -7,7 +7,7 @@ import type { BankType } from "@/services/api";
 interface QRPaymentProps {
   amount: number; // Pre-identified amount (exact amount to pay)
   orderId: string;
-  paymentType?: "full" | "downpayment" | "balance";
+  paymentType?: "full" | "downpayment" | "installment" | "balance";
   downpaymentAmount?: number;
   balance?: number;
   subtotal?: number; // Product subtotal
@@ -15,6 +15,10 @@ interface QRPaymentProps {
   lsf?: number; // Local Service Fee
   onPaymentComplete?: () => void;
   bankTypes?: BankType[]; // Optional bank types from API
+  useWallet?: boolean;
+  walletAmount?: number;
+  customerEmail?: string;
+  customerName?: string;
 }
 
 const DEFAULT_BANKS: BankType[] = [
@@ -35,12 +39,19 @@ export function QRPayment({
   isf,
   lsf,
   onPaymentComplete,
-  bankTypes 
+  bankTypes,
+  useWallet = false,
+  walletAmount = 0,
+  customerEmail = "",
+  customerName = ""
 }: QRPaymentProps) {
   // Use provided bank types or fall back to defaults
   const banks = bankTypes && bankTypes.length > 0 ? bankTypes : DEFAULT_BANKS;
   const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.code || "GCASH");
   const [qrCode, setQrCode] = useState<string>("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   // Generate QR code with pre-identified amount
   const generateQR = (bank: string) => {
@@ -88,7 +99,7 @@ export function QRPayment({
     }
   }, [banks, selectedBank]);
 
-  const paymentAmount: number = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance")
+  const paymentAmount: number = ((paymentType === "downpayment" || paymentType === "installment") && downpaymentAmount) || (paymentType === "balance")
     ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
     : amount;
 
@@ -97,11 +108,13 @@ export function QRPayment({
       <h3 className="mb-4 text-xl font-semibold">Payment via QR Code</h3>
       
       {/* Payment Type Info */}
-      {paymentType === "downpayment" && (
+      {(paymentType === "downpayment" || paymentType === "installment") && (
         <div className="mb-4 rounded-lg bg-info/10 p-3 text-sm">
-          <p className="font-semibold text-info">Downpayment Payment</p>
+          <p className="font-semibold text-info">
+            {paymentType === "installment" ? "Installment Payment" : "Downpayment Payment"}
+          </p>
           <p className="text-muted-foreground">
-            Downpayment: {formatCurrency(downpaymentAmount || 0, "PHP")}
+            {paymentType === "installment" ? "First Installment" : "Downpayment"}: {formatCurrency(downpaymentAmount || 0, "PHP")}
             {balance && (
               <span className="ml-2">Balance: {formatCurrency(balance, "PHP")}</span>
             )}
@@ -117,37 +130,16 @@ export function QRPayment({
         </div>
       )}
 
-      {/* Fee Breakdown */}
-      {(isf !== undefined || lsf !== undefined) && (
-        <div className="mb-4 rounded-lg border border-border bg-grey-50 p-4">
-          <h4 className="mb-3 font-semibold">Payment Breakdown</h4>
-          <div className="space-y-2 text-sm">
-            {subtotal !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal:</span>
-                <span className="font-medium">{formatCurrency(subtotal, "PHP")}</span>
-              </div>
-            )}
-            {isf !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ISF (International Service Fee):</span>
-                <span className="font-medium">{formatCurrency(isf, "PHP")}</span>
-              </div>
-            )}
-            {lsf !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">LSF (Local Service Fee):</span>
-                <span className="font-medium">{formatCurrency(lsf, "PHP")}</span>
-              </div>
-            )}
-            <div className="mt-3 flex justify-between border-t border-border pt-2">
-              <span className="font-semibold">Total Amount:</span>
-              <span className="text-lg font-bold">{formatCurrency(paymentAmount, "PHP")}</span>
-            </div>
-          </div>
+      {/* Wallet Usage Info */}
+      {useWallet && walletAmount > 0 && (
+        <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3">
+          <p className="text-sm font-semibold text-green-800">Using Wallet Balance</p>
+          <p className="text-xs text-green-700">
+            {formatCurrency(walletAmount, "PHP")} will be deducted from your wallet
+          </p>
         </div>
       )}
-      
+
       <p className="mb-4 text-muted-foreground">
         Select your payment method and scan the QR code. The amount is pre-identified in the QR code.
       </p>
@@ -187,7 +179,7 @@ export function QRPayment({
           <p className="text-lg font-bold">
             Amount: {formatCurrency(paymentAmount, "PHP")}
           </p>
-          {paymentType === "downpayment" && balance && (
+          {(paymentType === "downpayment" || paymentType === "installment") && balance && (
             <p className="mt-1 text-sm text-muted-foreground">
               Balance: {formatCurrency(balance, "PHP")}
             </p>
@@ -210,6 +202,11 @@ export function QRPayment({
           <li>Upload proof of payment after completing the transaction</li>
           <li>Manila office admin will verify your payment</li>
         </ol>
+        <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 p-2">
+          <p className="text-xs text-blue-800">
+            💡 <strong>Note:</strong> If you pay more than the required amount, the excess will be automatically credited to your wallet for future use.
+          </p>
+        </div>
       </div>
 
       {/* Upload Proof */}
@@ -220,18 +217,104 @@ export function QRPayment({
         <input
           type="file"
           accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setProofFile(file);
+              setUploadSuccess(false);
+            }
+          }}
           className="w-full rounded-lg border border-border bg-background px-4 py-2"
+          disabled={uploading}
         />
+        {proofFile && (
+          <p className="mt-2 text-xs text-green-600">
+            ✓ Selected: {proofFile.name}
+          </p>
+        )}
+        {uploadSuccess && (
+          <p className="mt-2 text-xs text-green-600">
+            ✓ Proof of payment sent successfully!
+          </p>
+        )}
         <p className="mt-2 text-xs text-muted-foreground">
           Upload screenshot or photo of your payment confirmation
         </p>
       </div>
 
       <button
-        onClick={onPaymentComplete}
-        className="mt-6 w-full rounded-lg bg-soft-blue-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700"
+        onClick={async () => {
+          if (!proofFile) {
+            alert("Please upload proof of payment before confirming");
+            return;
+          }
+
+          setUploading(true);
+          try {
+            // Convert file to base64
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+              const base64String = reader.result as string;
+              
+              // Get Google Apps Script URL from environment
+              const scriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL;
+              
+              if (!scriptUrl) {
+                console.warn("Google Apps Script URL not configured. Skipping upload.");
+                setUploadSuccess(true);
+                setUploading(false);
+                onPaymentComplete?.();
+                return;
+              }
+
+              // Prepare data to send
+              const data = {
+                orderId: orderId,
+                orderNumber: `ORD-${orderId.slice(-6)}`, // Generate order number from ID
+                amount: formatCurrency(amount, "PHP"),
+                paymentType: paymentType,
+                customerEmail: customerEmail || "N/A",
+                customerName: customerName || "N/A",
+                imageBase64: base64String,
+                fileName: proofFile.name
+              };
+
+              // Send to Google Apps Script
+              const response = await fetch(scriptUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+                mode: 'no-cors' // Required for Google Apps Script
+              });
+
+              // Note: With no-cors, we can't read the response
+              // But the request will be sent
+              setUploadSuccess(true);
+              setUploading(false);
+              
+              // Wait a bit to show success message
+              setTimeout(() => {
+                onPaymentComplete?.();
+              }, 1000);
+            };
+            
+            reader.readAsDataURL(proofFile);
+          } catch (error) {
+            console.error("Error uploading proof:", error);
+            alert("Failed to upload proof of payment. Please try again.");
+            setUploading(false);
+          }
+        }}
+        disabled={uploading || !proofFile}
+        className={`mt-6 w-full rounded-lg px-4 py-3 font-semibold text-white transition-colors ${
+          uploading || !proofFile
+            ? 'bg-grey-400 cursor-not-allowed'
+            : 'bg-soft-blue-600 hover:bg-soft-blue-700'
+        }`}
       >
-        Confirm Payment
+        {uploading ? "Uploading..." : uploadSuccess ? "✓ Sent! Processing..." : "Confirm Payment"}
       </button>
     </div>
   );

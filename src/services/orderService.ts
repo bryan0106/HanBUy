@@ -1,5 +1,7 @@
 import apiClient from '@/lib/apiClient';
 import { handleApiError } from '@/utils/errorHandler';
+import { shouldUseMockData } from '@/utils/env';
+import { mockOrderService } from '@/lib/mockOrdersData';
 
 export interface OrderItem {
   id: string;
@@ -45,17 +47,35 @@ export interface Order {
   ph_courier_tracking_number?: string;
   ph_courier_name?: string;
   // 3-Way Payment System
-  storage_status?: 'in_storage' | 'shipping_requested' | 'shipped' | 'delivered';
+  storage_status?: 'pending' | 'in_storage' | 'shipping_requested' | 'shipped' | 'delivered';
   shipping_requested_at?: string;
   shipping_payment_status?: 'pending' | 'paid' | 'cod_pending' | 'cod_paid';
   cod_amount?: number | null;
   wallet_credit?: number | null;
+  // Preorder workflow
+  preorder_status?: 'pending_approval' | 'approved' | 'processing' | 'received' | 'in_storage';
+  preorder_approved_at?: string;
+  preorder_processing_at?: string;
+  preorder_received_at?: string;
+  // Box selection
+  box_size?: 'small' | 'medium' | 'large';
+  selected_courier_id?: string | null; // For shared boxes - courier selection
+  use_cod?: boolean | null; // For shared boxes - COD option
   created_at: string;
   updated_at: string;
   paid_at?: string;
   shipping_paid_at?: string;
   cod_paid_at?: string;
   order_items: OrderItem[];
+  payment_history?: Array<{
+    payment_type: string;
+    amount: number;
+    currency: string;
+    payment_method?: any;
+    created_at: string;
+    verified?: boolean;
+    installment_number?: number;
+  }>;
 }
 
 export interface GetOrdersParams {
@@ -121,6 +141,7 @@ export interface CreateOrderRequest {
     image_url?: string;
     preorder_release_date?: string | null;
   }>;
+  customer_message?: string;
 }
 
 export interface CreateOrderResponse {
@@ -144,6 +165,11 @@ export const orderService = {
    * Get orders with optional filters
    */
   async getOrders(params?: GetOrdersParams): Promise<GetOrdersResponse> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockOrderService.getOrders(params);
+    }
+
     try {
       const response = await apiClient.get<GetOrdersResponse>('/orders', { params });
       return response.data;
@@ -156,6 +182,11 @@ export const orderService = {
    * Get single order by ID
    */
   async getOrderById(id: string): Promise<Order> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockOrderService.getOrderById(id);
+    }
+
     try {
       const response = await apiClient.get<GetOrderResponse>(`/orders/${id}`);
       return response.data.data;
@@ -168,6 +199,11 @@ export const orderService = {
    * Create new order
    */
   async createOrder(data: CreateOrderRequest): Promise<Order> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockOrderService.createOrder(data);
+    }
+
     try {
       const response = await apiClient.post<CreateOrderResponse>('/orders', data);
       return response.data.data;
@@ -193,6 +229,8 @@ export const orderService = {
   /**
    * Request shipping for stored items
    * Customer requests shipping and pays shipping fee
+   * For solo boxes: courier is selected here (direct delivery)
+   * For shared boxes: courier is selected later (3rd payment)
    */
   async requestShipping(orderId: string, data: {
     box_type: 'solo' | 'shared';
@@ -206,10 +244,37 @@ export const orderService = {
       zipCode: string;
       country: string;
     };
-    courier_id?: string; // Selected delivery company
+    courier_id?: string; // For solo boxes - direct delivery courier
   }): Promise<Order> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockOrderService.requestShipping(orderId, data);
+    }
+
     try {
       const response = await apiClient.post<{ success: boolean; data: Order }>(`/orders/${orderId}/request-shipping`, data);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Select courier for shared box shipping (3rd payment)
+   * Customer chooses delivery company and payment method (COD or prepaid)
+   */
+  async selectCourierForSharedBox(orderId: string, data: {
+    courier_id: string;
+    use_cod?: boolean; // If true, customer will pay COD
+    cod_amount?: number; // COD amount
+  }): Promise<Order> {
+    // Use mock data for testing
+    if (shouldUseMockData()) {
+      return mockOrderService.selectCourierForSharedBox(orderId, data);
+    }
+
+    try {
+      const response = await apiClient.post<{ success: boolean; data: Order }>(`/orders/${orderId}/select-courier`, data);
       return response.data.data;
     } catch (error) {
       throw handleApiError(error);
