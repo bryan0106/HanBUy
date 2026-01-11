@@ -36,7 +36,7 @@ function PaymentPageContent() {
   const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [walletAmount, setWalletAmount] = useState<number>(0);
   const orderId = searchParams.get("orderId");
-  const paymentTypeParam = searchParams.get("type"); // "balance", "shipping", "item_only", "local_shipping"
+  const paymentTypeParam = searchParams.get("type"); // "balance", "shipping", "item_only", "local_shipping", "full_payment"
   const walletAmountParam = searchParams.get("walletAmount");
   const amountParam = searchParams.get("amount"); // Shipping fee amount from URL
 
@@ -88,7 +88,7 @@ function PaymentPageContent() {
             console.error("Error parsing temp order:", e);
           }
         }
-      } else if (orderId && (paymentTypeParam === "balance" || paymentTypeParam === "shipping" || paymentTypeParam === "item_only" || paymentTypeParam === "local_shipping")) {
+          } else if (orderId && (paymentTypeParam === "balance" || paymentTypeParam === "shipping" || paymentTypeParam === "item_only" || paymentTypeParam === "local_shipping" || paymentTypeParam === "full_payment")) {
         // Fetch existing order for balance/shipping/item/local_shipping payment
         try {
           const fetchedOrder = await orderService.getOrderById(orderId);
@@ -132,6 +132,19 @@ function PaymentPageContent() {
             // Set balance amount
             const balance = fetchedOrder.balance || 0;
             setDownpaymentAmount(balance);
+          } else if (paymentTypeParam === "full_payment") {
+            // Full payment - items + shipping
+            const orderSummary: OrderSummary = {
+              subtotal: fetchedOrder.subtotal || 0,
+              isf: fetchedOrder.isf || 0,
+              lsf: fetchedOrder.lsf || 0,
+              total: fetchedOrder.total || 0,
+              currency: "PHP",
+              boxTypePreference: fetchedOrder.box_type_preference || "solo",
+            };
+            setOrderSummary(orderSummary);
+            setPaymentType("full");
+            setDownpaymentAmount(orderSummary.total);
           } else {
             // item_only payment (shouldn't happen as items are already paid, but handle it)
             const orderSummary: OrderSummary = {
@@ -282,6 +295,17 @@ function PaymentPageContent() {
         }
         alert(message);
         router.push("/store/orders");
+      } else if (paymentTypeParam === "full_payment") {
+        // Full payment - items + shipping all paid upfront
+        let message = "Full payment submitted! Manila admin will verify your payment.\n\n";
+        message += "After verification:\n";
+        message += "- Onhand items will be shipped directly to your address\n";
+        message += "- Preorder items will be approved, purchased, and shipped when ready";
+        if (useWalletBalance && actualWalletAmount > 0) {
+          message += `\n\n${formatCurrency(actualWalletAmount, "PHP")} will be deducted from your wallet.`;
+        }
+        alert(message);
+        router.push("/store/orders");
       } else if (paymentTypeParam === "item_only" || !paymentTypeParam) {
         // Item payment - items will be stored after admin verifies payment
         let message = "Payment submitted! Manila admin will verify your payment.\n\n";
@@ -386,6 +410,8 @@ function PaymentPageContent() {
             ? "Pay Local Shipping"
             : paymentTypeParam === "shipping" 
             ? "Step 2: Pay Shipping Fee" 
+            : paymentTypeParam === "full_payment"
+            ? "1-Time Payment"
             : paymentType === "balance" 
             ? "Pay Balance" 
             : "Payment"}
@@ -393,6 +419,8 @@ function PaymentPageContent() {
         <p className="mt-2 text-muted-foreground">
           {paymentTypeParam === "shipping"
             ? "Pay shipping fee for your box from Korea to Manila"
+            : paymentTypeParam === "full_payment"
+            ? "Pay for items and shipping in one payment - no hassle!"
             : paymentType === "balance"
             ? "Pay your remaining balance for this order"
             : "Complete your payment to confirm your order"}
@@ -480,7 +508,7 @@ function PaymentPageContent() {
           )}
 
           {/* Payment Type Selection */}
-          {paymentType !== "balance" && (
+          {paymentType !== "balance" && paymentTypeParam !== "full_payment" && (
             <div className="mb-6 rounded-lg border border-border bg-card p-4">
               <h2 className="mb-3 text-base font-semibold">Payment Type</h2>
               <div className="grid grid-cols-2 gap-2">
@@ -531,7 +559,9 @@ function PaymentPageContent() {
               <div>
                 <h2 className="text-lg font-semibold">Payment Amount</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {paymentType === "installment" 
+                  {paymentTypeParam === "full_payment"
+                    ? "Pay for items and shipping in one payment. Items will be shipped directly to you."
+                    : paymentType === "installment" 
                     ? "Pay 50% now. Remaining 50% can be paid later."
                     : "Pay for items only. Shipping will be paid separately when you request shipping."}
                 </p>

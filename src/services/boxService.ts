@@ -1,5 +1,7 @@
 import apiClient from '@/lib/apiClient';
 import { handleApiError } from '@/utils/errorHandler';
+import { shouldUseMockData } from '@/utils/env';
+import { mockBoxService } from '@/lib/mockBoxesData';
 
 export interface Box {
   id: string;
@@ -141,10 +143,18 @@ export const boxService = {
    * Get user boxes with optional filters
    */
   async getBoxes(params?: GetBoxesParams): Promise<GetBoxesResponse> {
+    // Use mock data for testing on localhost
+    if (shouldUseMockData()) {
+      console.log('📦 Using mock data for boxes (localhost)');
+      return mockBoxService.getBoxes(params);
+    }
+
     try {
+      console.log('🔗 Fetching boxes from API:', '/boxes', params);
       const response = await apiClient.get<GetBoxesResponse>('/boxes', { params });
       return response.data;
     } catch (error) {
+      console.error('❌ Error fetching boxes:', error);
       throw handleApiError(error);
     }
   },
@@ -153,10 +163,18 @@ export const boxService = {
    * Get single box by ID
    */
   async getBoxById(id: string): Promise<Box> {
+    // Use mock data for testing on localhost
+    if (shouldUseMockData()) {
+      console.log('📦 Using mock data for box (localhost)');
+      return mockBoxService.getBoxById(id);
+    }
+
     try {
+      console.log('🔗 Fetching box from API:', `/boxes/${id}`);
       const response = await apiClient.get<GetBoxResponse>(`/boxes/${id}`);
       return response.data.data;
     } catch (error) {
+      console.error('❌ Error fetching box:', error);
       throw handleApiError(error);
     }
   },
@@ -204,7 +222,14 @@ export const boxService = {
    * Shared boxes from admin/other customers that customers can join
    */
   async getAvailableSharedBoxes(): Promise<AvailableSharedBox[]> {
+    // Use mock data for testing on localhost
+    if (shouldUseMockData()) {
+      console.log('📦 Using mock data for available shared boxes (localhost)');
+      return mockBoxService.getAvailableSharedBoxes();
+    }
+
     try {
+      console.log('🔗 Fetching available shared boxes from API');
       const response = await apiClient.get<GetAvailableSharedBoxesResponse>('/boxes/shared/available');
       return response.data.data;
     } catch (error) {
@@ -219,7 +244,14 @@ export const boxService = {
    * Customer's own boxes that they can continue filling with more items
    */
   async getAvailableSoloBoxes(userId: string): Promise<AvailableSharedBox[]> {
+    // Use mock data for testing on localhost
+    if (shouldUseMockData()) {
+      console.log('📦 Using mock data for available solo boxes (localhost)');
+      return mockBoxService.getAvailableSoloBoxes(userId);
+    }
+
     try {
+      console.log('🔗 Fetching available solo boxes from API:', `/boxes/solo/available?user_id=${userId}`);
       const response = await apiClient.get<GetAvailableSharedBoxesResponse>('/boxes/solo/available', {
         params: { user_id: userId },
       });
@@ -236,13 +268,21 @@ export const boxService = {
    * Used when no shared boxes are available
    */
   async createDefaultSharedBox(): Promise<Box> {
+    // Use mock data for testing on localhost
+    if (shouldUseMockData()) {
+      console.log('📦 Using mock data to create default shared box (localhost)');
+      return mockBoxService.createDefaultSharedBox();
+    }
+
     try {
+      console.log('🔗 Creating default shared box via API');
       const response = await apiClient.post<CreateBoxResponse>('/boxes/shared/default', {
         box_type: 'shared',
         items: [],
       });
       return response.data.data;
     } catch (error) {
+      console.error('❌ Error creating default shared box:', error);
       throw handleApiError(error);
     }
   },

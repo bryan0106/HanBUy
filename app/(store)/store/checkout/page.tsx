@@ -10,6 +10,7 @@ import { orderService } from "@/services/orderService";
 import { productService } from "@/services/productService";
 import type { CartItem } from "@/services/cartService";
 import { Button } from "@/components/ui/button";
+import { calculateShippingFee } from "@/lib/shipping";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -22,6 +23,8 @@ export default function CheckoutPage() {
   const [isMessageOpen, setIsMessageOpen] = useState<boolean>(false);
   const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [walletAmount, setWalletAmount] = useState<number>(0);
+  const [paymentOption, setPaymentOption] = useState<"split" | "full">("split"); // "split" = 3-way, "full" = 1-time
+  const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -87,20 +90,36 @@ export default function CheckoutPage() {
     const subtotalKRW = cartItems.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
     const subtotalPHP = subtotalKRW * 0.042; // Convert KRW to PHP
 
-    // 3-Way Payment System: Checkout only charges for items
-    // Shipping will be paid separately when customer requests shipping
-    // No shipping fees in checkout
-    const total = subtotalPHP;
+    // Estimate weight and volume for shipping calculation
+    const estimatedWeight = cartItems.reduce((sum, item) => sum + (item.quantity * 0.5), 0); // 0.5kg per item
+    const estimatedVolume = cartItems.reduce((sum, item) => sum + (item.quantity * 0.001), 0); // 0.001 CBM per item
+
+    // Calculate shipping fees
+    const shippingFees = calculateShippingFee(boxTypePreference, estimatedWeight, estimatedVolume);
+    
+    // For 1-time payment: Include shipping fees
+    // For 3-way payment: Only items (shipping paid later)
+    const isf = paymentOption === "full" ? shippingFees.isf : 0;
+    const lsf = paymentOption === "full" ? shippingFees.lsf : 0;
+    const shippingFee = paymentOption === "full" ? shippingFees.total : 0;
+    
+    // Estimate local shipping (COD) for shared boxes - this is approximate
+    const estimatedLocalShipping = boxTypePreference === "shared" ? 150 : 0; // Approximate COD fee
+    
+    const total = paymentOption === "full" 
+      ? subtotalPHP + shippingFee + estimatedLocalShipping
+      : subtotalPHP;
 
     return {
       subtotalKRW,
       subtotalPHP,
-      isf: 0, // Will be calculated when shipping is requested
-      lsf: 0, // Will be calculated when shipping is requested
-      shippingFee: 0, // No shipping fee at checkout
-      soloShippingFee: 0,
-      sharedShippingFee: 0,
-      total, // Only item total
+      isf,
+      lsf,
+      shippingFee,
+      soloShippingFee: shippingFees.soloTotal,
+      sharedShippingFee: shippingFees.sharedTotal,
+      estimatedLocalShipping,
+      total,
     };
   };
 
@@ -145,17 +164,17 @@ export default function CheckoutPage() {
         user_id: user.id,
         order_number: orderNumber,
         subtotal: totals.subtotalPHP,
-        isf: 0, // Will be calculated when shipping is requested
-        lsf: 0, // Will be calculated when shipping is requested
-        shipping_fee: 0, // No shipping fee at checkout
-        solo_shipping_fee: undefined,
-        shared_shipping_fee: undefined,
-        total: totals.total, // Only item total
+        isf: totals.isf,
+        lsf: totals.lsf,
+        shipping_fee: totals.shippingFee,
+        solo_shipping_fee: totals.soloShippingFee,
+        shared_shipping_fee: totals.sharedShippingFee,
+        total: totals.total,
         currency: "PHP" as const,
         status: "pending",
         payment_status: "pending",
-        payment_type: "item_only" as const, // Payment for items only
-        box_type_preference: "solo" as const, // Default to solo, can be changed when requesting shipping
+        payment_type: paymentOption === "full" ? ("full_payment" as const) : ("item_only" as const),
+        box_type_preference: boxTypePreference,
         shipping_address: {
           street: "",
           city: "",
@@ -163,9 +182,13 @@ export default function CheckoutPage() {
           zipCode: "",
           country: "Philippines",
         }, // Will be filled when requesting shipping
-        storage_status: "pending" as const, // Will be 'in_storage' after payment (onhand) or 'pending_approval' (preorder)
+        storage_status: paymentOption === "full" ? "shipping_requested" as const : "pending" as const,
         ...(hasPreorder && {
           preorder_status: "pending_approval" as const,
+        }),
+        ...(paymentOption === "full" && {
+          shipping_payment_status: "paid" as const,
+          shipping_requested_at: new Date().toISOString(),
         }),
         order_items: orderItems,
         customer_message: customerMessage.trim() || undefined,
@@ -179,8 +202,8 @@ export default function CheckoutPage() {
 
       // Redirect to payment page with order ID and wallet info
       const paymentUrl = useWalletBalance && actualWalletAmount > 0
-        ? `/store/payment?orderId=${createdOrder.id}&walletAmount=${actualWalletAmount}`
-        : `/store/payment?orderId=${createdOrder.id}`;
+        ? `/store/payment?orderId=${createdOrder.id}&walletAmount=${actualWalletAmount}&type=${paymentOption === "full" ? "full_payment" : "item_only"}`
+        : `/store/payment?orderId=${createdOrder.id}&type=${paymentOption === "full" ? "full_payment" : "item_only"}`;
       router.push(paymentUrl);
     } catch (error: any) {
       console.error("Error creating order:", error);
@@ -437,11 +460,107 @@ export default function CheckoutPage() {
                   </p>
                 )}
               </div>
-              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-4">
-                <p className="text-xs text-blue-800 font-medium mb-1">📦 3-Way Payment System</p>
-                <p className="text-xs text-blue-700">
-                  Pay for items now. Shipping fee will be paid separately when you request shipping.
-                </p>
+              {/* Payment Option Selection */}
+              <div className="rounded-lg border border-border bg-card p-4 mt-4">
+                <h3 className="text-sm font-semibold mb-3">Payment Option</h3>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentOption("split")}
+                    className={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
+                      paymentOption === "split"
+                        ? "border-pink-500 bg-pink-50"
+                        : "border-border bg-background hover:bg-grey-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold">3-Way Payment</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Pay items now, shipping later
+                        </div>
+                      </div>
+                      <div className="text-xs font-medium text-pink-600">
+                        {formatCurrency(totals.subtotalPHP, "PHP")}
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentOption("full")}
+                    className={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
+                      paymentOption === "full"
+                        ? "border-pink-500 bg-pink-50"
+                        : "border-border bg-background hover:bg-grey-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold">1-Time Payment</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Pay everything now (items + shipping)
+                        </div>
+                      </div>
+                      <div className="text-xs font-medium text-pink-600">
+                        {formatCurrency(totals.total, "PHP")}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+                
+                {paymentOption === "full" && (
+                  <div className="mt-4 space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      <p className="font-medium mb-2">Box Type:</p>
+                      <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setBoxTypePreference("solo")}
+                        className={`flex-1 rounded-lg border p-2 text-xs transition-colors ${
+                          boxTypePreference === "solo"
+                            ? "border-pink-500 bg-pink-50 font-semibold"
+                            : "border-border bg-background"
+                        }`}
+                      >
+                        Solo Box
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBoxTypePreference("shared")}
+                        className={`flex-1 rounded-lg border p-2 text-xs transition-colors ${
+                          boxTypePreference === "shared"
+                            ? "border-pink-500 bg-pink-50 font-semibold"
+                            : "border-border bg-background"
+                        }`}
+                      >
+                        Shared Box (Save {formatCurrency(totals.soloShippingFee - totals.sharedShippingFee, "PHP")})
+                      </button>
+                    </div>
+                    </div>
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-2 mt-2">
+                      <div className="text-xs space-y-1">
+                        <div className="flex justify-between">
+                          <span>Items:</span>
+                          <span>{formatCurrency(totals.subtotalPHP, "PHP")}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Shipping (Korea → Manila):</span>
+                          <span>{formatCurrency(totals.isf, "PHP")}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Local Shipping (Manila → You):</span>
+                          <span>{formatCurrency(totals.lsf, "PHP")}</span>
+                        </div>
+                        {boxTypePreference === "shared" && totals.estimatedLocalShipping > 0 && (
+                          <div className="flex justify-between text-green-700">
+                            <span>Estimated COD Fee:</span>
+                            <span>{formatCurrency(totals.estimatedLocalShipping, "PHP")}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="mt-4 border-t border-border pt-3">
                 <div className="flex justify-between">
@@ -456,7 +575,9 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Items will be stored after payment
+                  {paymentOption === "full" 
+                    ? "Items will be shipped directly to you after payment"
+                    : "Items will be stored after payment"}
                 </p>
               </div>
             </div>

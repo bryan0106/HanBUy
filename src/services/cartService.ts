@@ -69,17 +69,20 @@ export const cartService = {
    * Get cart items for a user
    */
   async getCartItems(userId: string): Promise<CartItem[]> {
-    // Use mock data for testing
+    // Use mock data for testing on localhost
     if (shouldUseMockData()) {
+      console.log('🛒 Using mock data for cart (localhost)');
       return mockCartService.getCartItems(userId);
     }
 
     try {
+      console.log('🔗 Fetching cart from API:', `/cart?user_id=${userId}`);
       const response = await apiClient.get<GetCartResponse>('/cart', {
         params: { user_id: userId },
       });
       return response.data.data;
     } catch (error) {
+      console.error('❌ Error fetching cart:', error);
       throw handleApiError(error);
     }
   },

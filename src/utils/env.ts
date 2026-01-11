@@ -43,7 +43,20 @@ export function shouldUseMockData(): boolean {
 
 /**
  * Get the API base URL
+ * On localhost, defaults to localhost:3001/api for testing
+ * Can be overridden with NEXT_PUBLIC_API_URL environment variable
  */
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api';
+  // If explicitly set, use that
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // On localhost, default to localhost API for testing
+  if (isLocalhost()) {
+    return 'http://localhost:3001/api';
+  }
+  
+  // Production default
+  return 'https://hanbuy-api.onrender.com/api';
 }

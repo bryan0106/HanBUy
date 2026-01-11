@@ -29,7 +29,7 @@ export interface Order {
   currency: 'PHP' | 'KRW';
   status: string;
   payment_status: string;
-  payment_type: 'full' | 'downpayment' | 'balance' | 'installment' | 'item_only' | 'shipping' | 'cod';
+  payment_type: 'full' | 'downpayment' | 'balance' | 'installment' | 'item_only' | 'shipping' | 'cod' | 'full_payment';
   payment_method?: any;
   downpayment_amount?: number | null;
   balance?: number | null;
@@ -115,7 +115,7 @@ export interface CreateOrderRequest {
   currency: 'PHP' | 'KRW';
   status: string;
   payment_status: string;
-  payment_type: 'full' | 'downpayment' | 'item_only' | 'shipping' | 'cod';
+  payment_type: 'full' | 'downpayment' | 'item_only' | 'shipping' | 'cod' | 'full_payment';
   payment_method?: {
     type: 'qr_code' | 'bank_transfer' | 'online';
     bank: 'BPI' | 'BDO' | 'GCASH' | 'GOTYME' | 'MAYA';
@@ -165,15 +165,18 @@ export const orderService = {
    * Get orders with optional filters
    */
   async getOrders(params?: GetOrdersParams): Promise<GetOrdersResponse> {
-    // Use mock data for testing
+    // Use mock data for testing on localhost
     if (shouldUseMockData()) {
+      console.log('📦 Using mock data for orders (localhost)');
       return mockOrderService.getOrders(params);
     }
 
     try {
+      console.log('🔗 Fetching orders from API:', '/orders', params);
       const response = await apiClient.get<GetOrdersResponse>('/orders', { params });
       return response.data;
     } catch (error) {
+      console.error('❌ Error fetching orders:', error);
       throw handleApiError(error);
     }
   },

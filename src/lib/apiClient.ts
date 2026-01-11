@@ -1,8 +1,10 @@
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import { getApiBaseUrl, shouldUseMockData } from '@/utils/env';
 
 // Get base URL from environment variable
 // Production default: https://hanbuy-api.onrender.com/api
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api';
+// Localhost: Use localhost:3001/api or set NEXT_PUBLIC_API_URL
+const API_BASE_URL = getApiBaseUrl();
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -12,6 +14,12 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Log API configuration (only in development)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('🔗 API Base URL:', API_BASE_URL);
+  console.log('📦 Using Mock Data:', shouldUseMockData());
+}
 
 // Request interceptor - Add JWT token to all requests and prevent caching
 apiClient.interceptors.request.use(
