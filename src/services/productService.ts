@@ -627,4 +627,20 @@ export const productService = {
       throw handleApiError(error);
     }
   },
+
+  /**
+   * Submit a product suggestion for preorder
+   */
+  async suggestProduct(suggestion: {
+    product_url: string;
+    product_name?: string;
+    comment?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/products/suggestions', suggestion);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
 };

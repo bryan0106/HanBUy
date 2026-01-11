@@ -1,7 +1,7 @@
 // API service layer - Ready for backend integration
 // Base URL: Update NEXT_PUBLIC_API_URL in .env.local
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://hanbuyapi.onrender.com/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://hanbuy-api.onrender.com/api";
 
 /**
  * Check if running on localhost

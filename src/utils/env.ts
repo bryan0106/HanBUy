@@ -45,5 +45,5 @@ export function shouldUseMockData(): boolean {
  * Get the API base URL
  */
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'https://hanbuyapi.onrender.com/api';
+  return process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api';
 }

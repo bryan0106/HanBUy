@@ -11,6 +11,7 @@ import { LikeButton } from "@/components/store/LikeButton";
 import { PreorderCountdown } from "@/components/store/PreorderCountdown";
 import { PreorderProgress } from "@/components/store/PreorderProgress";
 import { PreorderPaymentInfo } from "@/components/store/PreorderPaymentInfo";
+import { ProductSuggestionModal, type ProductSuggestion } from "@/components/store/ProductSuggestionModal";
 
 interface PreorderProduct {
   id: string;
@@ -51,6 +52,7 @@ export default function PreorderProductsPage() {
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [viewType, setViewType] = useState<ViewType>("grid");
   const [showFilters, setShowFilters] = useState(false);
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -124,6 +126,16 @@ export default function PreorderProductsPage() {
     return matchesPrice && matchesBrand && matchesCategory;
   });
 
+  const handleSubmitSuggestion = async (suggestion: ProductSuggestion) => {
+    try {
+      await productService.suggestProduct(suggestion);
+      // Show success message (you can use toast here if available)
+      alert("Thank you! Your product suggestion has been submitted. We'll review it and add it to our pre-order page if approved.");
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to submit suggestion. Please try again.");
+    }
+  };
+
   return (
     <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6 md:py-8">
       <div className="mb-4 sm:mb-6">
@@ -187,6 +199,7 @@ export default function PreorderProductsPage() {
           </svg>
           Filters
         </button>
+        {/* View Type Buttons */}
         <div className="flex items-center gap-1 rounded-lg border border-border bg-white p-1">
           <button
             onClick={() => setViewType("list")}
@@ -196,19 +209,13 @@ export default function PreorderProductsPage() {
                 ? "bg-soft-blue-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
-            aria-label="List View"
+            aria-label="List view"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                fillRule="evenodd"
+                d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                clipRule="evenodd"
               />
             </svg>
           </button>
@@ -220,19 +227,13 @@ export default function PreorderProductsPage() {
                 ? "bg-soft-blue-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
-            aria-label="Single Column View"
+            aria-label="Single column view"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16v12H4V6z"
+                fillRule="evenodd"
+                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 1v10h10V5H5z"
+                clipRule="evenodd"
               />
             </svg>
           </button>
@@ -244,20 +245,10 @@ export default function PreorderProductsPage() {
                 ? "bg-soft-blue-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
-            aria-label="Grid View"
+            aria-label="Grid view"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h8M4 10h8M4 14h8M4 18h8M16 6h4M16 10h4M16 14h4M16 18h4"
-              />
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
           </button>
         </div>
@@ -501,6 +492,32 @@ export default function PreorderProductsPage() {
                       </Link>
                     );
                   })}
+                  
+                  {/* Suggestion Card */}
+                  <button
+                    onClick={() => setShowSuggestionModal(true)}
+                    className="w-full rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-6 text-center transition-colors hover:border-pink-400 hover:bg-pink-50"
+                  >
+                    <svg
+                      className="mx-auto mb-3 h-12 w-12 text-grey-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    <h3 className="mb-1 text-base font-semibold text-foreground">
+                      Can't find what you're looking for?
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Suggest a product and we'll add it to our pre-order list
+                    </p>
+                  </button>
                 </div>
               ) : viewType === "single" ? (
                 <div className="space-y-4 sm:space-y-6">
@@ -517,13 +534,13 @@ export default function PreorderProductsPage() {
                           <img
                             src={product.images[0]}
                             alt={product.name}
-                            className="mb-4 aspect-video w-full rounded-lg object-cover sm:aspect-square sm:h-64"
+                            className="mb-4 aspect-square w-full rounded-lg object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = '/placeholder-product.png';
                             }}
                           />
                         ) : (
-                          <div className="mb-4 aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-64"></div>
+                          <div className="mb-4 aspect-square w-full rounded-lg bg-grey-200"></div>
                         )}
                         <h3 className="mb-2 text-lg font-semibold sm:text-xl">{product.name}</h3>
                         {product.brand && (
@@ -612,9 +629,35 @@ export default function PreorderProductsPage() {
                       </div>
                     );
                   })}
+                  
+                  {/* Suggestion Card */}
+                  <button
+                    onClick={() => setShowSuggestionModal(true)}
+                    className="w-full rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-8 text-center transition-colors hover:border-pink-400 hover:bg-pink-50 sm:p-12"
+                  >
+                    <svg
+                      className="mx-auto mb-4 h-16 w-16 text-grey-400 sm:mb-6 sm:h-20 sm:w-20"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    <h3 className="mb-2 text-lg font-semibold text-foreground sm:text-xl">
+                      Can't find what you're looking for?
+                    </h3>
+                    <p className="text-sm text-muted-foreground sm:text-base">
+                      Suggest a product and we'll add it to our pre-order list
+                    </p>
+                  </button>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-4">
                   {filteredProducts.map((product) => {
                     const expectedDelivery = new Date(product.releaseDate);
                     expectedDelivery.setDate(expectedDelivery.getDate() + (product.shippingTimeDays || 7));
@@ -727,12 +770,45 @@ export default function PreorderProductsPage() {
                       </div>
                     );
                   })}
+                  
+                  {/* Suggestion Card */}
+                  <button
+                    onClick={() => setShowSuggestionModal(true)}
+                    className="col-span-2 rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-6 text-center transition-colors hover:border-pink-400 hover:bg-pink-50 sm:col-span-2 sm:p-8"
+                  >
+                    <svg
+                      className="mx-auto mb-3 h-12 w-12 text-grey-400 sm:mb-4 sm:h-16 sm:w-16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    <h3 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
+                      Can't find what you're looking for?
+                    </h3>
+                    <p className="text-xs text-muted-foreground sm:text-sm">
+                      Suggest a product and we'll add it to our pre-order list
+                    </p>
+                  </button>
                 </div>
               )}
             </>
           )}
         </div>
       </div>
+
+      {/* Product Suggestion Modal */}
+      <ProductSuggestionModal
+        isOpen={showSuggestionModal}
+        onClose={() => setShowSuggestionModal(false)}
+        onSubmit={handleSubmitSuggestion}
+      />
     </div>
   );
 }

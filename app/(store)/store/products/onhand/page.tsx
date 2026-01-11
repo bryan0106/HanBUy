@@ -145,6 +145,7 @@ export default function OnhandProductsPage() {
           </svg>
           Filters
         </button>
+        {/* View Type Buttons */}
         <div className="flex items-center gap-1 rounded-lg border border-border bg-white p-1">
           <button
             onClick={() => setViewType("list")}
@@ -154,19 +155,13 @@ export default function OnhandProductsPage() {
                 ? "bg-soft-blue-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
-            aria-label="List View"
+            aria-label="List view"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                fillRule="evenodd"
+                d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                clipRule="evenodd"
               />
             </svg>
           </button>
@@ -178,19 +173,13 @@ export default function OnhandProductsPage() {
                 ? "bg-soft-blue-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
-            aria-label="Single Column View"
+            aria-label="Single column view"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16v12H4V6z"
+                fillRule="evenodd"
+                d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 1v10h10V5H5z"
+                clipRule="evenodd"
               />
             </svg>
           </button>
@@ -202,20 +191,10 @@ export default function OnhandProductsPage() {
                 ? "bg-soft-blue-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
-            aria-label="Grid View"
+            aria-label="Grid view"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h8M4 10h8M4 14h8M4 18h8M16 6h4M16 10h4M16 14h4M16 18h4"
-              />
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
           </button>
         </div>
@@ -446,18 +425,18 @@ export default function OnhandProductsPage() {
                         className="group relative block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-lg sm:p-6"
                       >
                         <Link href={`/store/products/${product.id}`}>
-                          <div className="relative mb-4 aspect-video w-full sm:aspect-square sm:h-64 sm:mb-6">
+                          <div className="relative mb-4 aspect-square w-full sm:mb-6">
                             {product.images && product.images.length > 0 ? (
                               <img
                                 src={product.images[0]}
                                 alt={product.name}
-                                className="aspect-video w-full rounded-lg object-cover sm:aspect-square sm:h-full"
+                                className="aspect-square w-full rounded-lg object-cover"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).src = '/placeholder-product.png';
                                 }}
                               />
                             ) : (
-                              <div className="aspect-video w-full rounded-lg bg-grey-200 sm:aspect-square sm:h-full"></div>
+                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
                             )}
                             <LikeButton productId={product.id} />
                           </div>
@@ -488,7 +467,7 @@ export default function OnhandProductsPage() {
                   })}
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-4">
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
                     return (

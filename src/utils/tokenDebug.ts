@@ -109,7 +109,7 @@ export function testTokenInRequest(): void {
   
   // Test actual API call
   console.log('🧪 Testing token with actual API call...');
-  fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hanbuyapi.onrender.com/api'}/auth/me`, {
+  fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api'}/auth/me`, {
     method: 'GET',
     headers: testHeaders
   })
