@@ -2,7 +2,7 @@
 import type { Product, GetProductsParams, GetProductsResponse } from "@/services/productService";
 
 // Sample preorder products with release dates (3 items)
-const mockPreorderProducts: Product[] = [
+export const mockPreorderProducts: Product[] = [
   {
     id: "preorder-bts-v-1",
     name: "V (BTS) [TYPE 非] (Photobook + POSTER SET)",

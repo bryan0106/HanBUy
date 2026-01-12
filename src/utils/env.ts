@@ -54,7 +54,7 @@ export function getApiBaseUrl(): string {
   
   // On localhost, default to localhost API for testing
   if (isLocalhost()) {
-    return 'http://localhost:3001/api';
+    return 'https://hanbuy-api.onrender.com/api';
   }
   
   // Production default

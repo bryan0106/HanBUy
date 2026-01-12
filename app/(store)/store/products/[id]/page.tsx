@@ -992,44 +992,46 @@ export default function ProductDetailPage() {
 
           {/* Quantity selector moved to modal - variations kept here for reference */}
 
-          {/* Price Comparison - Accordion */}
-          <div className="mb-6">
-            <div className="rounded-lg border-2 border-soft-blue-200 bg-white">
-              <button
-                onClick={() => setPriceComparisonOpen(!priceComparisonOpen)}
-                className="w-full flex items-center justify-between p-4 transition-all hover:bg-soft-blue-50"
-              >
-                <div className="flex items-center gap-3">
-                  <svg className="h-5 w-5 text-[#FF85A2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <div className="text-left">
-                    <p className="text-base font-semibold text-grey-900">Price Comparison</p>
-                    <p className="text-xs text-grey-600">Compare with other Korean websites</p>
-                  </div>
-                </div>
-                <svg
-                  className={`h-5 w-5 text-grey-600 transition-transform ${priceComparisonOpen ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+          {/* Price Comparison - Accordion (Hidden for preorder items) */}
+          {!(product.product_type === 'preorder' || product.is_preorder_available) && (
+            <div className="mb-6">
+              <div className="rounded-lg border-2 border-soft-blue-200 bg-white">
+                <button
+                  onClick={() => setPriceComparisonOpen(!priceComparisonOpen)}
+                  className="w-full flex items-center justify-between p-4 transition-all hover:bg-soft-blue-50"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              
-              {priceComparisonOpen && (
-                <div className="px-4 pb-4">
-                  <PriceComparisonInline 
-                    product={product as unknown as ProductFromTypes}
-                    currentPrice={currentPrice}
-                    priceInPHP={priceInPHP}
-                    onViewFull={() => setShowPriceComparison(true)}
-                  />
-                </div>
-              )}
+                  <div className="flex items-center gap-3">
+                    <svg className="h-5 w-5 text-[#FF85A2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="text-base font-semibold text-grey-900">Price Comparison</p>
+                      <p className="text-xs text-grey-600">Compare with other Korean websites</p>
+                    </div>
+                  </div>
+                  <svg
+                    className={`h-5 w-5 text-grey-600 transition-transform ${priceComparisonOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {priceComparisonOpen && (
+                  <div className="px-4 pb-4">
+                    <PriceComparisonInline 
+                      product={product as unknown as ProductFromTypes}
+                      currentPrice={currentPrice}
+                      priceInPHP={priceInPHP}
+                      onViewFull={() => setShowPriceComparison(true)}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Price Summary - Accordion */}
           <div className="mb-6">

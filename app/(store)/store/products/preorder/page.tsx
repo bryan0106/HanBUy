@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { productService } from "@/services/productService";
+import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { categories } from "@/lib/mockData";
@@ -45,8 +46,7 @@ interface PreorderProduct {
 type ViewType = "list" | "single" | "grid";
 
 export default function PreorderProductsPage() {
-  const [products, setProducts] = useState<PreorderProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false); // No loading needed - data is static
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
@@ -54,77 +54,54 @@ export default function PreorderProductsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
 
-  useEffect(() => {
-    loadProducts();
-  }, [selectedCategory]);
+  // Convert mock data directly to PreorderProduct format - no API calls
+  const products: PreorderProduct[] = useMemo(() => {
+    return mockPreorderProducts.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description || '',
+      price: p.price,
+      currency: (p.currency === 'PHP' || p.currency === 'KRW' ? p.currency : 'KRW') as Currency,
+      images: p.images || [],
+      category: p.category || '',
+      brand: p.brand,
+      quantity: p.stock || 0,
+      orderDate: p.order_date ? new Date(p.order_date) : new Date(),
+      orderDeadline: p.order_deadline ? new Date(p.order_deadline) : p.release_date ? new Date(p.release_date) : new Date(),
+      releaseDate: p.release_date ? new Date(p.release_date) : new Date(),
+      
+      // Stock Management (Option 2)
+      stock: p.stock || 0,                    // Onhand stock
+      preorder_stock: p.preorder_stock || p.preorder_available_stock || p.stock || 100, // Preorder stock
+      
+      // Flags (Option 2)
+      is_preorder_available: p.is_preorder_available ?? (p.product_type === 'preorder' || p.product_type === 'preorder_and_onhand'),
+      is_onhand_available: p.is_onhand_available ?? (p.product_type === 'onhand' || (p.stock > 0 && p.product_type === 'preorder_and_onhand')),
+      
+      // Preorder-specific fields (with defaults if not provided)
+      depositPercentage: p.deposit_percentage || 50, // Default 50%
+      preorderAvailableStock: p.preorder_available_stock || p.preorder_stock || p.stock || 100,
+      preordersClaimed: p.preorders_claimed || 0,
+      shippingTimeDays: p.shipping_time_days || 7, // Default 7 days
+    }));
+  }, []);
 
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const params: any = {
-        page: 1,
-        limit: 50,
-      };
-      if (selectedCategory !== 'all') {
-        params.category = selectedCategory;
-      }
-      if (selectedBrand !== 'all') {
-        params.brand = selectedBrand;
-      }
-      if (priceRange[0] > 0 || priceRange[1] < 100000) {
-        params.min_price = priceRange[0];
-        params.max_price = priceRange[1];
-      }
-      const response = await productService.getPreorderProducts(params);
-      // Convert API response to PreorderProduct format (Option 2: Separate Onhand Stock)
-      const products: PreorderProduct[] = response.data.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description || '',
-        price: p.price,
-        currency: (p.currency === 'PHP' || p.currency === 'KRW' ? p.currency : 'KRW') as Currency,
-        images: p.images || [],
-        category: p.category || '',
-        brand: p.brand,
-        quantity: p.stock || 0,
-        orderDate: p.order_date ? new Date(p.order_date) : new Date(),
-        orderDeadline: p.order_deadline ? new Date(p.order_deadline) : p.release_date ? new Date(p.release_date) : new Date(),
-        releaseDate: p.release_date ? new Date(p.release_date) : new Date(),
-        
-        // Stock Management (Option 2)
-        stock: p.stock || 0,                    // Onhand stock
-        preorder_stock: p.preorder_stock || p.preorder_available_stock || p.stock || 100, // Preorder stock
-        
-        // Flags (Option 2)
-        is_preorder_available: p.is_preorder_available ?? (p.product_type === 'preorder' || p.product_type === 'preorder_and_onhand'),
-        is_onhand_available: p.is_onhand_available ?? (p.product_type === 'onhand' || (p.stock > 0 && p.product_type === 'preorder_and_onhand')),
-        
-        // Preorder-specific fields (with defaults if not provided)
-        depositPercentage: p.deposit_percentage || 50, // Default 50%
-        preorderAvailableStock: p.preorder_available_stock || p.preorder_stock || p.stock || 100,
-        preordersClaimed: p.preorders_claimed || 0,
-        shippingTimeDays: p.shipping_time_days || 7, // Default 7 days
-      }));
-      setProducts(products);
-    } catch (error) {
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const brands = useMemo(() => {
+    return Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
+  }, [products]);
 
-  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
-
-  const filteredProducts = products.filter((product) => {
-    const priceInPHP = product.price * 0.042; // Mock conversion
-    const matchesPrice =
-      priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
-    const matchesBrand =
-      selectedBrand === "all" || product.brand === selectedBrand;
-    const matchesCategory =
-      selectedCategory === "all" || product.category === selectedCategory;
-    return matchesPrice && matchesBrand && matchesCategory;
-  });
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const priceInPHP = product.price * 0.042; // Mock conversion
+      const matchesPrice =
+        priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
+      const matchesBrand =
+        selectedBrand === "all" || product.brand === selectedBrand;
+      const matchesCategory =
+        selectedCategory === "all" || product.category === selectedCategory;
+      return matchesPrice && matchesBrand && matchesCategory;
+    });
+  }, [products, priceRange, selectedBrand, selectedCategory]);
 
   const handleSubmitSuggestion = async (suggestion: ProductSuggestion) => {
     try {

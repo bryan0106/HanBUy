@@ -9,7 +9,9 @@ import { useRouter } from "next/navigation";
 import { cartService } from "@/services/cartService";
 import { productService } from "@/services/productService";
 import { orderService } from "@/services/orderService";
+import { initializeMockOrders, mockOrderService } from "@/lib/mockOrdersData";
 import type { CartItem } from "@/services/cartService";
+import type { Order as OrderType } from "@/services/orderService";
 
 interface Order {
   id: string;
@@ -130,74 +132,39 @@ export default function StoreOrdersPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Fetch orders from API
+      // Use mock data directly - no API calls
       if (user?.id) {
-        try {
-          console.log('=== FETCHING ORDERS ===');
-          console.log('User ID:', user.id);
-          console.log('User object:', user);
-          
-          const ordersResponse = await orderService.getOrders({ user_id: user.id });
-          const ordersData = ordersResponse.data;
-          
-          console.log('=== ORDERS API RESPONSE ===');
-          console.log('Orders data type:', typeof ordersData);
-          console.log('Is array:', Array.isArray(ordersData));
-          console.log('Number of orders:', ordersData?.length || 0);
-          console.log('Full orders data:', JSON.stringify(ordersData, null, 2));
-          
-          if (!ordersData || ordersData.length === 0) {
-            console.warn('No orders returned from API');
-            setOrders([]);
-            return;
-          }
-          
-          // Map API response to Order interface
-          const mappedOrders: Order[] = ordersData.map((order: any) => {
-            console.log('Mapping order:', {
-              id: order.id,
-              order_number: order.order_number,
-              order_items_length: order.order_items?.length,
-              items_count: order.items_count,
-              total: order.total,
-              status: order.status
-            });
-            
-            return {
-              id: order.id,
-              orderNumber: order.order_number,
-              items: order.order_items?.length || order.items_count || 0,
-              total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
-              currency: order.currency,
-              status: order.status,
-              paymentStatus: order.payment_status,
-              createdAt: new Date(order.created_at),
-              boxId: order.box_id,
-              phCourierTrackingNumber: order.ph_courier_tracking_number,
-            };
-          });
-          
-          console.log('=== MAPPED ORDERS ===');
-          console.log('Mapped orders count:', mappedOrders.length);
-          console.log('Mapped orders:', JSON.stringify(mappedOrders, null, 2));
-          
-          setOrders(mappedOrders);
-        } catch (orderError: any) {
-          console.error("=== ERROR LOADING ORDERS ===");
-          console.error("Error:", orderError);
-          console.error("Error message:", orderError.message);
-          console.error("Error stack:", orderError.stack);
-          setOrders([]);
-        }
-      } else {
-        console.warn('No user ID available, cannot fetch orders');
-        console.log('User object:', user);
+        console.log('📦 Using mock data for orders (no API calls)');
+        
+        // Initialize mock orders for user
+        initializeMockOrders(user.id);
+        
+        // Get orders from mock service
+        const ordersResponse = await mockOrderService.getOrders({ user_id: user.id });
+        const ordersData = ordersResponse.data;
+        
+        // Map mock data to Order interface
+        const mappedOrders: Order[] = ordersData.map((order: OrderType) => ({
+          id: order.id,
+          orderNumber: order.order_number,
+          items: order.order_items?.length || 0,
+          total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
+          currency: order.currency as "PHP" | "KRW",
+          status: order.status,
+          paymentStatus: order.payment_status,
+          createdAt: new Date(order.created_at),
+          boxId: order.box_id,
+          phCourierTrackingNumber: order.ph_courier_tracking_number,
+        }));
+        
+        setOrders(mappedOrders);
       }
 
-      // Fetch cart items from API
+      // Fetch cart items from API (cart service already uses mock data on localhost)
       await loadCart();
     } catch (error) {
       console.error("Error loading data:", error);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -208,7 +175,8 @@ export default function StoreOrdersPage() {
     
     setLoadingOrderDetails(prev => ({ ...prev, [orderId]: true }));
     try {
-      const orderDetail = await orderService.getOrderById(orderId);
+      // Use mock data directly - no API calls
+      const orderDetail = await mockOrderService.getOrderById(orderId);
       setOrderDetails(prev => ({ ...prev, [orderId]: orderDetail }));
     } catch (error) {
       console.error(`Error loading order ${orderId}:`, error);
