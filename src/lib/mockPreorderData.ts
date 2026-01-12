@@ -105,6 +105,40 @@ export const mockPreorderProducts: Product[] = [
     created_at: "2026-01-12T00:00:00.000Z",
     updated_at: "2026-01-12T00:00:00.000Z",
   },
+  {
+    id: "preorder-ateez-finale-1",
+    name: "ATEEZ - 2025 WORLD TOUR [TOWARDS THE LIGHT : WILL TO POWER] FINALE IN SEOUL (PLAYCODE)",
+    description: "ATEEZ 2025 World Tour Finale in Seoul Playcode. Pre-order now to secure your copy! This exclusive item commemorates the final concert of ATEEZ's 2025 World Tour. Worldwide shipping available. Orders will be shipped in the order they are completed.",
+    price: 45000,
+    currency: "KRW",
+    images: [
+      "https://hello82.com/cdn/shop/files/ATEEZ_WILL_TO_POWER_FINALE_PC.png?v=1767074432&width=1920",
+    ],
+    category: "k-pop",
+    brand: "ATEEZ",
+    sku: "ATEEZ-FINALE-PC-2025",
+    stock: 0,
+    preorder_stock: 800,
+    status: "active",
+    product_type: "preorder",
+    is_preorder_available: true,
+    is_onhand_available: false,
+    order_date: "2025-01-15T11:00:00.000Z", // Pre-order starts
+    order_deadline: "2025-02-15T23:59:59.000Z", // Pre-order deadline
+    release_date: "2025-03-01T00:00:00.000Z", // Release date
+    deposit_percentage: 50,
+    preorder_available_stock: 800,
+    preorders_claimed: 0,
+    shipping_time_days: 14, // Estimated shipping time after release
+    weight: 0.3,
+    dimensions: {
+      length: 15,
+      width: 10,
+      height: 1,
+    },
+    created_at: "2025-01-15T00:00:00.000Z",
+    updated_at: "2025-01-15T00:00:00.000Z",
+  },
 ];
 
 export const mockPreorderService = {

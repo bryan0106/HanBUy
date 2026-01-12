@@ -126,7 +126,7 @@ export default function PreorderProductsPage() {
             className={cn(
               "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors",
               selectedCategory === "all"
-                ? "bg-soft-blue-600 text-white"
+                ? "bg-pink-600 text-white"
                 : "bg-grey-100 text-grey-700 hover:bg-grey-200"
             )}
           >
@@ -138,9 +138,9 @@ export default function PreorderProductsPage() {
               onClick={() => setSelectedCategory(cat.slug)}
               className={cn(
                 "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                selectedCategory === cat.slug
-                  ? "bg-soft-blue-600 text-white"
-                  : "bg-grey-100 text-grey-700 hover:bg-grey-200"
+              selectedCategory === cat.slug
+                ? "bg-pink-600 text-white"
+                : "bg-grey-100 text-grey-700 hover:bg-grey-200"
               )}
             >
               {cat.name}
@@ -177,7 +177,7 @@ export default function PreorderProductsPage() {
             className={cn(
               "rounded-lg p-2 transition-all",
               viewType === "list"
-                ? "bg-soft-blue-600 text-white shadow-sm"
+                ? "bg-pink-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="List view"
@@ -195,7 +195,7 @@ export default function PreorderProductsPage() {
             className={cn(
               "rounded-lg p-2 transition-all",
               viewType === "single"
-                ? "bg-soft-blue-600 text-white shadow-sm"
+                ? "bg-pink-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="Single column view"
@@ -213,7 +213,7 @@ export default function PreorderProductsPage() {
             className={cn(
               "rounded-lg p-2 transition-all",
               viewType === "grid"
-                ? "bg-soft-blue-600 text-white shadow-sm"
+                ? "bg-pink-600 text-white shadow-sm"
                 : "text-grey-700 hover:bg-grey-100 hover:text-grey-900"
             )}
             aria-label="Grid view"
@@ -654,122 +654,65 @@ export default function PreorderProductsPage() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
                   {filteredProducts.map((product) => {
-                    const expectedDelivery = new Date(product.releaseDate);
-                    expectedDelivery.setDate(expectedDelivery.getDate() + (product.shippingTimeDays || 7));
+                    const priceInPHP = product.price * 0.042; // Mock conversion
+                    // Calculate original price (add 30% markup for strikethrough effect)
+                    const originalPrice = priceInPHP * 1.3;
                     
                     return (
                       <div
                         key={product.id}
-                        className="rounded-lg border border-border bg-card p-3 sm:p-4"
+                        className="group relative rounded-lg border border-border bg-card overflow-hidden transition-shadow hover:shadow-md"
                       >
+                        {/* Pre-Order Badge */}
+                        <div className="absolute top-2 left-2 z-10 rounded-md bg-pink-600 px-2 py-1 text-xs font-semibold text-white">
+                          Pre-Order
+                        </div>
+                        
                         <Link href={`/store/products/${product.id}`}>
-                          <div className="relative mb-3 aspect-square w-full overflow-hidden sm:mb-4">
+                          <div className="relative aspect-square w-full overflow-hidden">
                             {product.images && product.images.length > 0 ? (
                               <img
                                 src={product.images[0]}
                                 alt={product.name}
-                                className="aspect-square w-full rounded-lg object-cover"
+                                className="h-full w-full object-cover transition-transform group-hover:scale-105"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).src = '/placeholder-product.png';
                                 }}
                               />
                             ) : (
-                              <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
+                              <div className="h-full w-full bg-grey-200"></div>
                             )}
-                            <LikeButton productId={product.id} size="sm" />
+                            <div className="absolute top-2 right-2">
+                              <LikeButton productId={product.id} size="sm" />
+                            </div>
                           </div>
                         </Link>
-                        <h3 className="mb-1 font-semibold sm:mb-2">{product.name}</h3>
-                        {product.brand && (
-                          <p className="mb-1 text-xs text-muted-foreground sm:text-sm">
-                            {product.brand}
-                          </p>
-                        )}
                         
-                        {/* Payment Info with Deposit */}
-                        <PreorderPaymentInfo
-                          price={product.price}
-                          currency={product.currency}
-                          depositPercentage={product.depositPercentage || 50}
-                          className="mb-2"
-                        />
-                        
-                        {/* Countdown Timer - Only show if accepting preorders */}
-                        {product.is_preorder_available && (
-                          <PreorderCountdown
-                            deadline={product.orderDeadline}
-                            className="mb-2"
-                          />
-                        )}
-                        
-                        {/* Progress Bar - Only show if accepting preorders */}
-                        {product.is_preorder_available && product.preorderAvailableStock && (
-                          <PreorderProgress
-                            claimed={product.preordersClaimed || 0}
-                            available={product.preorderAvailableStock}
-                            className="mb-2"
-                          />
-                        )}
-                        
-                        {/* Option 2: Available Now Badge (if product has onhand stock) */}
-                        {product.is_onhand_available && product.stock > 0 && (
-                          <div className="mb-2 rounded-lg bg-green-100 p-2 text-xs font-medium text-green-700">
-                            ✅ Available Now: {product.stock} units in stock
-                          </div>
-                        )}
-                        
-                        {/* Timeline Info - Enhanced for New Item Releases */}
-                        <div className="mb-3 space-y-1 rounded-lg bg-grey-50 p-2 text-xs">
-                          {product.is_preorder_available && (
-                            <>
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium text-foreground">📅 Pre-Order:</span>
-                                <span className="text-muted-foreground">{formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium text-foreground">🎬 Release:</span>
-                                <span className="text-muted-foreground">{formatDate(product.releaseDate)}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium text-foreground">🚚 Arrival:</span>
-                                <span className="text-muted-foreground">{formatDate(expectedDelivery)}</span>
-                              </div>
-                            </>
-                          )}
-                          {product.is_onhand_available && (
-                            <p className="text-green-600 font-medium">
-                              🚀 Ready to Ship Now
+                        <div className="p-3">
+                          {/* Brand */}
+                          {product.brand && (
+                            <p className="mb-1 text-xs font-medium text-muted-foreground sm:text-sm">
+                              {product.brand}
                             </p>
                           )}
-                        </div>
-                        
-                        {/* Option 2: Dual Purchase Buttons (if both available) */}
-                        {product.is_onhand_available && product.is_preorder_available && product.stock > 0 ? (
-                          <div className="space-y-2">
-                            <Link
-                              href={`/store/products/${product.id}?purchase=onhand`}
-                              className="block w-full rounded-lg bg-green-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-green-700"
-                            >
-                              Buy Now ({product.stock} in stock)
-                            </Link>
-                            <Link
-                              href={`/store/products/${product.id}?purchase=preorder`}
-                              className="block w-full rounded-lg border-2 border-soft-blue-600 bg-white px-4 py-2 text-center font-semibold text-soft-blue-600 transition-colors hover:bg-soft-blue-50"
-                            >
-                              Pre-Order Now
-                            </Link>
+                          
+                          {/* Product Name */}
+                          <h3 className="mb-2 line-clamp-2 text-sm font-semibold leading-tight sm:text-base">
+                            {product.name}
+                          </h3>
+                          
+                          {/* Price - Simple with strikethrough */}
+                          <div className="flex flex-col">
+                            <p className="text-base font-bold text-pink-600 sm:text-lg">
+                              From {formatCurrency(priceInPHP, "PHP")}
+                            </p>
+                            <p className="text-xs text-muted-foreground line-through">
+                              {formatCurrency(originalPrice, "PHP")}
+                            </p>
                           </div>
-                        ) : (
-                          /* Single Button (only preorder or only onhand) */
-                          <Link
-                            href={`/store/products/${product.id}`}
-                            className="block w-full rounded-lg bg-soft-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700"
-                          >
-                            {product.is_onhand_available && product.stock > 0 ? 'Buy Now' : 'Pre-Order Now'}
-                          </Link>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
