@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { productService } from "@/services/productService";
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
@@ -46,7 +45,6 @@ interface PreorderProduct {
 type ViewType = "list" | "single" | "grid";
 
 export default function PreorderProductsPage() {
-  const [loading] = useState(false); // No loading needed - data is static
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
@@ -54,59 +52,55 @@ export default function PreorderProductsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
 
-  // Convert mock data directly to PreorderProduct format - no API calls
-  const products: PreorderProduct[] = useMemo(() => {
-    return mockPreorderProducts.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description || '',
-      price: p.price,
-      currency: (p.currency === 'PHP' || p.currency === 'KRW' ? p.currency : 'KRW') as Currency,
-      images: p.images || [],
-      category: p.category || '',
-      brand: p.brand,
-      quantity: p.stock || 0,
-      orderDate: p.order_date ? new Date(p.order_date) : new Date(),
-      orderDeadline: p.order_deadline ? new Date(p.order_deadline) : p.release_date ? new Date(p.release_date) : new Date(),
-      releaseDate: p.release_date ? new Date(p.release_date) : new Date(),
-      
-      // Stock Management (Option 2)
-      stock: p.stock || 0,                    // Onhand stock
-      preorder_stock: p.preorder_stock || p.preorder_available_stock || p.stock || 100, // Preorder stock
-      
-      // Flags (Option 2)
-      is_preorder_available: p.is_preorder_available ?? (p.product_type === 'preorder' || p.product_type === 'preorder_and_onhand'),
-      is_onhand_available: p.is_onhand_available ?? (p.product_type === 'onhand' || (p.stock > 0 && p.product_type === 'preorder_and_onhand')),
-      
-      // Preorder-specific fields (with defaults if not provided)
-      depositPercentage: p.deposit_percentage || 50, // Default 50%
-      preorderAvailableStock: p.preorder_available_stock || p.preorder_stock || p.stock || 100,
-      preordersClaimed: p.preorders_claimed || 0,
-      shippingTimeDays: p.shipping_time_days || 7, // Default 7 days
-    }));
-  }, []);
+  // Convert mock data directly to PreorderProduct format using .map() - no API calls
+  const products: PreorderProduct[] = mockPreorderProducts.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || '',
+    price: p.price,
+    currency: (p.currency === 'PHP' || p.currency === 'KRW' ? p.currency : 'KRW') as Currency,
+    images: p.images || [],
+    category: p.category || '',
+    brand: p.brand,
+    quantity: p.stock || 0,
+    orderDate: p.order_date ? new Date(p.order_date) : new Date(),
+    orderDeadline: p.order_deadline ? new Date(p.order_deadline) : p.release_date ? new Date(p.release_date) : new Date(),
+    releaseDate: p.release_date ? new Date(p.release_date) : new Date(),
+    
+    // Stock Management (Option 2)
+    stock: p.stock || 0,                    // Onhand stock
+    preorder_stock: p.preorder_stock || p.preorder_available_stock || p.stock || 100, // Preorder stock
+    
+    // Flags (Option 2)
+    is_preorder_available: p.is_preorder_available ?? (p.product_type === 'preorder' || p.product_type === 'preorder_and_onhand'),
+    is_onhand_available: p.is_onhand_available ?? (p.product_type === 'onhand' || (p.stock > 0 && p.product_type === 'preorder_and_onhand')),
+    
+    // Preorder-specific fields (with defaults if not provided)
+    depositPercentage: p.deposit_percentage || 50, // Default 50%
+    preorderAvailableStock: p.preorder_available_stock || p.preorder_stock || p.stock || 100,
+    preordersClaimed: p.preorders_claimed || 0,
+    shippingTimeDays: p.shipping_time_days || 7, // Default 7 days
+  }));
 
-  const brands = useMemo(() => {
-    return Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
-  }, [products]);
+  // Extract brands using .map()
+  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const priceInPHP = product.price * 0.042; // Mock conversion
-      const matchesPrice =
-        priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
-      const matchesBrand =
-        selectedBrand === "all" || product.brand === selectedBrand;
-      const matchesCategory =
-        selectedCategory === "all" || product.category === selectedCategory;
-      return matchesPrice && matchesBrand && matchesCategory;
-    });
-  }, [products, priceRange, selectedBrand, selectedCategory]);
+  // Filter products using .filter() and .map() - no API calls
+  const filteredProducts = products.filter((product) => {
+    const priceInPHP = product.price * 0.042; // Mock conversion
+    const matchesPrice =
+      priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
+    const matchesBrand =
+      selectedBrand === "all" || product.brand === selectedBrand;
+    const matchesCategory =
+      selectedCategory === "all" || product.category === selectedCategory;
+    return matchesPrice && matchesBrand && matchesCategory;
+  });
 
   const handleSubmitSuggestion = async (suggestion: ProductSuggestion) => {
     try {
-      await productService.suggestProduct(suggestion);
-      // Show success message (you can use toast here if available)
+      // Mock suggestion - no API call
+      console.log("Product suggestion (mock):", suggestion);
       alert("Thank you! Your product suggestion has been submitted. We'll review it and add it to our pre-order page if approved.");
     } catch (error: any) {
       throw new Error(error.message || "Failed to submit suggestion. Please try again.");
@@ -375,11 +369,7 @@ export default function PreorderProductsPage() {
 
         {/* Products Display */}
         <div className="flex-1">
-          {loading ? (
-            <div className="py-8 text-center sm:py-12">
-              <p className="text-muted-foreground">Loading products...</p>
-            </div>
-          ) : filteredProducts.length === 0 ? (
+          {filteredProducts.length === 0 ? (
             <div className="py-8 text-center sm:py-12">
               <p className="text-muted-foreground">No pre-order items available.</p>
             </div>

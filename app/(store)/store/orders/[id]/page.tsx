@@ -6,7 +6,7 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { orderService } from "@/services/orderService";
+import { mockOrderService } from "@/lib/mockOrdersData";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -34,7 +34,8 @@ export default function OrderDetailsPage() {
     setLoading(true);
     setError(null);
     try {
-      const orderData = await orderService.getOrderById(orderId);
+      // Use mock data - no API call
+      const orderData = await mockOrderService.getOrderById(orderId);
       
       // Verify the order belongs to the current user
       if (orderData.user_id !== user?.id) {

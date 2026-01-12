@@ -5,7 +5,7 @@ import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { notificationService } from "@/services/notificationService";
+// notificationService removed - using mock data only
 
 interface Notification {
   id: string;

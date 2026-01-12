@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
-import { cartService } from "@/services/cartService";
-import { orderService } from "@/services/orderService";
-import { productService } from "@/services/productService";
+import { mockCartService, mockOrderService } from "@/lib/mockOrdersData";
+import { mockProducts } from "@/lib/mockData";
+import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import type { CartItem } from "@/services/cartService";
 import { Button } from "@/components/ui/button";
 import { calculateShippingFee } from "@/lib/shipping";
@@ -41,9 +41,10 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
-      const cartItemsData = await cartService.getCartItems(user.id);
+      // Use mock cart service - no API call
+      const cartItemsData = await mockCartService.getCartItems(user.id);
 
-      // Fetch product details for each cart item to get images
+      // Fetch product details for each cart item to get images (from mock data)
       const cartItemsWithImages = await Promise.all(
         cartItemsData.map(async (item) => {
           if (item.image_url || (item.product && item.product.images && item.product.images.length > 0)) {
@@ -51,7 +52,14 @@ export default function CheckoutPage() {
           }
 
           try {
-            const product = await productService.getProductById(item.product_id);
+            // Check mock products first using direct .map() / .find()
+            let product = mockProducts.find(p => p.id === item.product_id);
+            
+            // If not found, check preorder products using direct .find()
+            if (!product) {
+              product = mockPreorderProducts.find(p => p.id === item.product_id) as any;
+            }
+            
             if (product && product.images && product.images.length > 0) {
               return {
                 ...item,
@@ -178,11 +186,12 @@ export default function CheckoutPage() {
           
           if (item.product_type === 'preorder') {
             try {
-              const product = await productService.getProductById(item.product_id);
-              if (product.release_date) {
+              // Use mock data - check preorder products using direct .find()
+              const product = mockPreorderProducts.find(p => p.id === item.product_id);
+              if (product && product.release_date) {
                 preorderReleaseDate = new Date(product.release_date).toISOString();
               }
-              if (product.deposit_percentage) {
+              if (product && product.deposit_percentage) {
                 depositPercentage = product.deposit_percentage;
               }
             } catch (error) {
@@ -242,11 +251,12 @@ export default function CheckoutPage() {
         customer_message: customerMessage.trim() || undefined,
       };
 
-      console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
+      console.log('Creating order with data (mock):', JSON.stringify(orderData, null, 2));
       
-      const createdOrder = await orderService.createOrder(orderData);
+      // Use mock order service - no API call
+      const createdOrder = await mockOrderService.createOrder(orderData);
 
-      console.log('Order created successfully:', createdOrder);
+      console.log('Order created successfully (mock):', createdOrder);
 
       // Redirect to payment page with order ID and wallet info
       const paymentUrl = useWalletBalance && actualWalletAmount > 0

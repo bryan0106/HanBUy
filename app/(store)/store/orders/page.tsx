@@ -6,7 +6,6 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { productService } from "@/services/productService";
 import { initializeMockOrders, mockOrderService, initializeMockCart, mockCartService } from "@/lib/mockOrdersData";
 import type { CartItem } from "@/services/cartService";
 import type { Order as OrderType } from "@/services/orderService";

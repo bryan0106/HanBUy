@@ -1,6 +1,9 @@
 // Mock Boxes Data for testing
 import type { Box, AvailableSharedBox, GetBoxesParams } from "@/services/boxService";
 
+// Re-export types for convenience
+export type { AvailableSharedBox, Box, GetBoxesParams };
+
 // Store boxes data in memory (simulating database)
 const mockBoxesStore: Record<string, Box[]> = {};
 

@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { scrapeProductFromUrl, parseKoreanDate, parseKoreanPrice } from "@/utils/webScraper";
 import type { ScrapedProductData } from "@/utils/webScraper";
 import { formatDate } from "@/lib/utils";
+import toast from "react-hot-toast";
 
 export default function PreorderImportPage() {
   const [url, setUrl] = useState("");
@@ -28,56 +28,118 @@ export default function PreorderImportPage() {
     shippingTimeDays: 14,
   });
 
+  // Mock data mapping for ktown4u URLs
+  const getMockScrapedData = (url: string) => {
+    // Map ktown4u event URLs to mock data
+    const urlMappings: Record<string, any> = {
+      "43965357": {
+        name: "LA POEM Event",
+        description: "LA POEM Store Event - Limited Edition",
+        price: 35000,
+        currency: "KRW",
+        images: [
+          "https://www.ktown4u.com/goods_files/SH0164/event_images/043957/EV43956132.default.2.png",
+        ],
+        brand: "LA POEM",
+        category: "k-pop",
+        order_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        order_deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        release_date: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    };
+
+    // Extract event number from URL
+    const eventMatch = url.match(/eve_no=(\d+)/);
+    const eventNo = eventMatch ? eventMatch[1] : null;
+
+    if (eventNo && urlMappings[eventNo]) {
+      return urlMappings[eventNo];
+    }
+
+    // Default mock data for any ktown4u URL
+    if (url.includes("ktown4u.com")) {
+      return {
+        name: "K-Pop Event Product",
+        description: "Pre-order event product from Ktown4u",
+        price: 30000,
+        currency: "KRW",
+        images: ["https://via.placeholder.com/400x400?text=K-Pop+Product"],
+        brand: "Unknown",
+        category: "k-pop",
+        order_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        order_deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        release_date: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+    }
+
+    return null;
+  };
+
   const handleScrape = async () => {
     if (!url.trim()) {
       setError("Please enter a URL");
+      toast.error("Please enter a URL");
       return;
     }
 
     setLoading(true);
     setError(null);
     setScrapedData(null);
+    const scrapeToast = toast.loading("Scraping product data...");
 
     try {
-      // Call backend API to scrape the URL
-      // For now, we'll use a mock response structure
-      const response = await fetch("/api/admin/scrape-product", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to scrape product data");
+      // Use mock data mapping instead of API call
+      const mockData = getMockScrapedData(url);
+      
+      if (!mockData) {
+        throw new Error("Unsupported URL. Please use a Ktown4u event URL.");
       }
 
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        setScrapedData(result.data);
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const data = mockData;
+        
+        // Create scrapedData object for preview
+        setScrapedData({
+          sourceSite: url.includes("ktown4u") ? "ktown4u" : "unknown",
+          sourceUrl: url,
+          name: data.name || "",
+          price: data.price || 0,
+          releaseDate: data.releaseDate || data.release_date || "",
+          preorderDeadline: data.preorderDeadline || data.order_deadline || "",
+          preorderStartDate: data.order_date || "",
+          description: data.description || "",
+          images: Array.isArray(data.images) ? data.images : [],
+          brand: data.brand || "",
+          category: data.category || "k-pop",
+        });
         
         // Pre-fill form with scraped data
         setProductData({
-          name: result.data.name || "",
-          description: result.data.description || "",
-          price: result.data.price?.toString() || "",
-          currency: result.data.currency || "KRW",
-          images: result.data.images || [],
-          category: result.data.category || "k-pop",
-          brand: result.data.brand || "",
-          orderDate: result.data.preorderStartDate || "",
-          orderDeadline: result.data.preorderDeadline || "",
-          releaseDate: result.data.releaseDate || "",
+          name: data.name || "",
+          description: data.description || "",
+          price: data.price?.toString() || "",
+          currency: data.currency || "KRW",
+          images: Array.isArray(data.images) ? data.images : [],
+          category: data.category || "k-pop",
+          brand: data.brand || "",
+        orderDate: data.order_date ? new Date(data.order_date).toISOString().slice(0, 16) : "",
+        orderDeadline: data.order_deadline || data.preorderDeadline ? new Date(data.order_deadline || data.preorderDeadline).toISOString().slice(0, 16) : "",
+        releaseDate: data.release_date || data.releaseDate ? new Date(data.release_date || data.releaseDate).toISOString().slice(0, 16) : "",
           depositPercentage: 50,
           preorderAvailableStock: 500,
           shippingTimeDays: 14,
         });
-      } else {
-        setError(result.error || "Failed to scrape product data");
-      }
+        
+        toast.dismiss(scrapeToast);
+        toast.success("Product data scraped successfully!");
     } catch (err: any) {
       console.error("Scraping error:", err);
-      setError(err.message || "Failed to scrape product. Please check the URL and try again.");
+      const errorMsg = err.message || "Failed to scrape product. Please check the URL and try again.";
+      setError(errorMsg);
+      toast.dismiss(scrapeToast);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -86,38 +148,55 @@ export default function PreorderImportPage() {
   const handleSubmit = async () => {
     // Validate required fields
     if (!productData.name || !productData.price || !productData.releaseDate) {
-      setError("Please fill in all required fields (Name, Price, Release Date)");
+      const errorMsg = "Please fill in all required fields (Name, Price, Release Date)";
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
+    setLoading(true);
+    setError(null);
+    const createToast = toast.loading("Creating preorder product...");
+
     try {
-      // Create preorder product
-      const response = await fetch("/api/admin/inventory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...productData,
-          price: parseFloat(productData.price),
-          product_type: "preorder",
-          is_preorder_available: true,
-          is_onhand_available: false,
-          stock: 0,
-          preorder_stock: productData.preorderAvailableStock,
-          order_date: productData.orderDate ? new Date(productData.orderDate).toISOString() : undefined,
-          order_deadline: productData.orderDeadline ? new Date(productData.orderDeadline).toISOString() : undefined,
-          release_date: productData.releaseDate ? new Date(productData.releaseDate).toISOString() : undefined,
-          deposit_percentage: productData.depositPercentage,
-          preorder_available_stock: productData.preorderAvailableStock,
-          shipping_time_days: productData.shippingTimeDays,
-          source_url: scrapedData?.sourceUrl,
-        }),
-      });
+      // Prepare payload (no API call - using mock data)
+      const payload = {
+        name: productData.name.trim(),
+        description: productData.description.trim() || undefined,
+        price: parseFloat(productData.price),
+        currency: productData.currency as "KRW" | "PHP",
+        images: productData.images,
+        category: productData.category || undefined,
+        brand: productData.brand.trim() || undefined,
+        product_type: "preorder" as const,
+        stock: 0,
+        status: "active" as const,
+        order_date: productData.orderDate ? new Date(productData.orderDate).toISOString() : undefined,
+        order_deadline: productData.orderDeadline ? new Date(productData.orderDeadline).toISOString() : undefined,
+        release_date: productData.releaseDate ? new Date(productData.releaseDate).toISOString() : undefined,
+        deposit_percentage: productData.depositPercentage,
+        preorder_available_stock: productData.preorderAvailableStock,
+        shipping_time_days: productData.shippingTimeDays,
+      };
 
-      if (!response.ok) {
-        throw new Error("Failed to create preorder product");
-      }
+      // Use mock data storage instead of API call
+      // Generate a new product ID
+      const newProductId = `preorder-${Date.now()}`;
+      const createdProduct = {
+        id: newProductId,
+        ...payload,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      alert("Preorder product created successfully!");
+      // Store in localStorage or mock data store (for demo purposes)
+      console.log("Mock product created:", createdProduct);
+      
+      // In a real implementation, you would add this to mockPreorderProducts array
+      // For now, we'll just log it and show success
+      
+      toast.dismiss(createToast);
+      toast.success("Preorder product created successfully! (Mock - stored in console)");
       
       // Reset form
       setUrl("");
@@ -138,7 +217,13 @@ export default function PreorderImportPage() {
         shippingTimeDays: 14,
       });
     } catch (err: any) {
-      setError(err.message || "Failed to create product");
+      console.error("Error creating product:", err);
+      const errorMsg = err.message || "Failed to create product. Please try again.";
+      setError(errorMsg);
+      toast.dismiss(createToast);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 

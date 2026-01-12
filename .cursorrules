@@ -46,6 +46,45 @@
 - Use meaningful variable names
 - Add minimal logging (console.log for debugging only)
 - **ALWAYS use `undefined` instead of `null` for optional fields** - This prevents TypeScript build errors. Use `undefined` for all optional properties, even if the type allows `null`.
+- **ALWAYS re-export types from mock data files** - When importing types in mock data files (e.g., `src/lib/mockBoxesData.ts`), re-export them using `export type { TypeName }` so they can be imported from the mock file. This prevents TypeScript build errors like "Module declares 'TypeName' locally, but it is not exported."
+
+## Build Error Prevention Patterns
+When solving issues or making changes, ALWAYS follow these patterns to prevent build failures:
+
+### Type Exports Pattern
+- **Problem**: "Module declares 'TypeName' locally, but it is not exported"
+- **Solution**: When importing types in a file that will be imported elsewhere, ALWAYS re-export them:
+  ```typescript
+  import type { TypeName } from "@/services/someService";
+  export type { TypeName }; // Re-export for external use
+  ```
+
+### Mock Data Files Pattern
+- **Problem**: Types imported in mock files cannot be used by consumers
+- **Solution**: In mock data files (e.g., `src/lib/mockBoxesData.ts`, `src/lib/mockUtilityData.ts`), ALWAYS re-export imported types:
+  ```typescript
+  import type { BoxType, Courier } from "@/services/utilityService";
+  export type { BoxType, Courier }; // Re-export for consumers
+  ```
+
+### Service Replacement Pattern
+- **Problem**: Using real services instead of mock services causes build/runtime errors
+- **Solution**: When replacing API calls with mock data:
+  1. Replace `import { service } from "@/services/service"` with `import { mockService } from "@/lib/mockServiceData"`
+  2. Replace ALL instances of `service.method()` with `mockService.method()` in the file
+  3. Use `grep` to find all occurrences: `grep -r "service\." path/to/file`
+
+### Type Import Pattern
+- **Problem**: Importing types from wrong location causes "not exported" errors
+- **Solution**: 
+  - If type is used in multiple places, import from the service file: `import type { Type } from "@/services/service"`
+  - If type is only in mock data, ensure it's re-exported from mock file
+  - Use `export type { TypeName }` syntax for type-only re-exports
+
+### Verification Pattern
+- **ALWAYS run build after making changes**: `pnpm run build` or `npm run build`
+- **Check for TypeScript errors**: Look for "Type error" or "Module declares" errors
+- **Fix all occurrences**: When fixing a pattern, search for ALL similar patterns in the codebase
 
 ## File Structure
 - Services: src/services/

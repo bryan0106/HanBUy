@@ -8,7 +8,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { QRPayment } from "@/components/payment/QRPayment";
 import { Button } from "@/components/ui/button";
 import { utilityService, type BankType, type Courier } from "@/services/utilityService";
-import { orderService } from "@/services/orderService";
+import { mockOrderService } from "@/lib/mockOrdersData";
 
 interface OrderSummary {
   subtotal: number;
@@ -91,7 +91,8 @@ function PaymentPageContent() {
           } else if (orderId && (paymentTypeParam === "balance" || paymentTypeParam === "shipping" || paymentTypeParam === "item_only" || paymentTypeParam === "local_shipping" || paymentTypeParam === "full_payment")) {
         // Fetch existing order for balance/shipping/item/local_shipping payment
         try {
-          const fetchedOrder = await orderService.getOrderById(orderId);
+          // Use mock data - no API call
+          const fetchedOrder = await mockOrderService.getOrderById(orderId);
           setExistingOrder(fetchedOrder);
           orderData = fetchedOrder;
           

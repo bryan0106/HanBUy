@@ -2,16 +2,15 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { productService, type Product } from "@/services/productService";
-import { cartService } from "@/services/cartService";
-import { orderService } from "@/services/orderService";
-import { currencyService } from "@/services/currencyService";
 import { formatCurrency } from "@/lib/currency";
 import type { Product as ProductFromTypes, ProductVariation, ProductReview } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
-import { getProductReviews, getAverageRating } from "@/lib/mockData";
+import { getProductReviews, getAverageRating, mockProducts } from "@/lib/mockData";
+import { mockPreorderProducts } from "@/lib/mockPreorderData";
+import { mockCartService, mockOrderService } from "@/lib/mockOrdersData";
+import type { Product } from "@/services/productService";
 import { PriceComparison } from "@/components/store/PriceComparison";
 import { PriceComparisonInline } from "@/components/store/PriceComparisonInline";
 import { ProductImageSkeleton, ProductInfoSkeleton, ReviewSkeleton } from "@/components/ui/skeleton";
@@ -91,7 +90,8 @@ export default function ProductDetailPage() {
   const loadCurrencyRate = async () => {
     setCurrencyLoading(true);
     try {
-      const rate = await currencyService.getKRWtoPHPRate();
+      // Use mock currency rate - no API call
+      const rate = 0.042; // Mock KRW to PHP rate
       setCurrencyRate(rate);
     } catch (error) {
       console.warn("Failed to load currency rate, using default");
@@ -117,8 +117,33 @@ export default function ProductDetailPage() {
       setError(null);
     }
     try {
-      const data = await productService.getProductById(productId);
-      setProduct(data as any);
+      // Use mock data - check both onhand and preorder products using direct .find()
+      let data = mockProducts.find(p => p.id === productId);
+      if (!data) {
+        data = mockPreorderProducts.find(p => p.id === productId) as any;
+      }
+      
+      if (!data) {
+        throw new Error("Product not found");
+      }
+      
+      // Convert to Product format expected by component
+      const productData: any = {
+        ...data,
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: data.price,
+        currency: data.currency,
+        images: data.images || [],
+        category: data.category,
+        brand: data.brand,
+        stock: data.stock || 0,
+        weight: data.weight,
+        dimensions: data.dimensions,
+      };
+      
+      setProduct(productData);
       
       // Load reviews for this product
       if (data) {
@@ -126,8 +151,7 @@ export default function ProductDetailPage() {
         setReviews(productReviews);
         
         // Load related products - mix of same category and popular products
-        const response = await productService.getProducts();
-        const allProducts = response.data;
+        const allProducts = [...mockProducts];
         
         // Get products from same category
         const sameCategoryProducts = allProducts
@@ -145,7 +169,7 @@ export default function ProductDetailPage() {
           .sort(() => Math.random() - 0.5) // Shuffle
           .slice(0, 8); // Get 8 products
         
-        setRelatedProducts(mixed);
+        setRelatedProducts(mixed as any);
       }
       setRetryCount(0);
     } catch (error: any) {
@@ -176,30 +200,23 @@ export default function ProductDetailPage() {
 
     setCheckingPurchase(true);
     try {
-      // Get user's orders (only paid or partially paid orders)
-      const ordersResponse = await orderService.getOrders({
+      // Use mock orders data - no API call
+      const ordersResponse = await mockOrderService.getOrders({
         user_id: user.id,
         payment_status: 'paid'
       });
-      const orders = ordersResponse?.data || [];
+      const orders = ordersResponse.data || [];
       
-      // Also check partial payments
-      let partialOrders: any[] = [];
-      try {
-        const partialOrdersResponse = await orderService.getOrders({
-          user_id: user.id,
-          payment_status: 'partial'
-        });
-        partialOrders = partialOrdersResponse?.data || [];
-      } catch (partialError) {
-        // Silently handle partial orders error - not critical
-        console.warn("Could not fetch partial orders:", partialError);
-      }
+      const partialOrdersResponse = await mockOrderService.getOrders({
+        user_id: user.id,
+        payment_status: 'partial'
+      });
+      const partialOrders = partialOrdersResponse.data || [];
       
-      const allOrders = [...orders, ...partialOrders];
+      const mockOrders = [...orders, ...partialOrders];
       
       // Check if user has purchased this product
-      const hasPurchasedProduct = allOrders.some(order => {
+      const hasPurchasedProduct = mockOrders.some(order => {
         // Check if any order item matches this product
         return order.order_items?.some((item: any) => item.product_id === product.id);
       });
@@ -349,8 +366,8 @@ export default function ProductDetailPage() {
     setCartSuccess(false);
 
     try {
-      // Add to cart - box selection will be done on request shipping page
-      await cartService.addToCart({
+      // Add to cart using mock service - no API call
+      await mockCartService.addToCart({
         user_id: user.id,
         product_id: product.id,
         quantity: qty,

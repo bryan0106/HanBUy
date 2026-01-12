@@ -4,8 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
-import { productService, type Product } from "@/services/productService";
-import { likedService, type LikedItem } from "@/services/likedService";
+import { mockProducts } from "@/lib/mockData";
+import { mockPreorderProducts } from "@/lib/mockPreorderData";
+import { mockLikedService, initializeMockLiked } from "@/lib/mockLikedData";
+import type { Product } from "@/services/productService";
+import type { LikedItem } from "@/services/likedService";
 import { LikeButton } from "@/components/store/LikeButton";
 
 export default function LikedItemsPage() {
@@ -25,47 +28,40 @@ export default function LikedItemsPage() {
   const loadLikedItems = async () => {
     setLoading(true);
     try {
-      // Get liked items from API (only called on this page, not on every product card)
-      const response = await likedService.getLikedItems();
-      setLikedItems(response.data);
+      // Use mock data directly - no API calls
+      if (user?.id) {
+        initializeMockLiked(user.id);
+        const response = await mockLikedService.getLikedItems();
+        setLikedItems(response.data);
 
-      // Sync API data to localStorage for LikeButton components to use
-      if (user?.id && typeof window !== "undefined") {
-        const localStorageData = response.data.map((item) => ({
-          productId: item.product_id,
-          likedAt: item.created_at,
-        }));
-        localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(localStorageData));
-      }
+        // Sync mock data to localStorage for LikeButton components to use
+        if (typeof window !== "undefined") {
+          const localStorageData = response.data.map((item) => ({
+            productId: item.product_id,
+            likedAt: item.created_at,
+          }));
+          localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(localStorageData));
+        }
 
-      // Fetch product details for liked items
-      if (response.data.length > 0) {
-        const productPromises = response.data.map((item) =>
-          productService.getProductById(item.product_id).catch(() => null)
-        );
-        const productResults = await Promise.all(productPromises);
-        const validProducts = productResults.filter((p): p is Product => p !== null);
-        setProducts(validProducts);
+        // Map liked items to products using direct .find() on mock data
+        const allProducts = [...mockProducts, ...mockPreorderProducts];
+        const likedProducts = response.data
+          .map((item) => {
+            // Find product in mock data using direct .find()
+            const product = allProducts.find((p) => p.id === item.product_id);
+            return product || null;
+          })
+          .filter((p): p is Product => p !== null);
+        
+        setProducts(likedProducts);
       } else {
+        setLikedItems([]);
         setProducts([]);
       }
     } catch (error) {
       console.error("Error loading liked items:", error);
-      // Fallback to localStorage on error
-      try {
-        const stored = localStorage.getItem(`hanbuy_liked_${user?.id || "guest"}`);
-        const liked: Array<{ productId: string; likedAt: string }> = stored ? JSON.parse(stored) : [];
-        if (liked.length > 0) {
-          const productPromises = liked.map((item) =>
-            productService.getProductById(item.productId).catch(() => null)
-          );
-          const productResults = await Promise.all(productPromises);
-          const validProducts = productResults.filter((p): p is Product => p !== null);
-          setProducts(validProducts);
-        }
-      } catch (fallbackError) {
-        console.error("Error loading from localStorage fallback:", fallbackError);
-      }
+      setLikedItems([]);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -73,10 +69,12 @@ export default function LikedItemsPage() {
 
   const handleRemoveLiked = async (productId: string) => {
     try {
-      // Remove from API
-      await likedService.removeFromLiked(productId);
+      // Remove from mock data - no API call
+      if (user?.id) {
+        await mockLikedService.removeFromLiked(productId, user.id);
+      }
       
-      // Update local state
+      // Update local state using direct .filter()
       setLikedItems(prev => prev.filter((item) => item.product_id !== productId));
       setProducts(prev => prev.filter((p) => p.id !== productId));
       

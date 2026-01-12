@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { orderService } from "@/services/orderService";
+import { mockOrderService } from "@/lib/mockOrdersData";
 import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import type { Order } from "@/services/orderService";
@@ -32,7 +32,8 @@ export default function CODPage() {
     setLoading(true);
     try {
       // Fetch orders with COD pending status
-      const orders = await orderService.getOrders({ 
+      // Use mock data - no API call
+      const orders = await mockOrderService.getOrders({ 
         user_id: user.id,
         payment_status: "paid",
       });

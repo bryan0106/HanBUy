@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { orderService } from "@/services/orderService";
-import { boxService, type AvailableSharedBox } from "@/services/boxService";
-import { utilityService, type BoxType, type Courier } from "@/services/utilityService";
+import { mockOrderService } from "@/lib/mockOrdersData";
+import { mockBoxService, type AvailableSharedBox } from "@/lib/mockBoxesData";
+import { mockUtilityService, type BoxType, type Courier } from "@/lib/mockUtilityData";
 import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import type { Order } from "@/services/orderService";
@@ -59,10 +59,11 @@ export default function RequestShippingPage() {
 
     setLoading(true);
     try {
+      // Use mock data directly - no API calls
       const [orderData, boxTypesData, couriersData] = await Promise.all([
-        orderService.getOrderById(orderId).catch(() => getMockOrder(orderId)),
-        utilityService.getBoxTypes().catch(() => []),
-        utilityService.getCouriers().catch(() => []),
+        mockOrderService.getOrderById(orderId).catch(() => getMockOrder(orderId)),
+        mockUtilityService.getBoxTypes(),
+        mockUtilityService.getCouriers(),
       ]);
 
       setOrder(orderData);
@@ -234,10 +235,10 @@ export default function RequestShippingPage() {
 
   const loadAvailableSharedBoxes = async () => {
     try {
-      const boxes = await boxService.getAvailableSharedBoxes();
+      const boxes = await mockBoxService.getAvailableSharedBoxes();
       if (boxes.length === 0) {
         try {
-          const defaultBox = await boxService.createDefaultSharedBox();
+          const defaultBox = await mockBoxService.createDefaultSharedBox();
           setAvailableSharedBoxes([defaultBox as AvailableSharedBox]);
           setSelectedSharedBoxId(defaultBox.id);
         } catch (error) {
@@ -321,7 +322,7 @@ export default function RequestShippingPage() {
     }
 
     try {
-      const boxes = await boxService.getAvailableSoloBoxes(user.id);
+      const boxes = await mockBoxService.getAvailableSoloBoxes(user.id);
       if (boxes.length === 0) {
         setShowBoxSizeSelection(true);
       } else {

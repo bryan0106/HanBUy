@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { productService } from "@/services/productService";
 import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
-import { categories } from "@/lib/mockData";
+import { categories, mockProducts } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";
 import { PasabuyModal, type PasabuyRequest } from "@/components/store/PasabuyModal";
@@ -29,42 +28,23 @@ export default function OnhandProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const params: any = {
-        page: 1,
-        limit: 50,
-      };
+      // Use mock data directly - no API calls
+      let filtered = [...mockProducts];
+      
       if (selectedCategory !== 'all') {
-        params.category = selectedCategory;
+        filtered = filtered.filter(p => p.category === selectedCategory);
       }
       if (selectedBrand !== 'all') {
-        params.brand = selectedBrand;
+        filtered = filtered.filter(p => p.brand === selectedBrand);
       }
-      if (priceRange[0] > 0 || priceRange[1] < 100000) {
-        params.min_price = priceRange[0];
-        params.max_price = priceRange[1];
-      }
-      const response = await productService.getOnhandProducts(params);
-      // Map API response to match Product type from @/types
-      const mappedProducts: Product[] = response.data.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description || '',
-        price: p.price,
-        currency: p.currency as 'KRW',
-        images: p.images || [],
-        category: p.category || '',
-        brand: p.brand,
-        sku: p.sku || '',
-        stock: p.stock,
-        weight: p.weight || 0,
-        dimensions: p.dimensions,
-        seoTitle: undefined,
-        seoDescription: undefined,
-        variations: undefined,
-        createdAt: p.created_at ? new Date(p.created_at) : new Date(),
-        updatedAt: p.updated_at ? new Date(p.updated_at) : new Date(),
-      }));
-      setProducts(mappedProducts);
+      
+      // Filter by price range (convert KRW to PHP for comparison)
+      filtered = filtered.filter(p => {
+        const priceInPHP = p.price * 0.042;
+        return priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
+      });
+      
+      setProducts(filtered);
     } catch (error) {
       console.error("Error loading onhand products:", error);
       setProducts([]);
@@ -77,7 +57,8 @@ export default function OnhandProductsPage() {
 
   const handleSubmitPasabuy = async (request: PasabuyRequest) => {
     try {
-      await productService.submitPasabuyRequest(request);
+      // Mock pasabuy request - no API call
+      console.log("Pasabuy request (mock):", request);
       alert("Pasabuy request submitted successfully! We'll contact you once we find the product.");
     } catch (error: any) {
       throw new Error(error.message || "Failed to submit pasabuy request");

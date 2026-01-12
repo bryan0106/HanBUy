@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { orderService } from "@/services/orderService";
 import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import type { Order } from "@/services/orderService";
@@ -33,17 +32,12 @@ export default function StoragePage() {
 
     setLoading(true);
     try {
-      const orders = await orderService.getStoredItems(user.id);
-      // If API returns empty, use mock data for testing
-      if (orders.length === 0) {
-        setStoredOrders(getMockStoredOrders());
-      } else {
-        setStoredOrders(orders);
-      }
+      // Use mock data directly - no API call
+      const mockOrders = getMockStoredOrders();
+      setStoredOrders(mockOrders);
     } catch (error) {
       console.error("Error loading stored items:", error);
-      // Use mock data for testing when API fails
-      setStoredOrders(getMockStoredOrders());
+      setStoredOrders([]);
     } finally {
       setLoading(false);
       setRefreshing(false);

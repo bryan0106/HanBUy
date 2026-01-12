@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { orderService } from "@/services/orderService";
-import { utilityService, type Courier } from "@/services/utilityService";
+import { mockOrderService } from "@/lib/mockOrdersData";
+import { mockUtilityService, type Courier } from "@/lib/mockUtilityData";
 import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import type { Order } from "@/services/orderService";
@@ -38,9 +38,10 @@ export default function SelectCourierPage() {
 
     setLoading(true);
     try {
+      // Use mock data directly - no API calls
       const [orderData, couriersData] = await Promise.all([
-        orderService.getOrderById(orderId).catch(() => null),
-        utilityService.getCouriers().catch(() => []),
+        mockOrderService.getOrderById(orderId).catch(() => null),
+        mockUtilityService.getCouriers(),
       ]);
 
       setOrder(orderData);
@@ -69,11 +70,9 @@ export default function SelectCourierPage() {
 
     setProcessing(true);
     try {
-      await orderService.selectCourierForSharedBox(order.id, {
-        courier_id: selectedCourier,
-        use_cod: useCOD,
-        cod_amount: useCOD ? codAmount : undefined,
-      });
+      // Mock courier selection - no API call
+      console.log("Mock courier selection:", { orderId: order.id, courierId: selectedCourier, useCOD });
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
 
       if (useCOD) {
         // COD selected - redirect to orders page

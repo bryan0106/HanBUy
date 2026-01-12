@@ -3,9 +3,9 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { productService, type Product } from "@/services/productService";
 import { formatCurrency } from "@/lib/currency";
-import { categories } from "@/lib/mockData";
+import { categories, mockProducts } from "@/lib/mockData";
+import type { Product } from "@/types";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";
 
@@ -31,9 +31,14 @@ function ProductsContent() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const category = selectedCategory === "all" ? undefined : selectedCategory;
-      const response = await productService.getProducts({ category });
-      setProducts(response.data);
+      // Use mock data directly - no API calls
+      let filtered = [...mockProducts];
+      
+      if (selectedCategory !== "all") {
+        filtered = filtered.filter(p => p.category === selectedCategory);
+      }
+      
+      setProducts(filtered);
     } catch (error) {
       console.error("Error loading products:", error);
       setProducts([]);

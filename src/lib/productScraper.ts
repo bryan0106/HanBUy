@@ -17,6 +17,11 @@ export interface ScrapedProduct {
     width?: number;
     height?: number;
   };
+  // Preorder-specific fields (optional)
+  releaseDate?: string;
+  preorderDeadline?: string;
+  preorderStartDate?: string;
+  sourceUrl?: string;
 }
 
 // Detect website type from URL
@@ -33,6 +38,116 @@ export function detectWebsite(url: string): string {
   if (hostname.includes("lazada")) return "lazada";
   
   return "generic";
+}
+
+// Ktown4u specific scraper (for preorder events)
+async function scrapeKtown4u(url: string): Promise<ScrapedProduct> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    },
+  });
+  
+  const html = await response.text();
+  const $ = load(html);
+  
+  // Extract product/event name
+  const name = $(".event-title, h1.event-title, .event-name, h1").first().text().trim() ||
+               $('meta[property="og:title"]').attr("content") || "";
+  
+  // Extract price - Ktown4u event pages
+  let price = 0;
+  const priceSelectors = [
+    ".event-price",
+    ".price-event",
+    ".event-info .price",
+    '[class*="price"]',
+    '[data-price]',
+  ];
+  
+  for (const selector of priceSelectors) {
+    const priceText = $(selector).first().text();
+    if (priceText) {
+      price = extractPrice(priceText);
+      if (price > 0) break;
+    }
+  }
+  
+  // Extract images
+  const images: string[] = [];
+  const imageSelectors = [
+    ".event-banner img",
+    ".event-image img",
+    ".event-images img",
+    '[class*="event-banner"] img',
+    '[class*="event-image"] img',
+    '.product-images img',
+  ];
+  
+  for (const selector of imageSelectors) {
+    $(selector).each((_, el) => {
+      const src = $(el).attr("src") || 
+                  $(el).attr("data-src") ||
+                  $(el).attr("data-original");
+      if (src) {
+        const normalizedUrl = normalizeImageUrl(src, url);
+        if (normalizedUrl && !images.includes(normalizedUrl)) {
+          images.push(normalizedUrl);
+        }
+      }
+    });
+  }
+  
+  // Also try Open Graph image
+  const ogImage = $('meta[property="og:image"]').attr("content");
+  if (ogImage && !images.includes(ogImage)) {
+    images.unshift(normalizeImageUrl(ogImage, url));
+  }
+  
+  // Extract description
+  const description = $(".event-description, .event-detail, .event-info").text().trim() ||
+                     $('meta[property="og:description"]').attr("content") ||
+                     $('meta[name="description"]').attr("content") || "";
+  
+  // Extract release date (common format: "2026.01.19" or "2026-01-19")
+  let releaseDate: string | undefined;
+  const releaseDateText = $('[class*="release"], [class*="date"], .event-date').first().text();
+  if (releaseDateText) {
+    const dateMatch = releaseDateText.match(/(\d{4}[.\-]\d{1,2}[.\-]\d{1,2})/);
+    if (dateMatch) {
+      releaseDate = dateMatch[1].replace(/\./g, '-');
+    }
+  }
+  
+  // Extract preorder deadline
+  let preorderDeadline: string | undefined;
+  const deadlineText = $('[class*="deadline"], [class*="preorder"]').first().text();
+  if (deadlineText) {
+    const dateMatch = deadlineText.match(/(\d{4}[.\-]\d{1,2}[.\-]\d{1,2})/);
+    if (dateMatch) {
+      preorderDeadline = dateMatch[1].replace(/\./g, '-');
+    }
+  }
+  
+  // Extract brand/artist (often in the title or event info)
+  const brand = $('.event-artist, .artist-name, [class*="artist"]').first().text().trim() ||
+                $('meta[property="product:brand"]').attr("content") ||
+                undefined;
+  
+  return {
+    name,
+    description,
+    price,
+    currency: "KRW",
+    images: images.slice(0, 10),
+    brand,
+    category: "k-pop",
+    releaseDate,
+    preorderDeadline,
+    sourceUrl: url,
+  };
 }
 
 // Helper function to extract price from text
@@ -437,6 +552,8 @@ export async function scrapeProduct(url: string): Promise<ScrapedProduct> {
     const website = detectWebsite(url);
     
     switch (website) {
+      case "ktown4u":
+        return await scrapeKtown4u(url);
       case "gmarket":
         return await scrapeGmarket(url);
       case "coupang":
