@@ -6,10 +6,8 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { cartService } from "@/services/cartService";
 import { productService } from "@/services/productService";
-import { orderService } from "@/services/orderService";
-import { initializeMockOrders, mockOrderService } from "@/lib/mockOrdersData";
+import { initializeMockOrders, mockOrderService, initializeMockCart, mockCartService } from "@/lib/mockOrdersData";
 import type { CartItem } from "@/services/cartService";
 import type { Order as OrderType } from "@/services/orderService";
 
@@ -50,52 +48,28 @@ export default function StoreOrdersPage() {
   const loadCart = async () => {
     if (user?.id) {
       try {
-        console.log('=== LOADING CART ===');
+        console.log('=== LOADING CART (Using Mock Data) ===');
         console.log('User ID:', user.id);
-        console.log('User object:', user);
         
-        const cartItemsData = await cartService.getCartItems(user.id);
+        // Use mock data directly - no API calls
+        initializeMockCart(user.id);
+        const cartItemsData = await mockCartService.getCartItems(user.id);
         
         console.log('=== CART ITEMS RECEIVED ===');
         console.log('Cart items count:', cartItemsData?.length || 0);
         console.log('Cart items data:', JSON.stringify(cartItemsData, null, 2));
         
-        // Fetch product details for each cart item to get images
-        const cartItemsWithImages = await Promise.all(
-          cartItemsData.map(async (item) => {
-            // If image_url or product.images already exists, use it
-            if (item.image_url || (item.product && item.product.images && item.product.images.length > 0)) {
-              return item;
-            }
-            
-            // Otherwise, fetch product details to get the image
-            try {
-              const product = await productService.getProductById(item.product_id);
-              if (product && product.images && product.images.length > 0) {
-                return {
-                  ...item,
-                  image_url: product.images[0],
-                  product: item.product ? {
-                    ...item.product,
-                    id: item.product.id || product.id,
-                    images: product.images,
-                  } : {
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    currency: product.currency,
-                    images: product.images,
-                    stock: product.stock,
-                  },
-                };
-              }
-            } catch (error) {
-              console.error(`Error fetching product ${item.product_id}:`, error);
-            }
-            
-            return item;
-          })
-        );
+        // Map cart items - images should already be included in mock data
+        const cartItemsWithImages = cartItemsData.map((item) => {
+          // Ensure image_url is set from product if not already present
+          if (!item.image_url && item.product && item.product.images && item.product.images.length > 0) {
+            return {
+              ...item,
+              image_url: item.product.images[0],
+            };
+          }
+          return item;
+        });
         
         setCartItems(cartItemsWithImages);
         // Select all items by default when cart loads

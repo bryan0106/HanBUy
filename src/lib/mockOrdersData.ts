@@ -8,6 +8,24 @@ const mockCartStore: Record<string, CartItem[]> = {};
 // Store orders data in memory (simulating database)
 const mockOrdersStore: Record<string, Order[]> = {};
 
+// Export function to get all orders from all users (for admin view)
+export const getAllMockOrders = (): Order[] => {
+  // Initialize orders for all known test users
+  const testUserIds = ["user-test-customer-1", "user-test-customer-2", "user-test-customer-3"];
+  testUserIds.forEach(userId => {
+    initializeMockOrders(userId);
+  });
+  
+  // Flatten all orders from all users using .map
+  const allOrders: Order[] = [];
+  Object.keys(mockOrdersStore).forEach(userId => {
+    const userOrders = mockOrdersStore[userId] || [];
+    allOrders.push(...userOrders);
+  });
+  
+  return allOrders;
+};
+
 // Initialize mock cart for test users
 export const initializeMockCart = (userId: string) => {
   if (!mockCartStore[userId]) {

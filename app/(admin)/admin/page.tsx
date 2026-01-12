@@ -184,16 +184,29 @@ function AdminDashboardContent() {
   });
 
   useEffect(() => {
-    // TODO: Fetch real stats from API
-    setStats({
-      totalOrders: 156,
-      pendingOrders: 12,
-      totalInventory: 1245,
-      lowStockItems: 8,
-      pendingInvoices: 23,
-      unpaidInvoices: 15,
-      activeBoxes: 89,
-      pendingApprovals: 5,
+    // Use mock data - calculate stats from mock data
+    console.log('📊 Calculating dashboard stats from mock data');
+    
+    // Import mock data
+    import("@/lib/mockData").then(({ mockProducts }) => {
+      import("@/lib/mockPreorderData").then(({ mockPreorderProducts }) => {
+        // Calculate inventory stats
+        const allProducts = [...mockProducts, ...mockPreorderProducts];
+        const totalInventory = allProducts.length;
+        const lowStockItems = allProducts.filter(p => p.stock < 10 && p.stock > 0).length;
+        
+        // Set stats from mock data
+        setStats({
+          totalOrders: 156, // Mock order count
+          pendingOrders: 12, // Mock pending orders
+          totalInventory,
+          lowStockItems,
+          pendingInvoices: 23, // Mock invoice count
+          unpaidInvoices: 15, // Mock unpaid invoices
+          activeBoxes: 89, // Mock box count
+          pendingApprovals: 5, // Mock approval count
+        });
+      });
     });
   }, []);
 

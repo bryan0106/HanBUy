@@ -12,9 +12,25 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
-const ADMIN_NAV_ITEMS = [
+interface NavItem {
+  label: string;
+  href: string;
+  icon: string;
+  subItems?: Array<{ label: string; href: string; icon: string }>;
+}
+
+const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/admin", icon: "📊" },
-  { label: "Inventory", href: "/admin/inventory", icon: "📦" },
+  { 
+    label: "Inventory", 
+    href: "/admin/inventory", 
+    icon: "📦",
+    subItems: [
+      { label: "Onhand", href: "/admin/inventory/onhand", icon: "✅" },
+      { label: "Preorder", href: "/admin/inventory/preorder", icon: "⏰" },
+      { label: "Pasabuy", href: "/admin/inventory/pasabuy", icon: "🛒" },
+    ]
+  },
   { label: "Orders", href: "/admin/orders", icon: "🛒" },
   { label: "Receiving", href: "/admin/fulfillment/receiving", icon: "📬" },
   { label: "Consolidation", href: "/admin/fulfillment/consolidation", icon: "📦" },
@@ -24,7 +40,7 @@ const ADMIN_NAV_ITEMS = [
   { label: "Clients", href: "/admin/clients", icon: "👥" },
   { label: "Social Media", href: "/admin/social", icon: "📱" },
   { label: "Notifications", href: "/admin/notifications", icon: "🔔" },
-] as const;
+];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
@@ -103,6 +119,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             {ADMIN_NAV_ITEMS.map((item) => {
               const isActive =
                 pathname === item.href || pathname?.startsWith(item.href + "/");
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isInventoryActive = item.href === "/admin/inventory" && 
+                (pathname?.startsWith("/admin/inventory/onhand") || 
+                 pathname?.startsWith("/admin/inventory/preorder") || 
+                 pathname?.startsWith("/admin/inventory/pasabuy"));
+              
               return (
                 <li key={item.href}>
                   <Link
@@ -110,7 +132,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     onClick={handleNavClick}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      isActive
+                      (isActive || isInventoryActive)
                         ? "bg-soft-blue-50 text-soft-blue-700"
                         : "text-grey-700 hover:bg-grey-50 hover:text-grey-900"
                     )}
@@ -118,6 +140,30 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     <span className="text-lg">{item.icon}</span>
                     {item.label}
                   </Link>
+                  {hasSubItems && (isActive || isInventoryActive) && (
+                    <ul className="ml-4 mt-1 space-y-1 border-l-2 border-soft-blue-200 pl-4">
+                      {item.subItems.map((subItem) => {
+                        const isSubActive = pathname === subItem.href || pathname?.startsWith(subItem.href + "/");
+                        return (
+                          <li key={subItem.href}>
+                            <Link
+                              href={subItem.href}
+                              onClick={handleNavClick}
+                              className={cn(
+                                "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+                                isSubActive
+                                  ? "bg-soft-blue-100 text-soft-blue-800 font-semibold"
+                                  : "text-grey-600 hover:bg-grey-50 hover:text-grey-900"
+                              )}
+                            >
+                              <span className="text-sm">{subItem.icon}</span>
+                              {subItem.label}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </li>
               );
             })}

@@ -3,21 +3,17 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
-import { type Product } from "@/services/productService";
+import { productService, type Product } from "@/services/productService";
 import { mockProducts } from "@/lib/mockData";
-import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import toast from "react-hot-toast";
 
 interface InventoryItem extends Product {
-  minStock?: number; // For low stock alerts (can be stored separately or calculated)
+  minStock?: number;
 }
 
-export default function InventoryPage() {
+export default function OnhandInventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [onhandItems, setOnhandItems] = useState<InventoryItem[]>([]);
-  const [preorderItems, setPreorderItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "onhand" | "preorder" | "low_stock" | "out_of_stock">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const loadingRef = useRef(false);
@@ -26,52 +22,27 @@ export default function InventoryPage() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      loadInventory(false); // Don't show toast on initial load
-    }
-  }, []);
-
-  // Refresh when returning from edit/create page
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('refreshed') === 'true') {
-        // Force refresh by resetting refs
-        loadingRef.current = false;
-        hasLoadedRef.current = false;
-        // Force refresh immediately with a small delay to ensure state is reset
-        setTimeout(() => {
-          loadInventory(true, true).then(() => {
-            // Clean up URL after refresh completes
-            window.history.replaceState({}, '', '/admin/inventory');
-          });
-        }, 50);
-      }
+      loadInventory(false);
     }
   }, []);
 
   const loadInventory = async (showToast = true, forceRefresh = false) => {
-    // Prevent duplicate calls unless forced refresh
     if (loadingRef.current && !forceRefresh) {
-      console.log("Inventory load already in progress, skipping duplicate call");
       return;
     }
     
     loadingRef.current = true;
     setLoading(true);
     
-    // Clear existing data on force refresh to show loading state
     if (forceRefresh) {
       setItems([]);
-      setOnhandItems([]);
-      setPreorderItems([]);
     }
     
-    const loadingToast = showToast ? toast.loading("Loading inventory...") : null;
+    const loadingToast = showToast ? toast.loading("Loading onhand inventory...") : null;
     try {
       // Use mock data directly - no API calls
-      console.log('📦 Using mock data for inventory (no API calls)');
+      console.log('📦 Using mock data for onhand inventory');
       
-      // Map onhand products from mock data
       const onhand: InventoryItem[] = mockProducts
         .filter((p: any) => p.product_type === "onhand" || p.product_type === "preorder_and_onhand")
         .map((p: any) => ({
@@ -81,38 +52,19 @@ export default function InventoryPage() {
           minStock: 10,
         }));
 
-      // Map preorder products from mock data
-      const preorder: InventoryItem[] = mockPreorderProducts.map((p) => ({
-        ...p,
-        product_type: "preorder" as const,
-        status: (p.status || (p.stock > 0 ? 'active' : 'out_of_stock')) as 'active' | 'inactive' | 'out_of_stock',
-        minStock: 10,
-      }));
-
-      console.log("Mapped onhand items:", onhand.length);
-      console.log("Mapped preorder items:", preorder.length);
-
-      // Combine both product types
-      const allProducts: InventoryItem[] = [...onhand, ...preorder];
-
-      setOnhandItems(onhand);
-      setPreorderItems(preorder);
-      setItems(allProducts);
+      setItems(onhand);
       
       if (loadingToast) {
         toast.dismiss(loadingToast);
-        toast.success(`Inventory loaded: ${allProducts.length} items`);
+        toast.success(`Onhand inventory loaded: ${onhand.length} items`);
       }
     } catch (error) {
-      console.error("Failed to load inventory:", error);
+      console.error("Failed to load onhand inventory:", error);
       if (loadingToast) {
         toast.dismiss(loadingToast);
         toast.error("Failed to load inventory. Please try again.");
       }
-      // Fallback to empty array on error
       setItems([]);
-      setOnhandItems([]);
-      setPreorderItems([]);
     } finally {
       setLoading(false);
       loadingRef.current = false;
@@ -120,31 +72,10 @@ export default function InventoryPage() {
   };
 
   const filteredItems = items.filter((item) => {
-    const minStock = item.minStock || 10;
-    
-    // First check product type filter (most specific)
-    let matchesFilter = false;
-    const pt = item.product_type;
-    if (filter === "onhand") {
-      // Only show items that are onhand (exclude preorder-only items)
-      matchesFilter = pt === "onhand" || pt === "preorder_and_onhand";
-    } else if (filter === "preorder") {
-      // Only show items that are preorder (exclude onhand-only items)
-      matchesFilter = pt === "preorder" || pt === "preorder_and_onhand";
-    } else if (filter === "low_stock") {
-      matchesFilter = item.stock < minStock && item.stock > 0;
-    } else if (filter === "out_of_stock") {
-      matchesFilter = item.stock === 0;
-    } else {
-      // filter === "all"
-      matchesFilter = true;
-    }
-    
     const matchesSearch =
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    return matchesFilter && matchesSearch;
+    return matchesSearch;
   });
 
   const lowStockCount = items.filter(
@@ -154,25 +85,13 @@ export default function InventoryPage() {
     }
   ).length;
   const outOfStockCount = items.filter((item) => item.stock === 0).length;
-  
-  // Calculate counts from items array to ensure accuracy
-  // Check for exact match or products that include the type
-  const onhandCount = items.filter((item) => {
-    const pt = item.product_type;
-    return pt === "onhand" || pt === "preorder_and_onhand";
-  }).length;
-  const preorderCount = items.filter((item) => {
-    const pt = item.product_type;
-    return pt === "preorder" || pt === "preorder_and_onhand";
-  }).length;
-  const totalCount = items.length;
 
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Inventory Management</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your product inventory and stock levels</p>
+          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Onhand Inventory</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Manage your onhand product inventory and stock levels</p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button
@@ -207,34 +126,11 @@ export default function InventoryPage() {
 
       {/* Stats */}
       <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <button
-          onClick={() => setFilter("all")}
-          className={`rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md ${
-            filter === "all" ? "ring-2 ring-soft-blue-600 ring-offset-2" : ""
-          }`}
-        >
+        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">{totalCount}</p>
-            </div>
-            <div className="rounded-full bg-soft-blue-100 p-3">
-              <svg className="h-6 w-6 text-soft-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-          </div>
-        </button>
-        <button
-          onClick={() => setFilter("onhand")}
-          className={`rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md ${
-            filter === "onhand" ? "ring-2 ring-success ring-offset-2" : ""
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Onhand Items</p>
-              <p className="mt-2 text-3xl font-bold text-success">{onhandCount}</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Onhand Items</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{items.length}</p>
             </div>
             <div className="rounded-full bg-success/10 p-3">
               <svg className="h-6 w-6 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -242,97 +138,37 @@ export default function InventoryPage() {
               </svg>
             </div>
           </div>
-        </button>
-        <button
-          onClick={() => setFilter("preorder")}
-          className={`rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md ${
-            filter === "preorder" ? "ring-2 ring-soft-blue-600 ring-offset-2" : ""
-          }`}
-        >
+        </div>
+        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Preorder Items</p>
-              <p className="mt-2 text-3xl font-bold text-soft-blue-600">{preorderCount}</p>
+              <p className="text-sm font-medium text-muted-foreground">Low Stock</p>
+              <p className="mt-2 text-3xl font-bold text-warning">{lowStockCount}</p>
             </div>
-            <div className="rounded-full bg-soft-blue-100 p-3">
-              <svg className="h-6 w-6 text-soft-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="rounded-full bg-warning/10 p-3">
+              <svg className="h-6 w-6 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
           </div>
-        </button>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Out of Stock</p>
+              <p className="mt-2 text-3xl font-bold text-error">{outOfStockCount}</p>
+            </div>
+            <div className="rounded-full bg-error/10 p-3">
+              <svg className="h-6 w-6 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6 flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => setFilter("all")}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-              filter === "all"
-                ? "bg-soft-blue-600 text-white shadow-md"
-                : "bg-grey-100 text-grey-700 hover:bg-grey-200"
-            }`}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            All ({totalCount})
-          </button>
-          <button
-            onClick={() => setFilter("onhand")}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-              filter === "onhand"
-                ? "bg-success text-white shadow-md"
-                : "bg-grey-100 text-grey-700 hover:bg-grey-200"
-            }`}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Onhand ({onhandCount})
-          </button>
-          <button
-            onClick={() => setFilter("preorder")}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-              filter === "preorder"
-                ? "bg-soft-blue-600 text-white shadow-md"
-                : "bg-grey-100 text-grey-700 hover:bg-grey-200"
-            }`}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Preorder ({preorderCount})
-          </button>
-          <div className="mx-2 h-6 w-px bg-border"></div>
-          <button
-            onClick={() => setFilter("low_stock")}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-              filter === "low_stock"
-                ? "bg-warning text-white shadow-md"
-                : "bg-grey-100 text-grey-700 hover:bg-grey-200"
-            }`}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            Low Stock ({lowStockCount})
-          </button>
-          <button
-            onClick={() => setFilter("out_of_stock")}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-              filter === "out_of_stock"
-                ? "bg-error text-white shadow-md"
-                : "bg-grey-100 text-grey-700 hover:bg-grey-200"
-            }`}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Out of Stock ({outOfStockCount})
-          </button>
-        </div>
+      {/* Search */}
+      <div className="mb-6">
         <div className="relative">
           <input
             type="text"
@@ -368,15 +204,13 @@ export default function InventoryPage() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
           </svg>
-          <h3 className="mt-4 text-lg font-semibold text-foreground">No items found</h3>
+          <h3 className="mt-4 text-lg font-semibold text-foreground">No onhand items found</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {searchTerm
-              ? "Try adjusting your search or filters"
-              : filter !== "all"
-              ? "No items match the selected filter"
-              : "Get started by adding your first product"}
+              ? "Try adjusting your search"
+              : "Get started by adding your first onhand product"}
           </p>
-          {!searchTerm && filter === "all" && (
+          {!searchTerm && (
             <Link
               href="/admin/inventory/new"
               className="mt-6 inline-flex items-center gap-2 rounded-lg bg-soft-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-soft-blue-700"
@@ -409,20 +243,12 @@ export default function InventoryPage() {
                 const isLowStock = item.stock < minStock && item.stock > 0;
                 const isOutOfStock = item.stock === 0;
                 const currency = (item.currency === "KRW" || item.currency === "PHP" ? item.currency : "KRW") as Currency;
-                const isPreorder = item.product_type === "preorder";
-                const isOnhand = item.product_type === "onhand";
                 const productImage = item.images && item.images.length > 0 ? item.images[0] : null;
                 
                 return (
                   <tr 
                     key={item.id} 
-                    className={`transition-colors ${
-                      isPreorder 
-                        ? "bg-soft-blue-50/50 hover:bg-soft-blue-50 border-l-4 border-l-soft-blue-600" 
-                        : isOnhand
-                        ? "hover:bg-grey-50 border-l-4 border-l-success"
-                        : "hover:bg-grey-50"
-                    }`}
+                    className="hover:bg-grey-50 border-l-4 border-l-success transition-colors"
                   >
                     <td className="px-2 py-3 sm:px-4">
                       <div className="relative h-16 w-16 overflow-hidden rounded-lg border border-border bg-grey-100 sm:h-20 sm:w-20">
@@ -452,40 +278,21 @@ export default function InventoryPage() {
                             </svg>
                           </div>
                         )}
-                        {/* Product Type Badge on Image */}
-                        {isPreorder && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-soft-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                            PREORDER
-                          </div>
-                        )}
-                        {isOnhand && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-success px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                            ONHAND
-                          </div>
-                        )}
+                        <div className="absolute bottom-0 left-0 right-0 bg-success px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                          ONHAND
+                        </div>
                       </div>
                     </td>
                     <td className="px-2 py-3 sm:px-4">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium sm:text-base">{item.name}</span>
-                          {/* Product Type Badge */}
-                          {isPreorder && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-soft-blue-100 px-2 py-0.5 text-[10px] font-semibold text-soft-blue-700">
-                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              Preorder
-                            </span>
-                          )}
-                          {isOnhand && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
-                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Onhand
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Onhand
+                          </span>
                         </div>
                         {item.brand && (
                           <div className="text-xs text-muted-foreground sm:text-sm">{item.brand}</div>
@@ -548,16 +355,15 @@ export default function InventoryPage() {
                               try {
                                 // Use mock data - just update local state
                                 console.log('🗑️ Deleting product (mock):', item.id);
-                                // In a real app, this would call the API, but for mock data we just refresh
                                 toast.dismiss(deleteToast);
                                 toast.success(`"${item.name}" has been deleted successfully`);
-                                // Force refresh inventory and update counts (without toast since we already showed success)
                                 loadingRef.current = false;
                                 await loadInventory(false, true);
                               } catch (error: any) {
                                 console.error("Failed to delete product:", error);
                                 toast.dismiss(deleteToast);
-                                toast.error("Failed to delete product");
+                                const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || "Failed to delete product";
+                                toast.error(errorMessage);
                               } finally {
                                 setDeletingId(null);
                               }
@@ -584,4 +390,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
