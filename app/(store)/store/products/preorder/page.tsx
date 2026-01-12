@@ -478,13 +478,28 @@ export default function PreorderProductsPage() {
                               </div>
                             )}
                             
-                            {/* Timeline */}
-                            <div className="mt-2 text-xs text-muted-foreground">
+                            {/* Timeline - Enhanced for New Item Releases */}
+                            <div className="mt-2 space-y-1">
                               {product.is_preorder_available && (
-                                <>Release: {formatDate(product.releaseDate)} → Delivery: {formatDate(expectedDelivery)}</>
+                                <>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">📅 Pre-Order:</span>
+                                    <span>{formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">🎬 Release:</span>
+                                    <span>{formatDate(product.releaseDate)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">🚚 Expected Arrival:</span>
+                                    <span>{formatDate(expectedDelivery)}</span>
+                                  </div>
+                                </>
                               )}
                               {product.is_onhand_available && !product.is_preorder_available && (
-                                <>🚀 Ready to Ship Now</>
+                                <div className="text-xs font-medium text-green-600">
+                                  🚀 Ready to Ship Now
+                                </div>
                               )}
                             </div>
                           </div>
@@ -579,19 +594,34 @@ export default function PreorderProductsPage() {
                           </div>
                         )}
                         
-                        {/* Timeline Info */}
+                        {/* Timeline Info - Enhanced for New Item Releases */}
                         <div className="mb-4 rounded-lg bg-grey-50 p-3 space-y-2">
                           {product.is_preorder_available && (
                             <>
-                              <p className="text-sm font-medium text-foreground">
-                                ⏰ Order Deadline: {formatDate(product.orderDeadline)}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                📅 Release Date: {formatDate(product.releaseDate)}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                🚚 Expected Delivery: {formatDate(expectedDelivery)}
-                              </p>
+                              <div className="border-b border-grey-200 pb-2 mb-2">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Pre-Order Period</p>
+                                <p className="text-sm font-medium text-foreground">
+                                  📅 {formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}
+                                </p>
+                              </div>
+                              <div className="border-b border-grey-200 pb-2 mb-2">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Release Date</p>
+                                <p className="text-sm font-medium text-foreground">
+                                  🎬 {formatDate(product.releaseDate)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Shipments will begin sequentially from the release date
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Expected Arrival</p>
+                                <p className="text-sm font-medium text-foreground">
+                                  🚚 {formatDate(expectedDelivery)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Estimated delivery after release (subject to shipping)
+                                </p>
+                              </div>
                             </>
                           )}
                           {product.is_onhand_available && (
@@ -723,16 +753,22 @@ export default function PreorderProductsPage() {
                           </div>
                         )}
                         
-                        {/* Timeline Info */}
+                        {/* Timeline Info - Enhanced for New Item Releases */}
                         <div className="mb-3 space-y-1 rounded-lg bg-grey-50 p-2 text-xs">
                           {product.is_preorder_available && (
                             <>
-                              <p className="text-muted-foreground">
-                                📅 Release: {formatDate(product.releaseDate)}
-                              </p>
-                              <p className="text-muted-foreground">
-                                🚚 Expected: {formatDate(expectedDelivery)}
-                              </p>
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-foreground">📅 Pre-Order:</span>
+                                <span className="text-muted-foreground">{formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-foreground">🎬 Release:</span>
+                                <span className="text-muted-foreground">{formatDate(product.releaseDate)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-foreground">🚚 Arrival:</span>
+                                <span className="text-muted-foreground">{formatDate(expectedDelivery)}</span>
+                              </div>
                             </>
                           )}
                           {product.is_onhand_available && (

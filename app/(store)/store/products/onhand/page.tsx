@@ -8,6 +8,7 @@ import type { Product } from "@/types";
 import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";
+import { PasabuyModal, type PasabuyRequest } from "@/components/store/PasabuyModal";
 
 type ViewType = "list" | "single" | "grid";
 
@@ -19,6 +20,7 @@ export default function OnhandProductsPage() {
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [viewType, setViewType] = useState<ViewType>("grid");
   const [showFilters, setShowFilters] = useState(false);
+  const [showPasabuyModal, setShowPasabuyModal] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -72,6 +74,15 @@ export default function OnhandProductsPage() {
   };
 
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
+
+  const handleSubmitPasabuy = async (request: PasabuyRequest) => {
+    try {
+      await productService.submitPasabuyRequest(request);
+      alert("Pasabuy request submitted successfully! We'll contact you once we find the product.");
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to submit pasabuy request");
+    }
+  };
 
   const filteredProducts = products.filter((product) => {
     const priceInPHP = product.price * 0.042; // Mock conversion
@@ -518,10 +529,56 @@ export default function OnhandProductsPage() {
                   })}
                 </div>
               )}
+
+              {/* Pasabuy Card - Last Item */}
+              <div
+                className={cn(
+                  "group relative rounded-lg border-2 border-dashed border-pink-300 bg-pink-50/50 p-4 transition-all hover:border-pink-400 hover:bg-pink-50 hover:shadow-md",
+                  viewType === "list" ? "col-span-1" : viewType === "single" ? "w-full" : "col-span-2"
+                )}
+                onClick={() => setShowPasabuyModal(true)}
+              >
+                <div className="flex flex-col items-center justify-center text-center py-4 sm:py-6">
+                  <div className="mb-3 rounded-full bg-pink-100 p-3 sm:mb-4 sm:p-4">
+                    <svg
+                      className="h-6 w-6 text-pink-500 sm:h-8 sm:w-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="mb-2 text-base font-semibold text-foreground sm:text-lg">
+                    Can't find what you're looking for?
+                  </h3>
+                  <p className="mb-3 text-xs text-muted-foreground sm:mb-4 sm:text-sm">
+                    Request a pasabuy! Send us the product URL or description, and we'll find and buy it for you.
+                  </p>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-pink-500 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-pink-600 sm:px-6 sm:py-2.5 sm:text-sm"
+                  >
+                    Request Pasabuy
+                  </button>
+                </div>
+              </div>
             </>
           )}
         </div>
       </div>
+
+      {/* Pasabuy Modal */}
+      <PasabuyModal
+        isOpen={showPasabuyModal}
+        onClose={() => setShowPasabuyModal(false)}
+        onSubmit={handleSubmitPasabuy}
+      />
     </div>
   );
 }

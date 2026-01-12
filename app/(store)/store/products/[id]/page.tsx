@@ -20,6 +20,10 @@ import { StickyCartBar } from "@/components/store/StickyCartBar";
 import { SocialShare } from "@/components/store/SocialShare";
 import { ErrorBoundary } from "@/components/store/ErrorBoundary";
 import { ProductSelectionModal } from "@/components/store/ProductSelectionModal";
+import { PreorderCountdown } from "@/components/store/PreorderCountdown";
+import { PreorderPaymentInfo } from "@/components/store/PreorderPaymentInfo";
+import { PreorderProgress } from "@/components/store/PreorderProgress";
+import { formatDate } from "@/lib/utils";
 
 // Extended Product type that includes variations for this component
 type ProductWithVariations = Product & {
@@ -636,21 +640,96 @@ export default function ProductDetailPage() {
               productImage={product.images?.[0]}
             />
           </div>
-          <div className="mb-6">
-            <div className="mb-2">
-              <p className="text-3xl font-bold text-soft-blue-600">
-                {formatCurrency(priceInPHP, "PHP")}
-              </p>
-            </div>
-            <p className="text-sm font-medium text-grey-600">
-              {formatCurrency(currentPrice, "KRW")}
-              {currentPrice !== product.price && (
-                <span className="ml-2 text-xs line-through text-grey-400">
-                  {formatCurrency(product.price, "KRW")}
-                </span>
-              )}
-            </p>
-          </div>
+          {/* Check if product is preorder */}
+          {(() => {
+            const isPreorder = product.product_type === 'preorder' || product.is_preorder_available;
+            const orderDate = product.order_date ? new Date(product.order_date) : undefined;
+            const orderDeadline = product.order_deadline ? new Date(product.order_deadline) : undefined;
+            const releaseDate = product.release_date ? new Date(product.release_date) : undefined;
+            const depositPercentage = product.deposit_percentage || 50;
+            const preorderAvailableStock = product.preorder_available_stock || product.preorder_stock || 0;
+            const preordersClaimed = product.preorders_claimed || 0;
+            const shippingTimeDays = product.shipping_time_days || 7;
+            const expectedDelivery = releaseDate ? new Date(releaseDate) : undefined;
+            if (expectedDelivery) {
+              expectedDelivery.setDate(expectedDelivery.getDate() + shippingTimeDays);
+            }
+
+            return (
+              <>
+                {/* Price Display */}
+                <div className="mb-6">
+                  {isPreorder ? (
+                    <PreorderPaymentInfo
+                      price={currentPrice}
+                      currency={product.currency as any}
+                      depositPercentage={depositPercentage}
+                    />
+                  ) : (
+                    <>
+                      <div className="mb-2">
+                        <p className="text-3xl font-bold text-soft-blue-600">
+                          {formatCurrency(priceInPHP, "PHP")}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium text-grey-600">
+                        {formatCurrency(currentPrice, "KRW")}
+                        {currentPrice !== product.price && (
+                          <span className="ml-2 text-xs line-through text-grey-400">
+                            {formatCurrency(product.price, "KRW")}
+                          </span>
+                        )}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {/* Preorder Information */}
+                {isPreorder && orderDeadline && (
+                  <div className="mb-6 space-y-4 rounded-lg border-2 border-pink-200 bg-pink-50/30 p-4">
+                    {/* Preorder Countdown */}
+                    {orderDeadline && (
+                      <PreorderCountdown deadline={orderDeadline} />
+                    )}
+
+                    {/* Preorder Progress */}
+                    {preorderAvailableStock > 0 && (
+                      <PreorderProgress
+                        claimed={preordersClaimed}
+                        available={preorderAvailableStock}
+                      />
+                    )}
+
+                    {/* Preorder Timeline */}
+                    {orderDate && releaseDate && expectedDelivery && (
+                      <div className="space-y-2 rounded-lg bg-white p-3 border border-pink-200">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">📅 Pre-Order Period:</span>
+                          <span>{formatDate(orderDate)} - {formatDate(orderDeadline)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">🎬 Release Date:</span>
+                          <span>{formatDate(releaseDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">🚚 Expected Arrival:</span>
+                          <span>{formatDate(expectedDelivery)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Preorder Notice */}
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                      <p className="text-xs font-medium text-blue-800 mb-1">📦 Pre-Order Payment System</p>
+                      <p className="text-xs text-blue-700">
+                        Pay {depositPercentage}% deposit now to secure your pre-order. The remaining balance will be paid when the item arrives at our warehouse.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Product Specifications - Compact Grid Layout */}
           <div className="mb-6 space-y-4">
@@ -992,12 +1071,42 @@ export default function ProductDetailPage() {
                       </div>
                       <span className="font-bold text-grey-900">{formatCurrency(subtotal, "PHP")}</span>
                     </div>
-                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-4">
-                      <p className="text-xs text-blue-800 font-medium mb-1">📦 3-Way Payment System</p>
-                      <p className="text-xs text-blue-700">
-                        Pay for items now. Shipping fee will be paid separately when you request shipping from your storage.
-                      </p>
-                    </div>
+                    {(() => {
+                      const isPreorder = product.product_type === 'preorder' || product.is_preorder_available;
+                      const depositPercentage = product.deposit_percentage || 50;
+                      const depositAmount = (total * depositPercentage) / 100;
+                      const balanceAmount = total - depositAmount;
+
+                      if (isPreorder) {
+                        return (
+                          <div className="rounded-lg bg-pink-50 border border-pink-200 p-3 mt-4">
+                            <p className="text-xs text-pink-800 font-medium mb-2">📦 Pre-Order Payment System</p>
+                            <div className="space-y-1 text-xs text-pink-700">
+                              <div className="flex justify-between">
+                                <span>Deposit ({depositPercentage}%):</span>
+                                <span className="font-semibold">{formatCurrency(depositAmount, "PHP")}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Balance (on release):</span>
+                                <span>{formatCurrency(balanceAmount, "PHP")}</span>
+                              </div>
+                              <p className="mt-2 text-xs text-pink-600">
+                                Pay deposit now to secure your pre-order. Remaining balance will be paid when item arrives.
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-4">
+                          <p className="text-xs text-blue-800 font-medium mb-1">📦 3-Way Payment System</p>
+                          <p className="text-xs text-blue-700">
+                            Pay for items now. Shipping fee will be paid separately when you request shipping from your storage.
+                          </p>
+                        </div>
+                      );
+                    })()}
                     <div className="border-t-2 border-grey-200 pt-3">
                       <div className="flex items-center justify-between">
                         <span className="text-base font-bold text-grey-900">Total to Pay:</span>
@@ -1035,7 +1144,7 @@ export default function ProductDetailPage() {
               className="flex-1"
               size="lg"
             >
-              Buy Now
+              {product.product_type === 'preorder' || product.is_preorder_available ? 'Pre-Order Now' : 'Buy Now'}
             </Button>
           </div>
         </div>

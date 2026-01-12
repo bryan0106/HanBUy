@@ -90,6 +90,24 @@ export default function CheckoutPage() {
     const subtotalKRW = cartItems.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
     const subtotalPHP = subtotalKRW * 0.042; // Convert KRW to PHP
 
+    // Check if order has preorder items
+    const hasPreorder = cartItems.some(item => item.product_type === 'preorder');
+    
+    // Calculate deposit for preorder items (50% default, or from product)
+    let depositAmount = 0;
+    let balanceAmount = 0;
+    if (hasPreorder && paymentOption === "split") {
+      // For preorder with split payment, only charge deposit now
+      const preorderItems = cartItems.filter(item => item.product_type === 'preorder');
+      const preorderTotal = preorderItems.reduce((sum, item) => sum + ((item.price || 0) * item.quantity * 0.042), 0);
+      const onhandItems = cartItems.filter(item => item.product_type !== 'preorder');
+      const onhandTotal = onhandItems.reduce((sum, item) => sum + ((item.price || 0) * item.quantity * 0.042), 0);
+      
+      // Preorder: 50% deposit, onhand: 100% (full payment)
+      depositAmount = (preorderTotal * 0.5) + onhandTotal;
+      balanceAmount = preorderTotal * 0.5;
+    }
+
     // Estimate weight and volume for shipping calculation
     const estimatedWeight = cartItems.reduce((sum, item) => sum + (item.quantity * 0.5), 0); // 0.5kg per item
     const estimatedVolume = cartItems.reduce((sum, item) => sum + (item.quantity * 0.001), 0); // 0.001 CBM per item
@@ -106,9 +124,14 @@ export default function CheckoutPage() {
     // Estimate local shipping (COD) for shared boxes - this is approximate
     const estimatedLocalShipping = boxTypePreference === "shared" ? 150 : 0; // Approximate COD fee
     
-    const total = paymentOption === "full" 
-      ? subtotalPHP + shippingFee + estimatedLocalShipping
-      : subtotalPHP;
+    // For preorder with split payment: Only deposit
+    // For full payment: Everything upfront
+    // For regular items: Full price
+    const total = hasPreorder && paymentOption === "split"
+      ? depositAmount
+      : paymentOption === "full" 
+        ? subtotalPHP + shippingFee + estimatedLocalShipping
+        : subtotalPHP;
 
     return {
       subtotalKRW,
@@ -120,6 +143,9 @@ export default function CheckoutPage() {
       sharedShippingFee: shippingFees.sharedTotal,
       estimatedLocalShipping,
       total,
+      depositAmount,
+      balanceAmount,
+      hasPreorder,
     };
   };
 
@@ -144,7 +170,27 @@ export default function CheckoutPage() {
       const orderNumber = `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
 
       // Prepare order items
-      const orderItems = cartItems.map((item) => ({
+      const orderItems = await Promise.all(
+        cartItems.map(async (item) => {
+          // Get product details to check if it's preorder and get release date
+          let preorderReleaseDate: string | undefined = undefined;
+          let depositPercentage = 50; // Default deposit
+          
+          if (item.product_type === 'preorder') {
+            try {
+              const product = await productService.getProductById(item.product_id);
+              if (product.release_date) {
+                preorderReleaseDate = new Date(product.release_date).toISOString();
+              }
+              if (product.deposit_percentage) {
+                depositPercentage = product.deposit_percentage;
+              }
+            } catch (error) {
+              console.warn('Could not fetch product details for preorder:', error);
+            }
+          }
+
+          return {
         product_id: item.product_id,
         product_name: item.product_name || item.product?.name || "Unknown Product",
         product_type: item.product_type || "onhand",
@@ -152,8 +198,10 @@ export default function CheckoutPage() {
         unit_price: (item.price || 0) * 0.042, // Convert to PHP
         total: ((item.price || 0) * item.quantity) * 0.042, // Convert to PHP
         image_url: item.image_url || item.product?.images?.[0],
-        preorder_release_date: undefined, // TODO: Get from product if preorder
-      }));
+            preorder_release_date: preorderReleaseDate,
+          };
+        })
+      );
 
       // Create order - New Payment Flow
       // Payment 1: Items only (will be stored after payment)
@@ -563,6 +611,38 @@ export default function CheckoutPage() {
                 )}
               </div>
               <div className="mt-4 border-t border-border pt-3">
+                {totals.hasPreorder && paymentOption === "split" ? (
+                  <div className="space-y-2">
+                    <div className="rounded-lg bg-pink-50 border border-pink-200 p-3">
+                      <p className="text-xs font-semibold text-pink-800 mb-2">📦 Pre-Order Payment</p>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-pink-700">Deposit (50%):</span>
+                          <span className="font-semibold text-pink-800">{formatCurrency(totals.depositAmount, "PHP")}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-pink-600">Balance (on release):</span>
+                          <span className="text-pink-600">{formatCurrency(totals.balanceAmount, "PHP")}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">Pay Now (Deposit)</span>
+                      <span className="text-xl font-bold text-pink-600">
+                        {formatCurrency(remainingAmount, "PHP")}
+                      </span>
+                    </div>
+                    {useWalletBalance && actualWalletAmount > 0 && (
+                      <div className="mt-1 text-xs text-green-600">
+                        (Wallet: -{formatCurrency(actualWalletAmount, "PHP")})
+                      </div>
+                    )}
+                    <p className="text-xs text-pink-600 mt-2">
+                      Pay 50% deposit to secure your pre-order. Balance will be paid when item arrives.
+                </p>
+              </div>
+                ) : (
+                  <>
                 <div className="flex justify-between">
                   <span className="font-semibold">Total to Pay</span>
                   <span className="text-xl font-bold text-[#FF85A2]">
@@ -575,10 +655,12 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  {paymentOption === "full" 
-                    ? "Items will be shipped directly to you after payment"
-                    : "Items will be stored after payment"}
+                      {paymentOption === "full" 
+                        ? "Items will be shipped directly to you after payment"
+                        : "Items will be stored after payment"}
                 </p>
+                  </>
+                )}
               </div>
             </div>
 
