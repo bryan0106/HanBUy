@@ -142,7 +142,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   </Link>
                   {hasSubItems && (isActive || isInventoryActive) && (
                     <ul className="ml-4 mt-1 space-y-1 border-l-2 border-soft-blue-200 pl-4">
-                      {item.subItems.map((subItem) => {
+                      {(item.subItems ?? []).map((subItem) => {
                         const isSubActive = pathname === subItem.href || pathname?.startsWith(subItem.href + "/");
                         return (
                           <li key={subItem.href}>
