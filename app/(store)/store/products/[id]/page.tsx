@@ -20,7 +20,6 @@ import { SocialShare } from "@/components/store/SocialShare";
 import { ErrorBoundary } from "@/components/store/ErrorBoundary";
 import { ProductSelectionModal } from "@/components/store/ProductSelectionModal";
 import { PreorderCountdown } from "@/components/store/PreorderCountdown";
-import { PreorderPaymentInfo } from "@/components/store/PreorderPaymentInfo";
 import { PreorderProgress } from "@/components/store/PreorderProgress";
 import { formatDate } from "@/lib/utils";
 
@@ -47,7 +46,6 @@ export default function ProductDetailPage() {
   // Accordion states
   const [productDetailsOpen, setProductDetailsOpen] = useState(false);
   const [priceComparisonOpen, setPriceComparisonOpen] = useState(false);
-  const [priceSummaryOpen, setPriceSummaryOpen] = useState(false);
   // Product selection modal state
   const [showProductModal, setShowProductModal] = useState(false);
   const [modalActionType, setModalActionType] = useState<"addToCart" | "buyNow">("addToCart");
@@ -624,6 +622,15 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
               )}
+              
+              {/* Share Feature - Below Product Image Selector */}
+              <div className="mt-3">
+                <SocialShare
+                  productName={product.name}
+                  productUrl={`/store/products/${product.id}`}
+                  productImage={product.images?.[0]}
+                />
+              </div>
             </div>
           ) : (
             <>
@@ -647,15 +654,10 @@ export default function ProductDetailPage() {
               {product.brand}
             </p>
           )}
-          <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="mb-4">
             <h1 className="text-3xl font-bold text-grey-900 sm:text-4xl">
               {product.name}
             </h1>
-            <SocialShare
-              productName={product.name}
-              productUrl={`/store/products/${product.id}`}
-              productImage={product.images?.[0]}
-            />
           </div>
           {/* Check if product is preorder */}
           {(() => {
@@ -676,29 +678,19 @@ export default function ProductDetailPage() {
               <>
                 {/* Price Display */}
                 <div className="mb-6">
-                  {isPreorder ? (
-                    <PreorderPaymentInfo
-                      price={currentPrice}
-                      currency={product.currency as any}
-                      depositPercentage={depositPercentage}
-                    />
-                  ) : (
-                    <>
-                      <div className="mb-2">
-                        <p className="text-3xl font-bold text-soft-blue-600">
-                          {formatCurrency(priceInPHP, "PHP")}
-                        </p>
-                      </div>
-                      <p className="text-sm font-medium text-grey-600">
-                        {formatCurrency(currentPrice, "KRW")}
-                        {currentPrice !== product.price && (
-                          <span className="ml-2 text-xs line-through text-grey-400">
-                            {formatCurrency(product.price, "KRW")}
-                          </span>
-                        )}
-                      </p>
-                    </>
-                  )}
+                  <div className="mb-2">
+                    <p className="text-3xl font-bold text-soft-blue-600">
+                      {formatCurrency(priceInPHP, "PHP")}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium text-grey-600">
+                    {formatCurrency(currentPrice, "KRW")}
+                    {currentPrice !== product.price && (
+                      <span className="ml-2 text-xs line-through text-grey-400">
+                        {formatCurrency(product.price, "KRW")}
+                      </span>
+                    )}
+                  </p>
                 </div>
 
                 {/* Preorder Information */}
@@ -727,10 +719,6 @@ export default function ProductDetailPage() {
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span className="font-medium text-foreground">🎬 Release Date:</span>
                           <span>{formatDate(releaseDate)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground">🚚 Expected Arrival:</span>
-                          <span>{formatDate(expectedDelivery)}</span>
                         </div>
                       </div>
                     )}
@@ -1049,97 +1037,6 @@ export default function ProductDetailPage() {
               </div>
             </div>
           )}
-
-          {/* Price Summary - Accordion */}
-          <div className="mb-6">
-            <div className="rounded-xl border-2 border-soft-blue-200 bg-white shadow-md">
-              <button
-                onClick={() => setPriceSummaryOpen(!priceSummaryOpen)}
-                className="w-full flex items-center justify-between p-5 transition-all hover:bg-soft-blue-50"
-              >
-                <div className="flex items-center gap-2">
-                  <svg className="h-5 w-5 text-soft-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
-                  </svg>
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-base font-bold text-grey-900">Price Summary</h3>
-                    <span className="text-lg font-bold text-soft-blue-600">
-                      {formatCurrency(total, "PHP")}
-                    </span>
-                  </div>
-                </div>
-                <svg
-                  className={`h-5 w-5 text-grey-600 transition-transform ${priceSummaryOpen ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {priceSummaryOpen && (
-                <div className="px-5 pb-5">
-                  <div className="space-y-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-grey-800 font-medium">
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-                        </svg>
-                        <span>Subtotal ({quantity} item{quantity > 1 ? 's' : ''}):</span>
-                      </div>
-                      <span className="font-bold text-grey-900">{formatCurrency(subtotal, "PHP")}</span>
-                    </div>
-                    {(() => {
-                      const isPreorder = product.product_type === 'preorder' || product.is_preorder_available;
-                      const depositPercentage = product.deposit_percentage || 50;
-                      const depositAmount = (total * depositPercentage) / 100;
-                      const balanceAmount = total - depositAmount;
-
-                      if (isPreorder) {
-                        return (
-                          <div className="rounded-lg bg-pink-50 border border-pink-200 p-3 mt-4">
-                            <p className="text-xs text-pink-800 font-medium mb-2">📦 Pre-Order Payment System</p>
-                            <div className="space-y-1 text-xs text-pink-700">
-                              <div className="flex justify-between">
-                                <span>Deposit ({depositPercentage}%):</span>
-                                <span className="font-semibold">{formatCurrency(depositAmount, "PHP")}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Balance (on release):</span>
-                                <span>{formatCurrency(balanceAmount, "PHP")}</span>
-                              </div>
-                              <p className="mt-2 text-xs text-pink-600">
-                                Pay deposit now to secure your pre-order. Remaining balance will be paid when item arrives.
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-4">
-                          <p className="text-xs text-blue-800 font-medium mb-1">📦 3-Way Payment System</p>
-                          <p className="text-xs text-blue-700">
-                            Pay for items now. Shipping fee will be paid separately when you request shipping from your storage.
-                          </p>
-                        </div>
-                      );
-                    })()}
-                    <div className="border-t-2 border-grey-200 pt-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-base font-bold text-grey-900">Total to Pay:</span>
-                        <span className="text-2xl font-bold text-soft-blue-600">{formatCurrency(total, "PHP")}</span>
-                      </div>
-                      <p className="text-xs text-grey-500 mt-2">
-                        Items will be stored after payment
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Action Buttons */}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">

@@ -13,6 +13,7 @@ import { PreorderProgress } from "@/components/store/PreorderProgress";
 import { PreorderPaymentInfo } from "@/components/store/PreorderPaymentInfo";
 import { ProductSuggestionModal, type ProductSuggestion } from "@/components/store/ProductSuggestionModal";
 import { useAuth } from "@/hooks/useAuth";
+import { FilterSidebar } from "@/components/store/FilterSidebar";
 
 interface PreorderProduct {
   id: string;
@@ -50,9 +51,13 @@ export default function PreorderProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
+  const [selectedArtist, setSelectedArtist] = useState<string>("all");
   const [viewType, setViewType] = useState<ViewType>("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+
+  // Mock artists list - in real app, this would come from product data
+  const artists = ["BTS", "BLACKPINK", "NewJeans", "IVE", "LE SSERAFIM", "aespa", "Stray Kids", "TWICE"];
 
   // Helper function to format date for badge (compact format)
   const formatDateForBadge = (date: Date | string): string => {
@@ -147,7 +152,10 @@ export default function PreorderProductsPage() {
   }));
 
   // Extract brands using .map()
-  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
+  const brands: string[] = Array.from(new Set(products.map((p) => p.brand).filter((b): b is string => Boolean(b))));
+
+  // Calculate max price for slider
+  const maxPrice = Math.max(...products.map(p => p.price * 0.042), 100000);
 
   // Filter products using .filter() and .map() - no API calls
   const filteredProducts = products.filter((product) => {
@@ -158,7 +166,10 @@ export default function PreorderProductsPage() {
       selectedBrand === "all" || product.brand === selectedBrand;
     const matchesCategory =
       selectedCategory === "all" || product.category === selectedCategory;
-    return matchesPrice && matchesBrand && matchesCategory;
+    // Mock artist matching - in real app, this would check product.artist
+    const matchesArtist = selectedArtist === "all" || 
+      product.name.toLowerCase().includes(selectedArtist.toLowerCase());
+    return matchesPrice && matchesBrand && matchesCategory && matchesArtist;
   });
 
   const handleSubmitSuggestion = async (suggestion: ProductSuggestion) => {
@@ -291,144 +302,41 @@ export default function PreorderProductsPage() {
 
       {/* Mobile Filters Dropdown */}
       {showFilters && (
-        <div className="mb-4 rounded-lg border border-border bg-card p-4 lg:hidden">
-          {/* Brand Filter */}
-          {brands.length > 0 && (
-            <div className="mb-4">
-              <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-                Brand
-              </h3>
-              <select
-                value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2"
-              >
-                <option value="all">All Brands</option>
-                {brands.map((brand) => (
-                  <option key={brand} value={brand}>
-                    {brand}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Price Range */}
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-              Price Range (PHP)
-            </h3>
-            <div className="space-y-2">
-              <input
-                type="number"
-                placeholder="Min"
-                value={priceRange[0]}
-                onChange={(e) =>
-                  setPriceRange([Number(e.target.value), priceRange[1]])
-                }
-                className="w-full rounded-lg border border-border bg-background px-3 py-2"
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                value={priceRange[1]}
-                onChange={(e) =>
-                  setPriceRange([priceRange[0], Number(e.target.value)])
-                }
-                className="w-full rounded-lg border border-border bg-background px-3 py-2"
-              />
-            </div>
-          </div>
+        <div className="mb-4 lg:hidden">
+          <FilterSidebar
+            selectedCategory={selectedCategory}
+            selectedBrand={selectedBrand}
+            selectedArtist={selectedArtist}
+            priceRange={priceRange}
+            onCategoryChange={setSelectedCategory}
+            onBrandChange={setSelectedBrand}
+            onArtistChange={setSelectedArtist}
+            onPriceRangeChange={setPriceRange}
+            categories={categories}
+            brands={brands}
+            artists={artists}
+            maxPrice={maxPrice}
+          />
         </div>
       )}
 
       <div className="flex flex-col gap-8 lg:flex-row">
         {/* Desktop Filters Sidebar */}
         <aside className="hidden w-full lg:block lg:w-64">
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-lg font-semibold">Filters</h2>
-
-            {/* Category Filter */}
-            <div className="mb-6">
-              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                Category
-              </h3>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="category"
-                    value="all"
-                    checked={selectedCategory === "all"}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="mr-2"
-                  />
-                  All Products
-                </label>
-                {categories.map((cat) => (
-                  <label key={cat.id} className="flex items-center">
-                    <input
-                      type="radio"
-                      name="category"
-                      value={cat.slug}
-                      checked={selectedCategory === cat.slug}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="mr-2"
-                    />
-                    {cat.name}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Brand Filter */}
-            {brands.length > 0 && (
-              <div className="mb-6">
-                <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                  Brand
-                </h3>
-                <select
-                  value={selectedBrand}
-                  onChange={(e) => setSelectedBrand(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2"
-                >
-                  <option value="all">All Brands</option>
-                  {brands.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Price Range */}
-            <div>
-              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                Price Range (PHP)
-              </h3>
-              <div className="space-y-2">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={priceRange[0]}
-                  onChange={(e) =>
-                    setPriceRange([Number(e.target.value), priceRange[1]])
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2"
-                />
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={priceRange[1]}
-                  onChange={(e) =>
-                    setPriceRange([priceRange[0], Number(e.target.value)])
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2"
-                />
-              </div>
-            </div>
-          </div>
+          <FilterSidebar
+            selectedCategory={selectedCategory}
+            selectedBrand={selectedBrand}
+            selectedArtist={selectedArtist}
+            priceRange={priceRange}
+            onCategoryChange={setSelectedCategory}
+            onBrandChange={setSelectedBrand}
+            onArtistChange={setSelectedArtist}
+            onPriceRangeChange={setPriceRange}
+            categories={categories}
+            brands={brands}
+            artists={artists}
+            maxPrice={maxPrice}
+          />
         </aside>
 
         {/* Products Display */}
