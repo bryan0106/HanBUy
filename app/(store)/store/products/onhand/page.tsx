@@ -8,10 +8,12 @@ import { categories, mockProducts } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";
 import { PasabuyModal, type PasabuyRequest } from "@/components/store/PasabuyModal";
+import { useAuth } from "@/hooks/useAuth";
 
 type ViewType = "list" | "single" | "grid";
 
 export default function OnhandProductsPage() {
+  const { isAuthenticated } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -20,6 +22,9 @@ export default function OnhandProductsPage() {
   const [viewType, setViewType] = useState<ViewType>("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [showPasabuyModal, setShowPasabuyModal] = useState(false);
+  // On mobile, floating button is visible by default (pasabuy section hidden)
+  // When X button is clicked, floating button hides and pasabuy section shows
+  const [isFloatingPasabuyVisible, setIsFloatingPasabuyVisible] = useState(true);
 
   useEffect(() => {
     loadProducts();
@@ -65,6 +70,19 @@ export default function OnhandProductsPage() {
     }
   };
 
+  const handleOpenPasabuyModal = () => {
+    setShowPasabuyModal(true);
+  };
+
+  const handleClosePasabuyModal = () => {
+    setShowPasabuyModal(false);
+  };
+
+  const handleToggleFloatingPasabuy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsFloatingPasabuyVisible(false);
+  };
+
   const filteredProducts = products.filter((product) => {
     const priceInPHP = product.price * 0.042; // Mock conversion
     const matchesPrice =
@@ -73,6 +91,15 @@ export default function OnhandProductsPage() {
       selectedBrand === "all" || product.brand === selectedBrand;
     return matchesPrice && matchesBrand;
   });
+
+  // Helper function to check if product is a new arrival (created within last 14 days)
+  const isNewArrival = (product: Product) => {
+    if (!product.createdAt) return false;
+    const createdAt = new Date(product.createdAt);
+    const now = new Date();
+    const daysDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    return daysDiff <= 14;
+  };
 
   return (
     <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6 md:py-8">
@@ -355,6 +382,7 @@ export default function OnhandProductsPage() {
                 <div className="space-y-3 sm:space-y-4">
                   {filteredProducts.map((product) => {
                     const priceInPHP = product.price * 0.042;
+                    const originalPrice = priceInPHP * 1.3;
                     return (
                       <div
                         key={product.id}
@@ -377,6 +405,12 @@ export default function OnhandProductsPage() {
                             ) : (
                               <div className="h-full w-full rounded-lg bg-grey-200"></div>
                             )}
+                            {/* New Arrival Badge */}
+                            {isNewArrival(product) && (
+                              <div className="absolute top-2 left-2 z-10 rounded px-2 py-1 text-[10px] font-semibold text-white bg-blue-600 sm:text-xs">
+                                New
+                              </div>
+                            )}
                             <LikeButton productId={product.id} size="sm" />
                           </div>
                         <div className="flex-1 min-w-0">
@@ -397,9 +431,12 @@ export default function OnhandProductsPage() {
                                 {formatCurrency(product.price, "KRW")}
                               </p>
                             </div>
-                            <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">
-                              In Stock ({product.stock})
-                            </span>
+                            {/* Only show label for out of stock */}
+                            {product.stock === 0 ? (
+                              <span className="rounded px-2.5 py-1 text-xs font-semibold text-white bg-red-600">
+                                Out of Stock
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                         </Link>
@@ -430,6 +467,12 @@ export default function OnhandProductsPage() {
                             ) : (
                               <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
                             )}
+                            {/* New Arrival Badge */}
+                            {isNewArrival(product) && (
+                              <div className="absolute top-2 left-2 z-10 rounded px-2.5 py-1 text-xs font-semibold text-white bg-blue-600">
+                                New Arrival
+                              </div>
+                            )}
                             <LikeButton productId={product.id} />
                           </div>
                         <h3 className="mb-2 text-lg font-semibold group-hover:text-pink-600 sm:text-xl">
@@ -449,9 +492,12 @@ export default function OnhandProductsPage() {
                               {formatCurrency(product.price, "KRW")}
                             </p>
                           </div>
-                          <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">
-                            In Stock ({product.stock})
-                          </span>
+                          {/* Only show label for out of stock */}
+                          {product.stock === 0 ? (
+                            <span className="rounded px-2.5 py-1 text-xs font-semibold text-white bg-red-600">
+                              Out of Stock
+                            </span>
+                          ) : null}
                         </div>
                         </Link>
                       </div>
@@ -470,10 +516,24 @@ export default function OnhandProductsPage() {
                         key={product.id}
                         className="group relative rounded-lg border border-border bg-card overflow-hidden transition-shadow hover:shadow-md"
                       >
-                        {/* In Stock Badge */}
-                        <div className="absolute top-2 left-2 z-10 rounded-md bg-green-600 px-2 py-1 text-xs font-semibold text-white">
-                          In Stock
-                        </div>
+                        {/* Stock Status Badge - Only show for out of stock */}
+                        {product.stock === 0 ? (
+                          <div className="absolute top-2 left-2 z-10 rounded px-2.5 py-1 text-xs font-semibold text-white bg-red-600">
+                            Out of Stock
+                          </div>
+                        ) : null}
+                        
+                        {/* New Arrival Badge - Position at top-left if no stock badge, otherwise below stock badge */}
+                        {isNewArrival(product) && (
+                          <div className={cn(
+                            "absolute z-10 rounded px-2.5 py-1 text-xs font-semibold text-white bg-blue-600",
+                            product.stock === 0 
+                              ? "top-10 left-2" 
+                              : "top-2 left-2"
+                          )}>
+                            New Arrival
+                          </div>
+                        )}
                         
                         <Link href={`/store/products/${product.id}`}>
                           <div className="relative aspect-square w-full overflow-hidden">
@@ -524,14 +584,19 @@ export default function OnhandProductsPage() {
                 </div>
               )}
 
-              {/* Pasabuy Card - Last Item */}
-              <div
-                className={cn(
-                  "group relative rounded-lg border-2 border-dashed border-pink-300 bg-pink-50/50 p-4 transition-all hover:border-pink-400 hover:bg-pink-50 hover:shadow-md",
-                  viewType === "list" ? "col-span-1" : viewType === "single" ? "w-full" : "col-span-2"
-                )}
-                onClick={() => setShowPasabuyModal(true)}
-              >
+              {/* Pasabuy Card - Last Item (Hidden on mobile when floating button is visible, only show for logged in users) */}
+              {isAuthenticated && (
+                <div
+                  className={cn(
+                    "group relative rounded-lg border-2 border-dashed border-pink-300 bg-pink-50/50 p-4 transition-all hover:border-pink-400 hover:bg-pink-50 hover:shadow-md",
+                    viewType === "list" ? "col-span-1" : viewType === "single" ? "w-full" : "col-span-2",
+                    // Hide on mobile when floating button is visible, always show on desktop
+                    isFloatingPasabuyVisible ? "hidden lg:block" : "block"
+                  )}
+                  onClick={() => {
+                    setShowPasabuyModal(true);
+                  }}
+                >
                 <div className="flex flex-col items-center justify-center text-center py-4 sm:py-6">
                   <div className="mb-3 rounded-full bg-pink-100 p-3 sm:mb-4 sm:p-4">
                     <svg
@@ -562,15 +627,63 @@ export default function OnhandProductsPage() {
                   </button>
                 </div>
               </div>
+              )}
             </>
           )}
         </div>
       </div>
 
+      {/* Floating Pasabuy Button - Mobile Only (Always visible, can be closed with X, only show for logged in users) */}
+      {isAuthenticated && isFloatingPasabuyVisible && (
+        <div className="fixed bottom-20 right-4 z-40 lg:hidden">
+          <div className="relative">
+            <button
+              onClick={handleOpenPasabuyModal}
+              className="flex items-center justify-center rounded-full bg-pink-500 p-4 shadow-lg transition-all hover:bg-pink-600 hover:shadow-xl active:scale-95"
+              aria-label="Request Pasabuy"
+            >
+              <svg
+                className="h-6 w-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </button>
+            {/* X Button to Close */}
+            <button
+              onClick={handleToggleFloatingPasabuy}
+              className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-grey-600 text-white shadow-md transition-all hover:bg-grey-700 active:scale-95"
+              aria-label="Close Pasabuy"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Pasabuy Modal */}
       <PasabuyModal
         isOpen={showPasabuyModal}
-        onClose={() => setShowPasabuyModal(false)}
+        onClose={handleClosePasabuyModal}
         onSubmit={handleSubmitPasabuy}
       />
     </div>

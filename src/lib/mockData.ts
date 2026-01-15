@@ -53,7 +53,7 @@ export const mockProducts: Product[] = [
     category: "skincare",
     brand: "COSRX",
     sku: "COSRX-SNAIL-96",
-    stock: 50,
+    stock: 0, // Out of stock
     weight: 0.1,
     dimensions: { length: 15, width: 5, height: 20 },
     seoTitle: "COSRX Snail Essence - Korean Skincare",
@@ -77,7 +77,7 @@ export const mockProducts: Product[] = [
     category: "skincare",
     brand: "Beauty of Joseon",
     sku: "BOJ-SUN-50",
-    stock: 75,
+    stock: 5, // Low stock
     weight: 0.08,
     dimensions: { length: 12, width: 4, height: 18 },
     createdAt: new Date("2024-01-20"),
@@ -100,7 +100,7 @@ export const mockProducts: Product[] = [
     category: "skincare",
     brand: "Laneige",
     sku: "LAN-WB-HC",
-    stock: 30,
+    stock: 8, // Low stock
     weight: 0.15,
     dimensions: { length: 10, width: 10, height: 5 },
     variations: [
@@ -109,7 +109,7 @@ export const mockProducts: Product[] = [
         name: "Size: 50ml",
         type: "size",
         value: "50ml",
-        stock: 15,
+        stock: 4,
         sku: "LAN-WB-HC-50",
       },
       {
@@ -118,12 +118,13 @@ export const mockProducts: Product[] = [
         type: "size",
         value: "75ml",
         priceModifier: 5000,
-        stock: 15,
+        stock: 4,
         sku: "LAN-WB-HC-75",
       },
     ],
-    createdAt: new Date("2024-01-25"),
-    updatedAt: new Date("2024-01-25"),
+    // New arrival - recent date
+    createdAt: new Date(),
+    updatedAt: new Date(),
   },
   // Food
   {
@@ -141,11 +142,12 @@ export const mockProducts: Product[] = [
     category: "food",
     brand: "Samyang",
     sku: "SAM-BULDAK-5",
-    stock: 100,
+    stock: 3, // Low stock
     weight: 0.5,
     dimensions: { length: 25, width: 20, height: 15 },
-    createdAt: new Date("2024-02-01"),
-    updatedAt: new Date("2024-02-01"),
+    // New arrival - recent date
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440014",
@@ -162,7 +164,7 @@ export const mockProducts: Product[] = [
     category: "food",
     brand: "HBA",
     sku: "HBA-ALMOND-200",
-    stock: 80,
+    stock: 0, // Out of stock
     weight: 0.25,
     dimensions: { length: 18, width: 12, height: 8 },
     createdAt: new Date("2024-02-05"),
@@ -183,11 +185,12 @@ export const mockProducts: Product[] = [
     category: "food",
     brand: "Korean Kitchen",
     sku: "KK-TTEOK-500",
-    stock: 60,
+    stock: 7, // Low stock
     weight: 0.5,
     dimensions: { length: 20, width: 15, height: 10 },
-    createdAt: new Date("2024-02-10"),
-    updatedAt: new Date("2024-02-10"),
+    // New arrival - recent date
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
   },
   // Fashion
   {
@@ -208,7 +211,7 @@ export const mockProducts: Product[] = [
     category: "fashion",
     brand: "Seoul Street",
     sku: "SS-HOODIE-OS",
-    stock: 40,
+    stock: 9, // Low stock
     weight: 0.6,
     dimensions: { length: 35, width: 30, height: 5 },
     variations: [
@@ -217,7 +220,7 @@ export const mockProducts: Product[] = [
         name: "Size: Small",
         type: "size",
         value: "Small",
-        stock: 8,
+        stock: 2,
         sku: "SS-HOODIE-S",
       },
       {
@@ -225,7 +228,7 @@ export const mockProducts: Product[] = [
         name: "Size: Medium",
         type: "size",
         value: "Medium",
-        stock: 12,
+        stock: 3,
         sku: "SS-HOODIE-M",
       },
       {
@@ -233,7 +236,7 @@ export const mockProducts: Product[] = [
         name: "Size: Large",
         type: "size",
         value: "Large",
-        stock: 10,
+        stock: 2,
         sku: "SS-HOODIE-L",
       },
       {
@@ -242,7 +245,7 @@ export const mockProducts: Product[] = [
         type: "size",
         value: "X-Large",
         priceModifier: 3000,
-        stock: 10,
+        stock: 2,
         sku: "SS-HOODIE-XL",
       },
       {
@@ -250,7 +253,7 @@ export const mockProducts: Product[] = [
         name: "Color: Black",
         type: "color",
         value: "Black",
-        stock: 15,
+        stock: 4,
         sku: "SS-HOODIE-BLK",
       },
       {
@@ -258,7 +261,7 @@ export const mockProducts: Product[] = [
         name: "Color: Grey",
         type: "color",
         value: "Grey",
-        stock: 12,
+        stock: 3,
         sku: "SS-HOODIE-GRY",
       },
       {
@@ -266,7 +269,7 @@ export const mockProducts: Product[] = [
         name: "Color: White",
         type: "color",
         value: "White",
-        stock: 13,
+        stock: 2,
         sku: "SS-HOODIE-WHT",
       },
     ],
@@ -289,11 +292,12 @@ export const mockProducts: Product[] = [
     category: "skincare",
     brand: "Mask Republic",
     sku: "MR-MASK-10",
-    stock: 90,
+    stock: 45,
     weight: 0.3,
     dimensions: { length: 20, width: 15, height: 8 },
-    createdAt: new Date("2024-02-20"),
-    updatedAt: new Date("2024-02-20"),
+    // New arrival - recent date
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
+    updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
   },
 ];
 

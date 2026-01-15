@@ -12,6 +12,7 @@ import { PreorderCountdown } from "@/components/store/PreorderCountdown";
 import { PreorderProgress } from "@/components/store/PreorderProgress";
 import { PreorderPaymentInfo } from "@/components/store/PreorderPaymentInfo";
 import { ProductSuggestionModal, type ProductSuggestion } from "@/components/store/ProductSuggestionModal";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PreorderProduct {
   id: string;
@@ -45,12 +46,75 @@ interface PreorderProduct {
 type ViewType = "list" | "single" | "grid";
 
 export default function PreorderProductsPage() {
+  const { isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [viewType, setViewType] = useState<ViewType>("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+
+  // Helper function to format date for badge (compact format)
+  const formatDateForBadge = (date: Date | string): string => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(d);
+  };
+
+  // Helper function to extract item type from product name
+  const getItemType = (productName: string, brand?: string): string => {
+    const name = productName.toLowerCase();
+    
+    // Check for common item types
+    if (name.includes('album') || name.includes('cd') || name.includes('photobook')) {
+      return 'Album';
+    }
+    if (name.includes('ticket') || name.includes('tour') || name.includes('concert') || name.includes('event')) {
+      return 'Ticket';
+    }
+    if (name.includes('bag') || name.includes('tote') || name.includes('backpack')) {
+      return 'Bag';
+    }
+    if (name.includes('accessory') || name.includes('accessories') || name.includes('keychain') || name.includes('pin') || name.includes('badge')) {
+      return 'Accessories';
+    }
+    if (name.includes('poster') || name.includes('postcard')) {
+      return 'Poster';
+    }
+    if (name.includes('clothing') || name.includes('shirt') || name.includes('hoodie') || name.includes('jacket')) {
+      return 'Clothing';
+    }
+    
+    // Default fallback
+    return 'Item';
+  };
+
+  // Helper function to get days until date and status
+  const getDateStatus = (date: Date | string) => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      return { status: "expired", days: Math.abs(diffDays), label: "Expired", showDate: true };
+    } else if (diffDays === 0) {
+      return { status: "today", days: 0, label: "Today", showDate: false };
+    } else if (diffDays === 3) {
+      return { status: "ending_soon", days: 3, label: "3 days", showDate: false };
+    } else if (diffDays === 7) {
+      return { status: "ending_soon", days: 7, label: "Week", showDate: false };
+    } else if (diffDays < 7) {
+      return { status: "ending_soon", days: diffDays, label: `${diffDays} days`, showDate: false };
+    } else {
+      return { status: "upcoming", days: diffDays, label: formatDateForBadge(d), showDate: true };
+    }
+  };
 
   // Convert mock data directly to PreorderProduct format using .map() - no API calls
   const products: PreorderProduct[] = mockPreorderProducts.map((p: any) => ({
@@ -383,6 +447,8 @@ export default function PreorderProductsPage() {
               {viewType === "list" ? (
                 <div className="space-y-3 sm:space-y-4">
                   {filteredProducts.map((product) => {
+                    const priceInPHP = product.price * 0.042; // Mock conversion
+                    const originalPrice = priceInPHP * 1.3;
                     const expectedDelivery = new Date(product.releaseDate);
                     expectedDelivery.setDate(expectedDelivery.getDate() + (product.shippingTimeDays || 7));
                     
@@ -408,66 +474,96 @@ export default function PreorderProductsPage() {
                           <div className="flex-1 min-w-0">
                             <h3 className="mb-1 font-semibold sm:mb-2">{product.name}</h3>
                             {product.brand && (
-                              <p className="mb-2 text-xs text-muted-foreground sm:text-sm">
-                                {product.brand}
-                              </p>
-                            )}
-                            
-                            {/* Payment Info with Deposit */}
-                            <PreorderPaymentInfo
-                              price={product.price}
-                              currency={product.currency}
-                              depositPercentage={product.depositPercentage || 50}
-                              className="mb-2"
-                            />
-                            
-                            {/* Option 2: Available Now Badge (if product has onhand stock) */}
-                            {product.is_onhand_available && product.stock > 0 && (
-                              <div className="mb-2 rounded-lg bg-green-100 p-2 text-xs font-medium text-green-700">
-                                ✅ Available Now: {product.stock} units
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <p className="text-xs text-muted-foreground sm:text-sm">
+                                  {product.brand}
+                                </p>
+                                <span className="rounded px-2 py-0.5 text-[10px] font-semibold text-white bg-grey-600 sm:text-xs">
+                                  {getItemType(product.name, product.brand)}
+                                </span>
                               </div>
                             )}
                             
-                            {/* Countdown & Progress */}
-                            {product.is_preorder_available && (
-                              <div className="flex flex-wrap gap-2 mb-2">
-                                <PreorderCountdown
-                                  deadline={product.orderDeadline}
-                                  className="text-xs"
-                                />
-                                {product.preorderAvailableStock && (
-                                  <PreorderProgress
-                                    claimed={product.preordersClaimed || 0}
-                                    available={product.preorderAvailableStock}
-                                    className="flex-1 min-w-[120px]"
-                                  />
+                            {/* Payment Info with Deposit - Desktop Only */}
+                            <div className="hidden sm:block mb-2">
+                              <PreorderPaymentInfo
+                                price={product.price}
+                                currency={product.currency}
+                                depositPercentage={product.depositPercentage || 50}
+                                className="mb-2"
+                              />
+                            </div>
+                            
+                            {/* Price - Mobile: Simple with deadline inline, Desktop: Full payment info */}
+                            <div className="mb-2 sm:hidden">
+                              <div className="flex flex-col">
+                                <p className="text-base font-bold text-pink-600">
+                                  From {formatCurrency(priceInPHP, "PHP")}
+                                </p>
+                                {product.is_preorder_available && (
+                                  <div className="flex items-center justify-between gap-2 mt-1">
+                                    <p className="text-xs text-muted-foreground line-through">
+                                      {formatCurrency(originalPrice, "PHP")}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                      <span className="font-medium">📅 Deadline:</span>{" "}
+                                      <span className="font-semibold text-foreground">{formatDateForBadge(product.orderDeadline)}</span>
+                                    </p>
+                                  </div>
                                 )}
                               </div>
-                            )}
+                            </div>
                             
-                            {/* Timeline - Enhanced for New Item Releases */}
-                            <div className="mt-2 space-y-1">
-                              {product.is_preorder_available && (
-                                <>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span className="font-medium text-foreground">📅 Pre-Order:</span>
-                                    <span>{formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span className="font-medium text-foreground">🎬 Release:</span>
-                                    <span>{formatDate(product.releaseDate)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span className="font-medium text-foreground">🚚 Expected Arrival:</span>
-                                    <span>{formatDate(expectedDelivery)}</span>
-                                  </div>
-                                </>
-                              )}
-                              {product.is_onhand_available && !product.is_preorder_available && (
-                                <div className="text-xs font-medium text-green-600">
-                                  🚀 Ready to Ship Now
+                            {/* Desktop Only: Additional Info */}
+                            <div className="hidden sm:block">
+                              {/* Option 2: Available Now Badge (if product has onhand stock) */}
+                              {product.is_onhand_available && product.stock > 0 && (
+                                <div className="mb-2 rounded-lg bg-green-100 p-2 text-xs font-medium text-green-700">
+                                  ✅ Available Now: {product.stock} units
                                 </div>
                               )}
+                              
+                              {/* Countdown & Progress */}
+                              {product.is_preorder_available && (
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  <PreorderCountdown
+                                    deadline={product.orderDeadline}
+                                    className="text-xs"
+                                  />
+                                  {product.preorderAvailableStock && (
+                                    <PreorderProgress
+                                      claimed={product.preordersClaimed || 0}
+                                      available={product.preorderAvailableStock}
+                                      className="flex-1 min-w-[120px]"
+                                    />
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Timeline - Enhanced for New Item Releases */}
+                              <div className="mt-2 space-y-1">
+                                {product.is_preorder_available && (
+                                  <>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span className="font-medium text-foreground">📅 Pre-Order:</span>
+                                      <span>{formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span className="font-medium text-foreground">🎬 Release:</span>
+                                      <span>{formatDate(product.releaseDate)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span className="font-medium text-foreground">🚚 Expected Arrival:</span>
+                                      <span>{formatDate(expectedDelivery)}</span>
+                                    </div>
+                                  </>
+                                )}
+                                {product.is_onhand_available && !product.is_preorder_available && (
+                                  <div className="text-xs font-medium text-green-600">
+                                    🚀 Ready to Ship Now
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -475,35 +571,39 @@ export default function PreorderProductsPage() {
                     );
                   })}
                   
-                  {/* Suggestion Card */}
-                  <button
-                    onClick={() => setShowSuggestionModal(true)}
-                    className="w-full rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-6 text-center transition-colors hover:border-pink-400 hover:bg-pink-50"
-                  >
-                    <svg
-                      className="mx-auto mb-3 h-12 w-12 text-grey-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  {/* Suggestion Card - Only show for logged in users */}
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => setShowSuggestionModal(true)}
+                      className="w-full rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-6 text-center transition-colors hover:border-pink-400 hover:bg-pink-50"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    <h3 className="mb-1 text-base font-semibold text-foreground">
-                      Can't find what you're looking for?
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Suggest a product and we'll add it to our pre-order list
-                    </p>
-                  </button>
+                      <svg
+                        className="mx-auto mb-3 h-12 w-12 text-grey-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      <h3 className="mb-1 text-base font-semibold text-foreground">
+                        Can't find what you're looking for?
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Suggest a product and we'll add it to our pre-order list
+                      </p>
+                    </button>
+                  )}
                 </div>
               ) : viewType === "single" ? (
                 <div className="space-y-4 sm:space-y-6">
                   {filteredProducts.map((product) => {
+                    const priceInPHP = product.price * 0.042; // Mock conversion
+                    const originalPrice = priceInPHP * 1.3;
                     const expectedDelivery = new Date(product.releaseDate);
                     expectedDelivery.setDate(expectedDelivery.getDate() + (product.shippingTimeDays || 7));
                     
@@ -512,146 +612,202 @@ export default function PreorderProductsPage() {
                         key={product.id}
                         className="rounded-lg border border-border bg-card p-4 sm:p-6"
                       >
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="mb-4 aspect-square w-full rounded-lg object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                            }}
-                          />
-                        ) : (
-                          <div className="mb-4 aspect-square w-full rounded-lg bg-grey-200"></div>
-                        )}
+                        <div className="relative mb-4 aspect-square w-full">
+                          {product.images && product.images.length > 0 ? (
+                            <img
+                              src={product.images[0]}
+                              alt={product.name}
+                              className="aspect-square w-full rounded-lg object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                              }}
+                            />
+                          ) : (
+                            <div className="aspect-square w-full rounded-lg bg-grey-200"></div>
+                          )}
+                          {/* Release Date Badge with Status */}
+                          {product.is_preorder_available && (() => {
+                            const dateStatus = getDateStatus(product.releaseDate);
+                            const badgeColor = 
+                              dateStatus.status === "expired" ? "bg-red-600" :
+                              dateStatus.status === "ending_soon" || dateStatus.status === "today" ? "bg-orange-600" :
+                              "bg-blue-600";
+                            
+                            return (
+                              <div className={`absolute top-2 left-2 z-10 rounded px-2.5 py-1 text-xs font-semibold text-white ${badgeColor}`}>
+                                {dateStatus.status === "expired" ? (
+                                  <span>⚠️ Expired: {formatDateForBadge(product.releaseDate)}</span>
+                                ) : dateStatus.status === "today" ? (
+                                  <span>⏰ Today</span>
+                                ) : dateStatus.status === "ending_soon" ? (
+                                  <span>⏰ {dateStatus.label}</span>
+                                ) : (
+                                  <span>Release: {dateStatus.label}</span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
                         <h3 className="mb-2 text-lg font-semibold sm:text-xl">{product.name}</h3>
                         {product.brand && (
-                          <p className="mb-2 text-sm text-muted-foreground">
-                            {product.brand}
-                          </p>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-sm text-muted-foreground">
+                              {product.brand}
+                            </p>
+                            <span className="rounded px-2 py-0.5 text-xs font-semibold text-white bg-grey-600">
+                              {getItemType(product.name, product.brand)}
+                            </span>
+                          </div>
                         )}
                         
-                        {/* Payment Info with Deposit */}
-                        <PreorderPaymentInfo
-                          price={product.price}
-                          currency={product.currency}
-                          depositPercentage={product.depositPercentage || 50}
-                          className="mb-4"
-                        />
-                        
-                        {/* Countdown Timer */}
-                        <PreorderCountdown
-                          deadline={product.orderDeadline}
-                          className="mb-4"
-                        />
-                        
-                        {/* Progress Bar */}
-                        {product.is_preorder_available && product.preorderAvailableStock && (
-                          <PreorderProgress
-                            claimed={product.preordersClaimed || 0}
-                            available={product.preorderAvailableStock}
+                        {/* Payment Info with Deposit - Desktop Only */}
+                        <div className="hidden sm:block mb-4">
+                          <PreorderPaymentInfo
+                            price={product.price}
+                            currency={product.currency}
+                            depositPercentage={product.depositPercentage || 50}
                             className="mb-4"
                           />
-                        )}
-                        
-                        {/* Option 2: Available Now Badge (if product has onhand stock) */}
-                        {product.is_onhand_available && product.stock > 0 && (
-                          <div className="mb-4 rounded-lg bg-green-100 p-3 text-sm font-medium text-green-700">
-                            ✅ Available Now: {product.stock} units in stock (Ready to Ship)
-                          </div>
-                        )}
-                        
-                        {/* Timeline Info - Enhanced for New Item Releases */}
-                        <div className="mb-4 rounded-lg bg-grey-50 p-3 space-y-2">
-                          {product.is_preorder_available && (
-                            <>
-                              <div className="border-b border-grey-200 pb-2 mb-2">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Pre-Order Period</p>
-                                <p className="text-sm font-medium text-foreground">
-                                  📅 {formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}
-                                </p>
-                              </div>
-                              <div className="border-b border-grey-200 pb-2 mb-2">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Release Date</p>
-                                <p className="text-sm font-medium text-foreground">
-                                  🎬 {formatDate(product.releaseDate)}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Shipments will begin sequentially from the release date
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Expected Arrival</p>
-                                <p className="text-sm font-medium text-foreground">
-                                  🚚 {formatDate(expectedDelivery)}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Estimated delivery after release (subject to shipping)
-                                </p>
-                              </div>
-                            </>
-                          )}
-                          {product.is_onhand_available && (
-                            <p className="text-sm font-medium text-green-600">
-                              🚀 Ready to Ship Now ({product.stock} units available)
-                            </p>
-                          )}
                         </div>
                         
-                        {/* Option 2: Dual Purchase Buttons (if both available) */}
-                        {product.is_onhand_available && product.is_preorder_available && product.stock > 0 ? (
-                          <div className="space-y-2">
-                            <Link
-                              href={`/store/products/${product.id}?purchase=onhand`}
-                              className="block w-full rounded-lg bg-green-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-green-700"
-                            >
-                              Buy Now ({product.stock} in stock)
-                            </Link>
-                            <Link
-                              href={`/store/products/${product.id}?purchase=preorder`}
-                              className="block w-full rounded-lg border-2 border-soft-blue-600 bg-white px-4 py-2 text-center font-semibold text-soft-blue-600 transition-colors hover:bg-soft-blue-50"
-                            >
-                              Pre-Order Now
-                            </Link>
+                        {/* Price - Mobile: Simple with deadline inline, Desktop: Full payment info */}
+                        <div className="mb-4 sm:hidden">
+                          <div className="flex flex-col">
+                            <p className="text-base font-bold text-pink-600">
+                              From {formatCurrency(priceInPHP, "PHP")}
+                            </p>
+                            {product.is_preorder_available && (
+                              <div className="flex items-center justify-between gap-2 mt-1">
+                                <p className="text-xs text-muted-foreground line-through">
+                                  {formatCurrency(originalPrice, "PHP")}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                  <span className="font-medium">📅 Deadline:</span>{" "}
+                                  <span className="font-semibold text-foreground">{formatDateForBadge(product.orderDeadline)}</span>
+                                </p>
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          /* Single Button */
-                          <Link
-                            href={`/store/products/${product.id}`}
-                            className="block w-full rounded-lg bg-soft-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700"
-                          >
-                            {product.is_onhand_available && product.stock > 0 ? 'Buy Now' : 'Pre-Order Now'}
-                          </Link>
-                        )}
+                        </div>
+                        
+                        {/* Desktop Only: Additional Info */}
+                        <div className="hidden sm:block">
+                          {/* Countdown Timer */}
+                          <PreorderCountdown
+                            deadline={product.orderDeadline}
+                            className="mb-4"
+                          />
+                          
+                          {/* Progress Bar */}
+                          {product.is_preorder_available && product.preorderAvailableStock && (
+                            <PreorderProgress
+                              claimed={product.preordersClaimed || 0}
+                              available={product.preorderAvailableStock}
+                              className="mb-4"
+                            />
+                          )}
+                          
+                          {/* Option 2: Available Now Badge (if product has onhand stock) */}
+                          {product.is_onhand_available && product.stock > 0 && (
+                            <div className="mb-4 rounded-lg bg-green-100 p-3 text-sm font-medium text-green-700">
+                              ✅ Available Now: {product.stock} units in stock (Ready to Ship)
+                            </div>
+                          )}
+                          
+                          {/* Timeline Info - Enhanced for New Item Releases */}
+                          <div className="mb-4 rounded-lg bg-grey-50 p-3 space-y-2">
+                            {product.is_preorder_available && (
+                              <>
+                                <div className="border-b border-grey-200 pb-2 mb-2">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Pre-Order Period</p>
+                                  <p className="text-sm font-medium text-foreground">
+                                    📅 {formatDate(product.orderDate)} - {formatDate(product.orderDeadline)}
+                                  </p>
+                                </div>
+                                <div className="border-b border-grey-200 pb-2 mb-2">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Release Date</p>
+                                  <p className="text-sm font-medium text-foreground">
+                                    🎬 {formatDate(product.releaseDate)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Shipments will begin sequentially from the release date
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Expected Arrival</p>
+                                  <p className="text-sm font-medium text-foreground">
+                                    🚚 {formatDate(expectedDelivery)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Estimated delivery after release (subject to shipping)
+                                  </p>
+                                </div>
+                              </>
+                            )}
+                            {product.is_onhand_available && (
+                              <p className="text-sm font-medium text-green-600">
+                                🚀 Ready to Ship Now ({product.stock} units available)
+                              </p>
+                            )}
+                          </div>
+                          
+                          {/* Option 2: Dual Purchase Buttons (if both available) */}
+                          {product.is_onhand_available && product.is_preorder_available && product.stock > 0 ? (
+                            <div className="space-y-2">
+                              <Link
+                                href={`/store/products/${product.id}?purchase=onhand`}
+                                className="block w-full rounded-lg bg-green-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-green-700"
+                              >
+                                Buy Now ({product.stock} in stock)
+                              </Link>
+                              <Link
+                                href={`/store/products/${product.id}?purchase=preorder`}
+                                className="block w-full rounded-lg border-2 border-soft-blue-600 bg-white px-4 py-2 text-center font-semibold text-soft-blue-600 transition-colors hover:bg-soft-blue-50"
+                              >
+                                Pre-Order Now
+                              </Link>
+                            </div>
+                          ) : (
+                            /* Single Button */
+                            <Link
+                              href={`/store/products/${product.id}`}
+                              className="block w-full rounded-lg bg-soft-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-soft-blue-700"
+                            >
+                              {product.is_onhand_available && product.stock > 0 ? 'Buy Now' : 'Pre-Order Now'}
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                   
-                  {/* Suggestion Card */}
-                  <button
-                    onClick={() => setShowSuggestionModal(true)}
-                    className="w-full rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-8 text-center transition-colors hover:border-pink-400 hover:bg-pink-50 sm:p-12"
-                  >
-                    <svg
-                      className="mx-auto mb-4 h-16 w-16 text-grey-400 sm:mb-6 sm:h-20 sm:w-20"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  {/* Suggestion Card - Only show for logged in users */}
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => setShowSuggestionModal(true)}
+                      className="w-full rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-8 text-center transition-colors hover:border-pink-400 hover:bg-pink-50 sm:p-12"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    <h3 className="mb-2 text-lg font-semibold text-foreground sm:text-xl">
-                      Can't find what you're looking for?
-                    </h3>
-                    <p className="text-sm text-muted-foreground sm:text-base">
-                      Suggest a product and we'll add it to our pre-order list
-                    </p>
-                  </button>
+                      <svg
+                        className="mx-auto mb-4 h-16 w-16 text-grey-400 sm:mb-6 sm:h-20 sm:w-20"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      <h3 className="mb-2 text-lg font-semibold text-foreground sm:text-xl">
+                        Can't find what you're looking for?
+                      </h3>
+                      <p className="text-sm text-muted-foreground sm:text-base">
+                        Suggest a product and we'll add it to our pre-order list
+                      </p>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -665,10 +821,28 @@ export default function PreorderProductsPage() {
                         key={product.id}
                         className="group relative rounded-lg border border-border bg-card overflow-hidden transition-shadow hover:shadow-md"
                       >
-                        {/* Pre-Order Badge */}
-                        <div className="absolute top-2 left-2 z-10 rounded-md bg-pink-600 px-2 py-1 text-xs font-semibold text-white">
-                          Pre-Order
-                        </div>
+                        {/* Release Date Badge with Status */}
+                        {product.is_preorder_available && (() => {
+                          const dateStatus = getDateStatus(product.releaseDate);
+                          const badgeColor = 
+                            dateStatus.status === "expired" ? "bg-red-600" :
+                            dateStatus.status === "ending_soon" || dateStatus.status === "today" ? "bg-orange-600" :
+                            "bg-blue-600";
+                          
+                          return (
+                            <div className={`absolute top-2 left-2 z-10 rounded px-2.5 py-1 text-xs font-semibold text-white ${badgeColor}`}>
+                              {dateStatus.status === "expired" ? (
+                                <span>⚠️ Expired: {formatDateForBadge(product.releaseDate)}</span>
+                              ) : dateStatus.status === "today" ? (
+                                <span>⏰ Today</span>
+                              ) : dateStatus.status === "ending_soon" ? (
+                                <span>⏰ {dateStatus.label}</span>
+                              ) : (
+                                <span>Release: {dateStatus.label}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                         
                         <Link href={`/store/products/${product.id}`}>
                           <div className="relative aspect-square w-full overflow-hidden">
@@ -691,11 +865,16 @@ export default function PreorderProductsPage() {
                         </Link>
                         
                         <div className="p-3">
-                          {/* Brand */}
+                          {/* Brand with Item Type */}
                           {product.brand && (
-                            <p className="mb-1 text-xs font-medium text-muted-foreground sm:text-sm">
-                              {product.brand}
-                            </p>
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <p className="text-xs font-medium text-muted-foreground sm:text-sm">
+                                {product.brand}
+                              </p>
+                              <span className="rounded px-2 py-0.5 text-[10px] font-semibold text-white bg-grey-600 sm:text-xs">
+                                {getItemType(product.name, product.brand)}
+                              </span>
+                            </div>
                           )}
                           
                           {/* Product Name */}
@@ -704,44 +883,55 @@ export default function PreorderProductsPage() {
                           </h3>
                           
                           {/* Price - Simple with strikethrough */}
-                          <div className="flex flex-col">
+                          <div className="mb-2 flex flex-col">
                             <p className="text-base font-bold text-pink-600 sm:text-lg">
                               From {formatCurrency(priceInPHP, "PHP")}
                             </p>
-                            <p className="text-xs text-muted-foreground line-through">
-                              {formatCurrency(originalPrice, "PHP")}
-                            </p>
+                            {/* Discount price with deadline inline on right */}
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground line-through">
+                                {formatCurrency(originalPrice, "PHP")}
+                              </p>
+                              {product.is_preorder_available && (
+                                <p className="text-[10px] text-muted-foreground sm:text-xs whitespace-nowrap">
+                                  <span className="font-medium">📅 Deadline:</span>{" "}
+                                  <span className="font-semibold text-foreground">{formatDateForBadge(product.orderDeadline)}</span>
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
                     );
                   })}
                   
-                  {/* Suggestion Card */}
-                  <button
-                    onClick={() => setShowSuggestionModal(true)}
-                    className="col-span-2 rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-6 text-center transition-colors hover:border-pink-400 hover:bg-pink-50 sm:col-span-2 sm:p-8"
-                  >
-                    <svg
-                      className="mx-auto mb-3 h-12 w-12 text-grey-400 sm:mb-4 sm:h-16 sm:w-16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  {/* Suggestion Card - Only show for logged in users */}
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => setShowSuggestionModal(true)}
+                      className="col-span-2 rounded-lg border-2 border-dashed border-grey-300 bg-grey-50 p-6 text-center transition-colors hover:border-pink-400 hover:bg-pink-50 sm:col-span-2 sm:p-8"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    <h3 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
-                      Can't find what you're looking for?
-                    </h3>
-                    <p className="text-xs text-muted-foreground sm:text-sm">
-                      Suggest a product and we'll add it to our pre-order list
-                    </p>
-                  </button>
+                      <svg
+                        className="mx-auto mb-3 h-12 w-12 text-grey-400 sm:mb-4 sm:h-16 sm:w-16"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      <h3 className="mb-1 text-base font-semibold text-foreground sm:text-lg">
+                        Can't find what you're looking for?
+                      </h3>
+                      <p className="text-xs text-muted-foreground sm:text-sm">
+                        Suggest a product and we'll add it to our pre-order list
+                      </p>
+                    </button>
+                  )}
                 </div>
               )}
             </>
