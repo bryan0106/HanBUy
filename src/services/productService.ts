@@ -57,6 +57,9 @@ export interface Product {
     krw_to_php: number;
     updated_at: string;
   };
+  
+  // Item type (Album, Ticket, Bag, Accessories, Poster, Clothing, Item)
+  item_type?: string;
 }
 
 export interface GetProductsParams {
@@ -173,125 +176,8 @@ export const productService = {
    * Query params: page, limit, category, brand, search, min_price, max_price, in_stock, sort
    */
   async getOnhandProducts(params?: GetProductsParams): Promise<GetProductsResponse> {
-    // Use mock data for testing on localhost
-    if (shouldUseMockData()) {
-      console.log('📦 Using mock data for onhand products (localhost)');
-      
-      // Filter mock products based on params
-      let filteredProducts = [...mockProducts];
-      
-      // Filter by category
-      if (params?.category && params.category !== 'all') {
-        filteredProducts = filteredProducts.filter(p => p.category === params.category);
-      }
-      
-      // Filter by brand
-      if (params?.brand && params.brand !== 'all') {
-        filteredProducts = filteredProducts.filter(p => p.brand === params.brand);
-      }
-      
-      // Filter by search
-      if (params?.search) {
-        const searchLower = params.search.toLowerCase();
-        filteredProducts = filteredProducts.filter(p => 
-          p.name.toLowerCase().includes(searchLower) ||
-          p.description?.toLowerCase().includes(searchLower) ||
-          p.brand?.toLowerCase().includes(searchLower)
-        );
-      }
-      
-      // Filter by price range
-      if (params?.min_price !== undefined) {
-        filteredProducts = filteredProducts.filter(p => p.price >= params.min_price!);
-      }
-      if (params?.max_price !== undefined) {
-        filteredProducts = filteredProducts.filter(p => p.price <= params.max_price!);
-      }
-      
-      // Filter by in_stock
-      if (params?.in_stock === true) {
-        filteredProducts = filteredProducts.filter(p => (p.stock || 0) > 0);
-      }
-      
-      // Sort products
-      if (params?.sort) {
-        switch (params.sort) {
-          case 'price_asc':
-            filteredProducts.sort((a, b) => a.price - b.price);
-            break;
-          case 'price_desc':
-            filteredProducts.sort((a, b) => b.price - a.price);
-            break;
-          case 'name_asc':
-            filteredProducts.sort((a, b) => a.name.localeCompare(b.name));
-            break;
-          case 'name_desc':
-            filteredProducts.sort((a, b) => b.name.localeCompare(a.name));
-            break;
-          case 'created_desc':
-            filteredProducts.sort((a, b) => 
-              (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)
-            );
-            break;
-          case 'created_asc':
-            filteredProducts.sort((a, b) => 
-              (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0)
-            );
-            break;
-          case 'stock_desc':
-            filteredProducts.sort((a, b) => (b.stock || 0) - (a.stock || 0));
-            break;
-        }
-      }
-      
-      // Pagination
-      const page = params?.page || 1;
-      const limit = params?.limit || 50;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
-      
-      // Convert to Product format expected by service
-      const mappedProducts: Product[] = paginatedProducts.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description || '',
-        price: p.price,
-        currency: p.currency,
-        images: p.images || [],
-        category: p.category || '',
-        brand: p.brand,
-        sku: p.sku || '',
-        stock: p.stock || 0,
-        status: 'active',
-        product_type: 'onhand',
-        is_preorder_available: false,
-        is_onhand_available: true,
-        weight: p.weight || 0,
-        dimensions: p.dimensions,
-        created_at: p.createdAt?.toISOString() || new Date().toISOString(),
-        updated_at: p.updatedAt?.toISOString() || new Date().toISOString(),
-      }));
-      
-      const total = filteredProducts.length;
-      const totalPages = Math.ceil(total / limit);
-      
-      return {
-        success: true,
-        data: mappedProducts,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-          hasNextPage: page < totalPages,
-          hasPrevPage: page > 1,
-        },
-      };
-    }
-
     try {
-      console.log('🔗 Fetching onhand products from API:', '/products/onhand', params);
+      console.log('🔗 Fetching onhand products from API: https://hanbuy-api.onrender.com/api/products/onhand', params);
       const response = await apiClient.get<GetProductsResponse>('/products/onhand', { params });
       return response.data;
     } catch (error) {
@@ -305,14 +191,8 @@ export const productService = {
    * Query params: page, limit, category, brand, search, min_price, max_price, sort
    */
   async getPreorderProducts(params?: Omit<GetProductsParams, 'in_stock'>): Promise<GetProductsResponse> {
-    // Use mock data for testing on localhost
-    if (shouldUseMockData()) {
-      console.log('📦 Using mock data for preorder products (localhost)');
-      return mockPreorderService.getPreorderProducts(params);
-    }
-
     try {
-      console.log('🔗 Fetching preorder products from API:', '/products/preorder', params);
+      console.log('🔗 Fetching preorder products from API: https://hanbuy-api.onrender.com/api/products/preorder', params);
       const response = await apiClient.get<GetProductsResponse>('/products/preorder', { params });
       return response.data;
     } catch (error) {

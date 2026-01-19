@@ -49,12 +49,23 @@ export function shouldUseMockData(): boolean {
 export function getApiBaseUrl(): string {
   // If explicitly set, use that
   if (process.env.NEXT_PUBLIC_API_URL) {
+    // If someone configured a relative "/api" baseURL (typical for Next.js route handlers),
+    // force the real backend when running locally. Otherwise product pages will call
+    // `http://localhost:3000/api/...` instead of the backend `http://localhost:3001/api/...`.
+    if (
+      isLocalhost() &&
+      (process.env.NEXT_PUBLIC_API_URL === '/api' ||
+        process.env.NEXT_PUBLIC_API_URL.startsWith('/api/'))
+    ) {
+      return 'http://localhost:3001/api';
+    }
+
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
   // On localhost, default to localhost API for testing
   if (isLocalhost()) {
-    return 'https://hanbuy-api.onrender.com/api';
+    return 'http://localhost:3001/api';
   }
   
   // Production default

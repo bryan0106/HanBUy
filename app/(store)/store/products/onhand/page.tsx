@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import type { Product } from "@/types";
-import { categories, mockProducts } from "@/lib/mockData";
+import { categories } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { LikeButton } from "@/components/store/LikeButton";
 import { PasabuyModal, type PasabuyRequest } from "@/components/store/PasabuyModal";
 import { useAuth } from "@/hooks/useAuth";
 import { FilterSidebar } from "@/components/store/FilterSidebar";
+import { productService } from "@/services/productService";
+import type { Product as ServiceProduct } from "@/services/productService";
 
 type ViewType = "list" | "single" | "grid";
 
@@ -33,28 +35,107 @@ export default function OnhandProductsPage() {
 
   useEffect(() => {
     loadProducts();
-  }, [selectedCategory]);
+  }, [selectedCategory, selectedBrand, priceRange]);
+
+  // Helper function to get item type (fallback to name-based detection if not in API)
+  const getItemType = (product: ServiceProduct): string => {
+    // Use item_type from API if available
+    if (product.item_type) {
+      return product.item_type;
+    }
+    // Fallback to name-based detection
+    const name = product.name.toLowerCase();
+    if (name.includes('album') || name.includes('cd') || name.includes('photobook')) {
+      return 'Album';
+    }
+    if (name.includes('ticket') || name.includes('tour') || name.includes('concert') || name.includes('event')) {
+      return 'Ticket';
+    }
+    if (name.includes('bag') || name.includes('tote') || name.includes('backpack')) {
+      return 'Bag';
+    }
+    if (name.includes('accessory') || name.includes('accessories') || name.includes('keychain') || name.includes('pin') || name.includes('badge')) {
+      return 'Accessories';
+    }
+    if (name.includes('poster') || name.includes('postcard')) {
+      return 'Poster';
+    }
+    if (name.includes('clothing') || name.includes('shirt') || name.includes('hoodie') || name.includes('jacket')) {
+      return 'Clothing';
+    }
+    return 'Item';
+  };
+
+  // Helper function to convert ServiceProduct to frontend Product type
+  const convertServiceProductToProduct = (serviceProduct: ServiceProduct): Product => {
+    return {
+      id: serviceProduct.id,
+      name: serviceProduct.name,
+      description: serviceProduct.description || '',
+      price: serviceProduct.price,
+      currency: (serviceProduct.currency || 'KRW') as 'KRW',
+      images: serviceProduct.images || [],
+      category: serviceProduct.category || '',
+      brand: serviceProduct.brand,
+      sku: serviceProduct.sku || '',
+      stock: serviceProduct.stock || 0,
+      weight: serviceProduct.weight || 0,
+      dimensions: serviceProduct.dimensions,
+      variations: serviceProduct.variations,
+      createdAt: serviceProduct.created_at ? new Date(serviceProduct.created_at) : new Date(),
+      updatedAt: serviceProduct.updated_at ? new Date(serviceProduct.updated_at) : new Date(),
+      itemType: getItemType(serviceProduct), // Add item type
+    };
+  };
 
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // Use mock data directly - no API calls
-      let filtered = [...mockProducts];
-      
+      // Build query parameters
+      const params: any = {
+        page: 1,
+        limit: 100, // API max is 100; we'll page if needed
+      };
+
       if (selectedCategory !== 'all') {
-        filtered = filtered.filter(p => p.category === selectedCategory);
+        params.category = selectedCategory;
       }
+
       if (selectedBrand !== 'all') {
-        filtered = filtered.filter(p => p.brand === selectedBrand);
+        params.brand = selectedBrand;
       }
+
+      // Convert PHP price range to KRW for API (approximate conversion: 1 PHP ≈ 23.8 KRW)
+      // But we'll do price filtering client-side since the API uses KRW
+      // params.min_price = Math.round(priceRange[0] * 23.8);
+      // params.max_price = Math.round(priceRange[1] * 23.8);
+
+      // Fetch products from API (page through if there are more than 100)
+      const allServiceProducts: ServiceProduct[] = [];
+      let currentPage = 1;
+      while (true) {
+        const response = await productService.getOnhandProducts({
+          ...params,
+          page: currentPage,
+        });
+
+        allServiceProducts.push(...response.data);
+
+        if (!response.pagination?.hasNextPage) break;
+        currentPage += 1;
+        if (currentPage > 1000) break; // safety
+      }
+
+      // Convert service products to frontend Product type
+      let convertedProducts = allServiceProducts.map(convertServiceProductToProduct);
       
-      // Filter by price range (convert KRW to PHP for comparison)
-      filtered = filtered.filter(p => {
+      // Filter by price range client-side (convert KRW to PHP for comparison)
+      convertedProducts = convertedProducts.filter(p => {
         const priceInPHP = p.price * 0.042;
         return priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
       });
       
-      setProducts(filtered);
+      setProducts(convertedProducts);
     } catch (error) {
       console.error("Error loading onhand products:", error);
       setProducts([]);
@@ -326,9 +407,23 @@ export default function OnhandProductsPage() {
                             {product.name}
                           </h3>
                           {product.brand && (
-                            <p className="mb-2 text-xs text-muted-foreground sm:text-sm">
-                              {product.brand}
-                            </p>
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground sm:text-sm">
+                                {product.brand}
+                              </p>
+                              {product.itemType && (
+                                <span className="rounded px-2 py-0.5 text-[10px] font-semibold text-white bg-grey-600 sm:text-xs">
+                                  {product.itemType}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {!product.brand && product.itemType && (
+                            <div className="mb-2 flex justify-end">
+                              <span className="rounded px-2 py-0.5 text-[10px] font-semibold text-white bg-grey-600 sm:text-xs">
+                                {product.itemType}
+                              </span>
+                            </div>
                           )}
                           <div className="mb-2 flex items-center justify-between">
                             <div>
@@ -387,9 +482,23 @@ export default function OnhandProductsPage() {
                           {product.name}
                         </h3>
                         {product.brand && (
-                          <p className="mb-2 text-sm text-muted-foreground">
-                            {product.brand}
-                          </p>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-sm text-muted-foreground">
+                              {product.brand}
+                            </p>
+                            {product.itemType && (
+                              <span className="rounded px-2 py-0.5 text-xs font-semibold text-white bg-grey-600">
+                                {product.itemType}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!product.brand && product.itemType && (
+                          <div className="mb-2 flex justify-end">
+                            <span className="rounded px-2 py-0.5 text-xs font-semibold text-white bg-grey-600">
+                              {product.itemType}
+                            </span>
+                          </div>
                         )}
                         <div className="mb-4 flex items-center justify-between">
                           <div>
@@ -464,11 +573,25 @@ export default function OnhandProductsPage() {
                         </Link>
                         
                         <div className="p-3">
-                          {/* Brand */}
+                          {/* Brand and Item Type */}
                           {product.brand && (
-                            <p className="mb-1 text-xs font-medium text-muted-foreground sm:text-sm">
-                              {product.brand}
-                            </p>
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <p className="text-xs font-medium text-muted-foreground sm:text-sm">
+                                {product.brand}
+                              </p>
+                              {product.itemType && (
+                                <span className="rounded px-2 py-0.5 text-[10px] font-semibold text-white bg-grey-600 sm:text-xs">
+                                  {product.itemType}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {!product.brand && product.itemType && (
+                            <div className="mb-1 flex justify-end">
+                              <span className="rounded px-2 py-0.5 text-[10px] font-semibold text-white bg-grey-600 sm:text-xs">
+                                {product.itemType}
+                              </span>
+                            </div>
                           )}
                           
                           {/* Product Name */}

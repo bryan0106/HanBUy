@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { categories } from "@/lib/mockData";
@@ -14,6 +13,8 @@ import { PreorderPaymentInfo } from "@/components/store/PreorderPaymentInfo";
 import { ProductSuggestionModal, type ProductSuggestion } from "@/components/store/ProductSuggestionModal";
 import { useAuth } from "@/hooks/useAuth";
 import { FilterSidebar } from "@/components/store/FilterSidebar";
+import { productService } from "@/services/productService";
+import type { Product as ServiceProduct } from "@/services/productService";
 
 interface PreorderProduct {
   id: string;
@@ -48,6 +49,8 @@ type ViewType = "list" | "single" | "grid";
 
 export default function PreorderProductsPage() {
   const { isAuthenticated } = useAuth();
+  const [products, setProducts] = useState<PreorderProduct[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
@@ -58,6 +61,87 @@ export default function PreorderProductsPage() {
 
   // Mock artists list - in real app, this would come from product data
   const artists = ["BTS", "BLACKPINK", "NewJeans", "IVE", "LE SSERAFIM", "aespa", "Stray Kids", "TWICE"];
+
+  // Helper function to convert ServiceProduct to PreorderProduct
+  const convertServiceProductToPreorderProduct = (serviceProduct: ServiceProduct): PreorderProduct => {
+    return {
+      id: serviceProduct.id,
+      name: serviceProduct.name,
+      description: serviceProduct.description || '',
+      price: serviceProduct.price,
+      currency: (serviceProduct.currency || 'KRW') as Currency,
+      images: serviceProduct.images || [],
+      category: serviceProduct.category || '',
+      brand: serviceProduct.brand,
+      quantity: serviceProduct.stock || 0,
+      orderDate: serviceProduct.order_date ? new Date(serviceProduct.order_date) : new Date(),
+      orderDeadline: serviceProduct.order_deadline ? new Date(serviceProduct.order_deadline) : serviceProduct.release_date ? new Date(serviceProduct.release_date) : new Date(),
+      releaseDate: serviceProduct.release_date ? new Date(serviceProduct.release_date) : new Date(),
+      stock: serviceProduct.stock || 0,
+      preorder_stock: serviceProduct.preorder_stock || serviceProduct.preorder_available_stock || serviceProduct.stock || 100,
+      is_preorder_available: serviceProduct.is_preorder_available ?? (serviceProduct.product_type === 'preorder' || serviceProduct.product_type === 'preorder_and_onhand'),
+      is_onhand_available: serviceProduct.is_onhand_available ?? (serviceProduct.product_type === 'onhand' || (serviceProduct.stock > 0 && serviceProduct.product_type === 'preorder_and_onhand')),
+      depositPercentage: serviceProduct.deposit_percentage || 50,
+      preorderAvailableStock: serviceProduct.preorder_available_stock || serviceProduct.preorder_stock || serviceProduct.stock || 100,
+      preordersClaimed: serviceProduct.preorders_claimed || 0,
+      shippingTimeDays: serviceProduct.shipping_time_days || 7,
+    };
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, [selectedCategory, selectedBrand, priceRange]);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      // Build query parameters
+      const params: any = {
+        page: 1,
+        limit: 100, // API max is 100; we'll page if needed
+      };
+
+      if (selectedCategory !== 'all') {
+        params.category = selectedCategory;
+      }
+
+      if (selectedBrand !== 'all') {
+        params.brand = selectedBrand;
+      }
+
+      // Fetch products from API (page through if there are more than 100)
+      const allServiceProducts: ServiceProduct[] = [];
+      let currentPage = 1;
+      while (true) {
+        const response = await productService.getPreorderProducts({
+          ...params,
+          page: currentPage,
+        });
+
+        allServiceProducts.push(...response.data);
+
+        if (!response.pagination?.hasNextPage) break;
+        currentPage += 1;
+        if (currentPage > 1000) break; // safety
+      }
+
+      // Convert service products to PreorderProduct type
+      let convertedProducts = allServiceProducts.map(convertServiceProductToPreorderProduct);
+      
+      // Filter by price range client-side (convert KRW to PHP for comparison)
+      convertedProducts = convertedProducts.filter(p => {
+        const priceInPHP = p.price * 0.042;
+        return priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
+      });
+      
+      setProducts(convertedProducts);
+    } catch (error) {
+      console.error("Error loading preorder products:", error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Helper function to format date for badge (compact format)
   const formatDateForBadge = (date: Date | string): string => {
@@ -121,45 +205,15 @@ export default function PreorderProductsPage() {
     }
   };
 
-  // Convert mock data directly to PreorderProduct format using .map() - no API calls
-  const products: PreorderProduct[] = mockPreorderProducts.map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    description: p.description || '',
-    price: p.price,
-    currency: (p.currency === 'PHP' || p.currency === 'KRW' ? p.currency : 'KRW') as Currency,
-    images: p.images || [],
-    category: p.category || '',
-    brand: p.brand,
-    quantity: p.stock || 0,
-    orderDate: p.order_date ? new Date(p.order_date) : new Date(),
-    orderDeadline: p.order_deadline ? new Date(p.order_deadline) : p.release_date ? new Date(p.release_date) : new Date(),
-    releaseDate: p.release_date ? new Date(p.release_date) : new Date(),
-    
-    // Stock Management (Option 2)
-    stock: p.stock || 0,                    // Onhand stock
-    preorder_stock: p.preorder_stock || p.preorder_available_stock || p.stock || 100, // Preorder stock
-    
-    // Flags (Option 2)
-    is_preorder_available: p.is_preorder_available ?? (p.product_type === 'preorder' || p.product_type === 'preorder_and_onhand'),
-    is_onhand_available: p.is_onhand_available ?? (p.product_type === 'onhand' || (p.stock > 0 && p.product_type === 'preorder_and_onhand')),
-    
-    // Preorder-specific fields (with defaults if not provided)
-    depositPercentage: p.deposit_percentage || 50, // Default 50%
-    preorderAvailableStock: p.preorder_available_stock || p.preorder_stock || p.stock || 100,
-    preordersClaimed: p.preorders_claimed || 0,
-    shippingTimeDays: p.shipping_time_days || 7, // Default 7 days
-  }));
-
-  // Extract brands using .map()
+  // Extract brands from products
   const brands: string[] = Array.from(new Set(products.map((p) => p.brand).filter((b): b is string => Boolean(b))));
 
   // Calculate max price for slider
   const maxPrice = Math.max(...products.map(p => p.price * 0.042), 100000);
 
-  // Filter products using .filter() and .map() - no API calls
+  // Filter products client-side
   const filteredProducts = products.filter((product) => {
-    const priceInPHP = product.price * 0.042; // Mock conversion
+    const priceInPHP = product.price * 0.042; // Convert KRW to PHP for comparison
     const matchesPrice =
       priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
     const matchesBrand =
@@ -341,7 +395,11 @@ export default function PreorderProductsPage() {
 
         {/* Products Display */}
         <div className="flex-1">
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="py-8 text-center sm:py-12">
+              <p className="text-muted-foreground">Loading preorder products...</p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="py-8 text-center sm:py-12">
               <p className="text-muted-foreground">No pre-order items available.</p>
             </div>

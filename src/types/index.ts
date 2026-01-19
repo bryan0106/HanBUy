@@ -128,6 +128,7 @@ export interface Product {
   seoTitle?: string;
   seoDescription?: string;
   variations?: ProductVariation[]; // Optional variations (size, color, etc.)
+  itemType?: string; // Item type (Album, Ticket, Bag, Accessories, Poster, Clothing, Item)
   createdAt: Date;
   updatedAt: Date;
 }
