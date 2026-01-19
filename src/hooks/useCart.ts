@@ -101,7 +101,23 @@ export function useCart(userId: string | null): UseCartReturn {
 
   const getTotal = useCallback((): number => {
     return cartItems.reduce((total, item) => {
-      const price = item.price || item.product?.price || 0;
+      // Get price from item or product, ensuring it's a number
+      const itemPrice = item.price || 0;
+      const productPrice = item.product?.price;
+      
+      // Parse price if it's a string, otherwise use as number
+      let price: number;
+      if (productPrice !== undefined && productPrice !== null) {
+        price = typeof productPrice === 'string' ? parseFloat(productPrice) : productPrice;
+      } else {
+        price = typeof itemPrice === 'string' ? parseFloat(String(itemPrice)) : itemPrice;
+      }
+      
+      // Ensure price is a valid number
+      if (isNaN(price)) {
+        price = 0;
+      }
+      
       return total + price * item.quantity;
     }, 0);
   }, [cartItems]);

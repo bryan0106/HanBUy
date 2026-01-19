@@ -9,7 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { getProductReviews, getAverageRating, mockProducts } from "@/lib/mockData";
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
-import { mockCartService, mockOrderService } from "@/lib/mockOrdersData";
+import { cartService } from "@/services/cartService";
+import { mockOrderService } from "@/lib/mockOrdersData";
 import type { Product } from "@/services/productService";
 import { productService } from "@/services/productService";
 import { PriceComparison } from "@/components/store/PriceComparison";
@@ -23,6 +24,7 @@ import { ProductSelectionModal } from "@/components/store/ProductSelectionModal"
 import { PreorderCountdown } from "@/components/store/PreorderCountdown";
 import { PreorderProgress } from "@/components/store/PreorderProgress";
 import { formatDate } from "@/lib/utils";
+import toast from "react-hot-toast";
 
 // Extended Product type that includes variations for this component
 type ProductWithVariations = Product & {
@@ -346,27 +348,41 @@ export default function ProductDetailPage() {
     setCartSuccess(false);
 
     try {
-      // Add to cart using mock service - no API call
-      await mockCartService.addToCart({
+      // Add to cart using real API
+      await cartService.addToCart({
         user_id: user.id,
         product_id: product.id,
         quantity: qty,
-        // No box info needed - will be selected when requesting shipping
+        box_type_preference: 'solo', // Default to solo, can be changed later
+        box_size: 'medium', // Default size
       });
 
       setCartSuccess(true);
+      toast.success("Item added to cart!");
+      
+      // Dispatch event to update cart count in header
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cartItemAdded'));
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+      }
+      
       setTimeout(() => setCartSuccess(false), 3000);
     } catch (error: any) {
       console.error("Error adding to cart:", error);
-      const errorMessage = error?.message || "Failed to add item to cart. Please try again.";
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to add item to cart. Please try again.";
       
       // Show more specific error messages
       if (errorMessage.includes("uuid") || errorMessage.includes("UUID")) {
-        alert("Invalid product ID format. Please refresh the page and try again.");
+        toast.error("Invalid product ID format. Please refresh the page and try again.");
       } else if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-        alert("Product not found. Please refresh the page and try again.");
+        toast.error("Product not found. Please refresh the page and try again.");
+      } else if (errorMessage.includes("stock") || errorMessage.includes("Insufficient")) {
+        toast.error(errorMessage);
+      } else if (error?.response?.status === 401) {
+        toast.error("Please log in to add items to cart");
+        router.push("/auth/login?redirect=" + encodeURIComponent(window.location.pathname));
       } else {
-        alert(errorMessage);
+        toast.error(errorMessage);
       }
     } finally {
       setAddingToCart(false);

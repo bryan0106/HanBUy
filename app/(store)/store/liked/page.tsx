@@ -4,11 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
-import { mockProducts } from "@/lib/mockData";
-import { mockPreorderProducts } from "@/lib/mockPreorderData";
-import { mockLikedService, initializeMockLiked } from "@/lib/mockLikedData";
-import type { Product } from "@/services/productService";
-import type { LikedItem } from "@/services/likedService";
+import { likedService, type LikedItem } from "@/services/likedService";
+import { productService, type Product } from "@/services/productService";
+import toast from "react-hot-toast";
 import { LikeButton } from "@/components/store/LikeButton";
 
 export default function LikedItemsPage() {
@@ -28,13 +26,12 @@ export default function LikedItemsPage() {
   const loadLikedItems = async () => {
     setLoading(true);
     try {
-      // Use mock data directly - no API calls
       if (user?.id) {
-        initializeMockLiked(user.id);
-        const response = await mockLikedService.getLikedItems();
+        // Use real API
+        const response = await likedService.getLikedItems();
         setLikedItems(response.data);
 
-        // Sync mock data to localStorage for LikeButton components to use
+        // Sync to localStorage for LikeButton components to use
         if (typeof window !== "undefined") {
           const localStorageData = response.data.map((item) => ({
             productId: item.product_id,
@@ -43,23 +40,30 @@ export default function LikedItemsPage() {
           localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(localStorageData));
         }
 
-        // Map liked items to products using direct .find() on mock data
-        const allProducts = [...mockProducts, ...mockPreorderProducts];
-        const likedProducts = response.data
-          .map((item) => {
-            // Find product in mock data using direct .find()
-            const product = allProducts.find((p) => p.id === item.product_id);
-            return product || null;
+        // Fetch product details for each liked item from API
+        const likedProducts = await Promise.all(
+          response.data.map(async (item) => {
+            try {
+              const product = await productService.getProductById(item.product_id);
+              return product;
+            } catch (error) {
+              console.error(`Error fetching product ${item.product_id}:`, error);
+              return null;
+            }
           })
-          .filter((p): p is Product => p !== null);
+        );
         
-        setProducts(likedProducts);
+        // Filter out null products (failed to fetch)
+        const validProducts = likedProducts.filter((p): p is Product => p !== null);
+        setProducts(validProducts);
       } else {
         setLikedItems([]);
         setProducts([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading liked items:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to load liked items";
+      toast.error(errorMessage);
       setLikedItems([]);
       setProducts([]);
     } finally {
@@ -69,12 +73,10 @@ export default function LikedItemsPage() {
 
   const handleRemoveLiked = async (productId: string) => {
     try {
-      // Remove from mock data - no API call
-      if (user?.id) {
-        await mockLikedService.removeFromLiked(productId, user.id);
-      }
+      // Remove from API
+      await likedService.removeFromLiked(productId);
       
-      // Update local state using direct .filter()
+      // Update local state
       setLikedItems(prev => prev.filter((item) => item.product_id !== productId));
       setProducts(prev => prev.filter((p) => p.id !== productId));
       
@@ -88,8 +90,11 @@ export default function LikedItemsPage() {
       
       // Trigger re-render of LikeButton components
       window.dispatchEvent(new Event("likedItemsUpdated"));
-    } catch (error) {
+      toast.success("Item removed from liked list");
+    } catch (error: any) {
       console.error("Error removing liked item:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to remove item";
+      toast.error(errorMessage);
     }
   };
 
@@ -137,7 +142,8 @@ export default function LikedItemsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {products.map((product) => {
             const mainImage = product.images && product.images.length > 0 ? product.images[0] : "/placeholder-product.png";
-            const priceInPHP = product.price * 0.042;
+            // Use php_price if available, otherwise calculate from price and conversion rate
+            const priceInPHP = product.php_price || (product.price * (product.price_conversion_rate || 0.042));
             
             return (
               <div

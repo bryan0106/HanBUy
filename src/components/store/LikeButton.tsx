@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { likedService } from "@/services/likedService";
+import { handleApiError } from "@/utils/errorHandler";
+import toast from "react-hot-toast";
 
 interface LikeButtonProps {
   productId: string;
@@ -15,15 +17,39 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
   const [isLiked, setIsLiked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load liked status from localStorage only (no API call - avoids excessive requests)
+  // Load liked status - check API on mount, then use localStorage for quick updates
   useEffect(() => {
     if (isAuthenticated && user?.id) {
+      // Check API on initial load
+      const checkLikedStatus = async () => {
+        try {
+          const isLikedStatus = await likedService.checkIfLiked(productId);
+          setIsLiked(isLikedStatus);
+          
+          // Update localStorage to keep it in sync
+          const likedItems = getLikedItemsFromStorage();
+          if (isLikedStatus && !likedItems.some((item) => item.productId === productId)) {
+            const updated = [...likedItems, { productId, likedAt: new Date().toISOString() }];
+            localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
+          } else if (!isLikedStatus) {
+            const updated = likedItems.filter((item) => item.productId !== productId);
+            localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
+          }
+        } catch (error) {
+          console.error('Error checking liked status:', error);
+          // Fallback to localStorage if API fails
+          const likedItems = getLikedItemsFromStorage();
+          setIsLiked(likedItems.some((item) => item.productId === productId));
+        }
+      };
+      
+      checkLikedStatus();
+      
+      // Also listen for custom events for quick UI updates
       const updateLikedStatus = () => {
         const likedItems = getLikedItemsFromStorage();
         setIsLiked(likedItems.some((item) => item.productId === productId));
       };
-      
-      updateLikedStatus();
       
       // Listen for storage changes (when items are liked/unliked from other tabs/pages)
       window.addEventListener("storage", updateLikedStatus);
@@ -61,11 +87,15 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
     }
 
     setIsLoading(true);
+    const previousState = isLiked;
+    
+    // Optimistic update
+    setIsLiked(!isLiked);
+    
     try {
-      if (isLiked) {
+      if (previousState) {
         // Remove from liked items via API
         await likedService.removeFromLiked(productId);
-        setIsLiked(false);
         
         // Also remove from localStorage as backup
         const likedItems = getLikedItemsFromStorage();
@@ -73,10 +103,11 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
         if (typeof window !== "undefined" && user?.id) {
           localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
         }
+        
+        toast.success("Removed from liked items");
       } else {
         // Add to liked items via API
         await likedService.addToLiked(productId);
-        setIsLiked(true);
         
         // Also save to localStorage as backup
         const likedItems = getLikedItemsFromStorage();
@@ -88,14 +119,20 @@ export function LikeButton({ productId, className = "", size = "md" }: LikeButto
         if (typeof window !== "undefined" && user?.id) {
           localStorage.setItem(`hanbuy_liked_${user.id}`, JSON.stringify(updated));
         }
+        
+        toast.success("Added to liked items");
       }
       
       // Dispatch custom event to update other LikeButton components in the same tab
       window.dispatchEvent(new Event("likedItemsUpdated"));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error toggling like:", error);
       // Revert UI state on error
-      setIsLiked(!isLiked);
+      setIsLiked(previousState);
+      
+      // Show error message
+      const errorMessage = handleApiError(error).message;
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
-import { mockCartService, mockOrderService } from "@/lib/mockOrdersData";
+import { cartService } from "@/services/cartService";
+import { mockOrderService } from "@/lib/mockOrdersData";
 import { mockProducts } from "@/lib/mockData";
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import type { CartItem } from "@/services/cartService";
@@ -42,7 +43,7 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       // Use mock cart service - no API call
-      const cartItemsData = await mockCartService.getCartItems(user.id);
+      const cartItemsData = await cartService.getCartItems(user.id);
 
       // Fetch product details for each cart item to get images (from mock data)
       const cartItemsWithImages = await Promise.all(

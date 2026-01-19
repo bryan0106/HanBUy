@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { invoiceService } from "@/services/api";
+import { useCart } from "@/hooks/useCart";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { AccountDropdown } from "./AccountDropdown";
 import { NotificationButton } from "./NotificationButton";
@@ -19,9 +20,52 @@ export function StoreLayout({ children }: StoreLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
+  const { cartItems, getItemCount, refetch } = useCart(user?.id || null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [hasInvoices, setHasInvoices] = useState(false);
+  const cartItemCount = getItemCount();
+
+  // Listen for cart updates from other pages
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      if (user?.id) {
+        refetch();
+      }
+    };
+
+    // Listen for custom cart update events
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener('cartItemAdded', handleCartUpdate);
+    window.addEventListener('cartItemRemoved', handleCartUpdate);
+    window.addEventListener('cartItemUpdated', handleCartUpdate);
+    window.addEventListener('cartCleared', handleCartUpdate);
+
+    // Refresh cart when window gains focus (user returns to tab)
+    const handleFocus = () => {
+      if (user?.id) {
+        refetch();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Periodic refresh every 30 seconds as fallback
+    const intervalId = setInterval(() => {
+      if (user?.id) {
+        refetch();
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      window.removeEventListener('cartItemAdded', handleCartUpdate);
+      window.removeEventListener('cartItemRemoved', handleCartUpdate);
+      window.removeEventListener('cartItemUpdated', handleCartUpdate);
+      window.removeEventListener('cartCleared', handleCartUpdate);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
+    };
+  }, [user?.id, refetch]);
 
   const navItems = [
     { label: "Home", href: "/store" },
@@ -100,8 +144,8 @@ export function StoreLayout({ children }: StoreLayoutProps) {
           <div className="flex items-center gap-3">
             {/* Cart Icon */}
             <Link
-              href="/store/checkout"
-              className="flex items-center justify-center p-2 text-[#2C2C2C] hover:text-[#FF85A2] transition-colors"
+              href="/store/orders?tab=cart"
+              className="relative flex items-center justify-center p-2 text-[#2C2C2C] hover:text-[#FF85A2] transition-colors"
               aria-label="Shopping Cart"
             >
               <svg
@@ -117,6 +161,11 @@ export function StoreLayout({ children }: StoreLayoutProps) {
                   d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
                 />
               </svg>
+              {isAuthenticated && cartItemCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#FF85A2] text-xs font-bold text-white">
+                  {cartItemCount > 99 ? '99+' : cartItemCount}
+                </span>
+              )}
             </Link>
 
             {/* Account/Login Button */}
