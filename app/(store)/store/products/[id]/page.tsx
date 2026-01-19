@@ -541,17 +541,19 @@ export default function ProductDetailPage() {
         />
       )}
 
-      {/* Sticky Cart Bar (Mobile) */}
-      <StickyCartBar
-        price={priceInPHP}
-        currency="PHP"
-        quantity={quantity}
-        canAddToCart={canAddToCart}
-        addingToCart={addingToCart}
-        cartSuccess={cartSuccess}
-        onAddToCart={handleAddToCart}
-        onBuyNow={handleBuyNow}
-      />
+      {/* Sticky Cart Bar (Mobile) - Only show if user is logged in */}
+      {isAuthenticated && (
+        <StickyCartBar
+          price={priceInPHP}
+          currency="PHP"
+          quantity={quantity}
+          canAddToCart={canAddToCart}
+          addingToCart={addingToCart}
+          cartSuccess={cartSuccess}
+          onAddToCart={handleAddToCart}
+          onBuyNow={handleBuyNow}
+        />
+      )}
 
       <div className="container mx-auto px-4 py-8 pb-20 lg:pb-8">
       <div className="grid gap-8 lg:grid-cols-2">

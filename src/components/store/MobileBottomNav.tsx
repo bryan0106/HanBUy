@@ -20,16 +20,30 @@ const navItems: NavItem[] = [
   { label: "Account", href: "/store/account", icon: "👤", requiresAuth: true },
 ];
 
+// Search item for non-authenticated users
+const searchItem = { label: "Search", href: "/store/search", icon: "🔍" };
+
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
 
-  // Show all items, but redirect auth-required items to login if not authenticated
-  const displayItems = navItems.map((item) => {
-    if (item.requiresAuth && !isAuthenticated) {
-      return { ...item, href: "/auth/login" };
+  // Build display items based on authentication
+  let displayItems: NavItem[] = [];
+  
+  navItems.forEach((item) => {
+    // For non-authenticated users, replace "My Orders" with search
+    if (!isAuthenticated && item.label === "My Orders") {
+      displayItems.push(searchItem);
+      return;
     }
-    return item;
+    
+    // For authenticated users, show "My Orders" normally
+    if (item.requiresAuth && !isAuthenticated) {
+      // For auth-required items, redirect to login
+      displayItems.push({ ...item, href: "/auth/login" });
+    } else {
+      displayItems.push(item);
+    }
   });
 
   return (
@@ -53,6 +67,10 @@ export function MobileBottomNav() {
           // My Orders - store orders routes
           else if (item.label === "My Orders") {
             active = pathname?.startsWith("/store/orders");
+          }
+          // Search - search page
+          else if (item.label === "Search") {
+            active = pathname === "/store/search" || pathname?.startsWith("/store/search");
           }
           // Account - store account page
           else if (item.label === "Account") {
