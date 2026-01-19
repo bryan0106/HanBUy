@@ -95,6 +95,8 @@ export default function PreorderProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
+      console.log('🔗 Loading preorder products from API: http://localhost:3001/api/products/preorder');
+      
       // Build query parameters
       const params: any = {
         page: 1,
@@ -113,17 +115,21 @@ export default function PreorderProductsPage() {
       const allServiceProducts: ServiceProduct[] = [];
       let currentPage = 1;
       while (true) {
+        console.log(`📡 Fetching preorder products page ${currentPage}...`);
         const response = await productService.getPreorderProducts({
           ...params,
           page: currentPage,
         });
 
         allServiceProducts.push(...response.data);
+        console.log(`✅ Page ${currentPage}: ${response.data.length} products, total: ${allServiceProducts.length}`);
 
         if (!response.pagination?.hasNextPage) break;
         currentPage += 1;
         if (currentPage > 1000) break; // safety
       }
+
+      console.log(`✅ Total preorder products loaded: ${allServiceProducts.length}`);
 
       // Convert service products to PreorderProduct type
       let convertedProducts = allServiceProducts.map(convertServiceProductToPreorderProduct);
@@ -134,9 +140,15 @@ export default function PreorderProductsPage() {
         return priceInPHP >= priceRange[0] && priceInPHP <= priceRange[1];
       });
       
+      console.log(`✅ Products after price filter: ${convertedProducts.length}`);
       setProducts(convertedProducts);
-    } catch (error) {
-      console.error("Error loading preorder products:", error);
+    } catch (error: any) {
+      console.error("❌ Error loading preorder products:", error);
+      console.error("❌ Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      });
       setProducts([]);
     } finally {
       setLoading(false);

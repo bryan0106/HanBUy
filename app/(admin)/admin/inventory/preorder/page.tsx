@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
+import { productService, type Product } from "@/services/productService";
 import toast from "react-hot-toast";
 
 interface PreorderProduct {
@@ -18,7 +19,7 @@ interface PreorderProduct {
   sku?: string;
   stock: number;
   preorder_stock?: number;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "out_of_stock";
   product_type: "preorder";
   is_preorder_available: boolean;
   is_onhand_available: boolean;
@@ -38,231 +39,41 @@ interface PreorderProduct {
   expected_arrival?: string;
 }
 
-// Comprehensive mock preorder products with all scenarios
-const mockPreorderProducts: PreorderProduct[] = [
-  // Scenario 1: Active Pre-order (Accepting Orders)
-  {
-    id: "preorder-bts-v-1",
-    name: "V (BTS) [TYPE 非] (Photobook + POSTER SET)",
-    description: "BTS V Photobook with poster set. Pre-order now to secure your copy!",
-    price: 35000,
-    currency: "KRW",
-    images: [
-      "https://www.ktown4u.com/goods_files/SH0164/event_images/043957/EV43956132.default.2.png",
-    ],
-    category: "k-pop",
-    brand: "BTS",
-    sku: "BTS-V-PB-2026",
-    stock: 110,
-    preorder_stock: 500,
-    status: "active",
-    product_type: "preorder",
-    is_preorder_available: true,
-    is_onhand_available: false,
-    order_date: "2025-12-31T11:00:00.000Z",
-    order_deadline: "2026-01-18T23:59:59.000Z",
-    release_date: "2026-01-19T00:00:00.000Z",
-    deposit_percentage: 50,
-    preorder_available_stock: 500,
-    preorders_claimed: 127,
-    shipping_time_days: 14,
-    created_at: "2025-12-15T00:00:00.000Z",
-    updated_at: new Date().toISOString(),
-    minStock: 10,
-    preorder_status: "accepting",
-    total_preorders: 127,
-    expected_arrival: "2026-02-02T00:00:00.000Z",
-  },
-  // Scenario 2: Deadline Passed (Pre-order Closed, Waiting for Release)
-  {
-    id: "preorder-zerobaseone-1",
-    name: "ZEROBASEONE Special Limited Album [RE-FLOW]",
-    description: "[PRE-ORDER EVENT] ZEROBASEONE Special Limited Album [RE-FLOW]",
-    price: 35600,
-    currency: "KRW",
-    images: [
-      "https://image.static.bstage.in/cdn-cgi/image/metadata=none,dpr=1,f=auto,width=640/zerobaseone/641c7fe3-a3fb-4854-89a2-bca98cf973b9/a1f46549-3c58-419f-82a7-91ce06da03c4/ori.jpg",
-    ],
-    category: "k-pop",
-    brand: "ZEROBASEONE",
-    sku: "ZB1-ALBUM-2026",
-    stock: 0,
-    preorder_stock: 300,
-    status: "active",
-    product_type: "preorder",
-    is_preorder_available: false,
-    is_onhand_available: false,
-    order_date: "2026-01-09T14:00:00.000Z",
-    order_deadline: "2026-02-01T23:59:59.000Z",
-    release_date: "2026-02-26T00:00:00.000Z",
-    deposit_percentage: 50,
-    preorder_available_stock: 300,
-    preorders_claimed: 245,
-    shipping_time_days: 10,
-    created_at: "2026-01-05T00:00:00.000Z",
-    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    minStock: 10,
-    preorder_status: "deadline_passed",
-    total_preorders: 245,
-    expected_arrival: "2026-03-08T00:00:00.000Z",
-  },
-  // Scenario 3: Release Approaching (Deadline Passed, Release Soon)
-  {
-    id: "preorder-nmixx-1",
-    name: "NMIXX 64 Fan Signing & Video Call Event",
-    description: "NMIXX Fan Signing & Video Call Event - Limited Edition",
-    price: 42000,
-    currency: "KRW",
-    images: [
-      "https://www.makestar.com/_vercel/image?url=https:%2F%2Fmystarroom-public-cdn.makestar.com%2Fpublic%2Fimage%2Fproduct%2FP_9723_NMIXX_64_Banner_Sub.jpg_2025-12-29_155719818560_thumb.jpeg&w=1024&q=80",
-    ],
-    category: "k-pop",
-    brand: "NMIXX",
-    sku: "NMIXX-64-EVENT",
-    stock: 0,
-    preorder_stock: 200,
-    status: "active",
-    product_type: "preorder",
-    is_preorder_available: false,
-    is_onhand_available: false,
-    order_date: "2026-01-12T11:00:00.000Z",
-    order_deadline: "2026-01-14T22:59:59.000Z",
-    release_date: "2026-01-22T00:00:00.000Z",
-    deposit_percentage: 50,
-    preorder_available_stock: 200,
-    preorders_claimed: 180,
-    shipping_time_days: 7,
-    created_at: "2026-01-10T00:00:00.000Z",
-    updated_at: new Date().toISOString(),
-    minStock: 10,
-    preorder_status: "release_approaching",
-    total_preorders: 180,
-    expected_arrival: "2026-01-29T00:00:00.000Z",
-  },
-  // Scenario 4: Released (Items Being Shipped from Korea)
-  {
-    id: "preorder-newjeans-1",
-    name: "NewJeans 'Get Up' Mini Album (Special Edition)",
-    description: "NewJeans special edition mini album with exclusive photocard",
-    price: 28000,
-    currency: "KRW",
-    images: ["https://via.placeholder.com/300x300?text=NewJeans+Album"],
-    category: "k-pop",
-    brand: "NewJeans",
-    sku: "NJ-GETUP-2025",
-    stock: 0,
-    preorder_stock: 400,
-    status: "active",
-    product_type: "preorder",
-    is_preorder_available: false,
-    is_onhand_available: false,
-    order_date: "2025-11-01T00:00:00.000Z",
-    order_deadline: "2025-11-30T23:59:59.000Z",
-    release_date: "2025-12-15T00:00:00.000Z",
-    deposit_percentage: 50,
-    preorder_available_stock: 400,
-    preorders_claimed: 320,
-    shipping_time_days: 14,
-    created_at: "2025-10-25T00:00:00.000Z",
-    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    minStock: 10,
-    preorder_status: "released",
-    total_preorders: 320,
-    expected_arrival: "2025-12-29T00:00:00.000Z",
-  },
-  // Scenario 5: In Storage (Items Arrived, Ready for Customers)
-  {
-    id: "preorder-ive-1",
-    name: "IVE 'I've IVE' Full Album (Limited Edition)",
-    description: "IVE full album limited edition with poster and photocard set",
-    price: 32000,
-    currency: "KRW",
-    images: ["https://via.placeholder.com/300x300?text=IVE+Album"],
-    category: "k-pop",
-    brand: "IVE",
-    sku: "IVE-IVE-2025",
-    stock: 0,
-    preorder_stock: 350,
-    status: "active",
-    product_type: "preorder",
-    is_preorder_available: false,
-    is_onhand_available: false,
-    order_date: "2025-10-01T00:00:00.000Z",
-    order_deadline: "2025-10-31T23:59:59.000Z",
-    release_date: "2025-11-20T00:00:00.000Z",
-    deposit_percentage: 50,
-    preorder_available_stock: 350,
-    preorders_claimed: 298,
-    shipping_time_days: 12,
-    created_at: "2025-09-25T00:00:00.000Z",
-    updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    minStock: 10,
-    preorder_status: "in_storage",
-    total_preorders: 298,
-    expected_arrival: "2025-12-02T00:00:00.000Z",
-  },
-  // Scenario 6: Cancelled Pre-order
-  {
-    id: "preorder-cancelled-1",
-    name: "Cancelled Artist Photobook (Event Cancelled)",
-    description: "Photobook for cancelled event - pre-orders refunded",
-    price: 45000,
-    currency: "KRW",
-    images: ["https://via.placeholder.com/300x300?text=Cancelled"],
-    category: "k-pop",
-    brand: "Unknown",
-    sku: "CANCEL-2025-001",
-    stock: 0,
-    preorder_stock: 0,
-    status: "inactive",
-    product_type: "preorder",
-    is_preorder_available: false,
-    is_onhand_available: false,
-    order_date: "2025-09-01T00:00:00.000Z",
-    order_deadline: "2025-09-30T23:59:59.000Z",
-    release_date: "2025-11-01T00:00:00.000Z",
-    deposit_percentage: 50,
-    preorder_available_stock: 150,
-    preorders_claimed: 45,
-    shipping_time_days: 14,
-    created_at: "2025-08-25T00:00:00.000Z",
-    updated_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    minStock: 10,
-    preorder_status: "cancelled",
-    total_preorders: 45,
-  },
-  // Scenario 7: Low Stock Pre-order (Almost Sold Out)
-  {
-    id: "preorder-lowstock-1",
-    name: "Limited Edition K-Pop Merch (Almost Sold Out)",
-    description: "Limited edition merch - only a few slots remaining!",
-    price: 55000,
-    currency: "KRW",
-    images: ["https://via.placeholder.com/300x300?text=Low+Stock"],
-    category: "k-pop",
-    brand: "Various",
-    sku: "LOW-STOCK-2026",
-    stock: 0,
-    preorder_stock: 100,
-    status: "active",
-    product_type: "preorder",
-    is_preorder_available: true,
-    is_onhand_available: false,
-    order_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    order_deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-    release_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    deposit_percentage: 50,
-    preorder_available_stock: 100,
-    preorders_claimed: 92,
-    shipping_time_days: 14,
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-    minStock: 10,
-    preorder_status: "accepting",
-    total_preorders: 92,
-    expected_arrival: new Date(Date.now() + 44 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
+// Helper function to calculate preorder status based on dates
+const calculatePreorderStatus = (product: Product): PreorderProduct["preorder_status"] => {
+  if (product.status === "inactive") {
+    return "cancelled";
+  }
+  
+  const now = new Date();
+  const orderDeadline = product.order_deadline ? new Date(product.order_deadline) : null;
+  const releaseDate = product.release_date ? new Date(product.release_date) : null;
+  const expectedDelivery = product.expected_delivery ? new Date(product.expected_delivery) : null;
+  
+  if (!orderDeadline) {
+    return "accepting";
+  }
+  
+  if (orderDeadline < now) {
+    // Deadline passed
+    if (releaseDate && releaseDate > now) {
+      // Release date hasn't arrived yet
+      const daysUntilRelease = Math.ceil((releaseDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return daysUntilRelease <= 7 ? "release_approaching" : "deadline_passed";
+    } else if (releaseDate && releaseDate <= now) {
+      // Release date passed
+      if (expectedDelivery && expectedDelivery <= now) {
+        return "in_storage";
+      } else {
+        return "released";
+      }
+    } else {
+      return "deadline_passed";
+    }
+  } else {
+    return "accepting";
+  }
+};
 
 export default function PreorderInventoryPage() {
   const [items, setItems] = useState<PreorderProduct[]>([]);
@@ -276,6 +87,23 @@ export default function PreorderInventoryPage() {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
       loadInventory(false);
+    }
+  }, []);
+
+  // Refresh when returning from edit/create page
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('refreshed') === 'true') {
+        loadingRef.current = false;
+        hasLoadedRef.current = false;
+        setTimeout(() => {
+          console.log('🔄 Refreshing preorder inventory after product creation...');
+          loadInventory(true, true).then(() => {
+            window.history.replaceState({}, '', '/admin/inventory/preorder');
+          });
+        }, 1000);
+      }
     }
   }, []);
 
@@ -293,40 +121,32 @@ export default function PreorderInventoryPage() {
     
     const loadingToast = showToast ? toast.loading("Loading preorder inventory...") : null;
     try {
-      // Use mock data directly - no API calls
-      console.log('📦 Using mock data for preorder inventory');
+      console.log('📦 Loading preorder inventory from API...');
       
-      // Calculate preorder_status based on dates
-      const now = new Date();
-      const productsWithStatus = mockPreorderProducts.map((p) => {
-        let preorderStatus: PreorderProduct["preorder_status"] = "accepting";
-        
-        if (p.status === "inactive" || p.preorder_status === "cancelled") {
-          preorderStatus = "cancelled";
-        } else if (p.order_deadline && new Date(p.order_deadline) < now) {
-          // Deadline passed
-          if (p.release_date && new Date(p.release_date) > now) {
-            // Release date hasn't arrived yet
-            const daysUntilRelease = Math.ceil((new Date(p.release_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            preorderStatus = daysUntilRelease <= 7 ? "release_approaching" : "deadline_passed";
-          } else if (p.release_date && new Date(p.release_date) <= now) {
-            // Release date passed
-            if (p.expected_arrival && new Date(p.expected_arrival) <= now) {
-              preorderStatus = "in_storage";
-            } else {
-              preorderStatus = "released";
-            }
-          } else {
-            preorderStatus = "deadline_passed";
-          }
-        } else if (p.order_deadline && new Date(p.order_deadline) >= now) {
-          preorderStatus = "accepting";
-        }
+      // Fetch preorder products from API
+      const response = await productService.getPreorderProducts({
+        page: 1,
+        limit: 1000, // Get all products
+      });
+
+      // Map preorder products and calculate status
+      const productsWithStatus: PreorderProduct[] = (response.data || []).map((p) => {
+        const preorderStatus = calculatePreorderStatus(p);
+        const expectedArrival = p.release_date && p.shipping_time_days
+          ? new Date(new Date(p.release_date).getTime() + p.shipping_time_days * 24 * 60 * 60 * 1000).toISOString()
+          : undefined;
         
         return {
           ...p,
+          product_type: "preorder" as const,
+          currency: (p.currency === "KRW" || p.currency === "PHP" ? p.currency : "KRW") as "KRW" | "PHP",
+          status: (p.status === 'out_of_stock' ? 'inactive' : (p.status || (p.stock > 0 ? 'active' : 'inactive'))) as 'active' | 'inactive' | 'out_of_stock',
+          is_preorder_available: p.is_preorder_available ?? true,
+          is_onhand_available: p.is_onhand_available ?? false,
+          minStock: p.min_threshold || 10,
           preorder_status: preorderStatus,
-          minStock: 10,
+          total_preorders: p.preorders_claimed || 0,
+          expected_arrival: expectedArrival,
         };
       });
       
@@ -336,11 +156,12 @@ export default function PreorderInventoryPage() {
         toast.dismiss(loadingToast);
         toast.success(`Preorder inventory loaded: ${productsWithStatus.length} items`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load preorder inventory:", error);
       if (loadingToast) {
         toast.dismiss(loadingToast);
-        toast.error("Failed to load inventory. Please try again.");
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to load inventory. Please try again.";
+        toast.error(errorMessage);
       }
       setItems([]);
     } finally {

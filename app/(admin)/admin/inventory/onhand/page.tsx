@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { productService, type Product } from "@/services/productService";
-import { mockProducts } from "@/lib/mockData";
 import toast from "react-hot-toast";
 
 interface InventoryItem extends Product {
@@ -26,6 +25,23 @@ export default function OnhandInventoryPage() {
     }
   }, []);
 
+  // Refresh when returning from edit/create page
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('refreshed') === 'true') {
+        loadingRef.current = false;
+        hasLoadedRef.current = false;
+        setTimeout(() => {
+          console.log('🔄 Refreshing onhand inventory after product creation...');
+          loadInventory(true, true).then(() => {
+            window.history.replaceState({}, '', '/admin/inventory/onhand');
+          });
+        }, 1000);
+      }
+    }
+  }, []);
+
   const loadInventory = async (showToast = true, forceRefresh = false) => {
     if (loadingRef.current && !forceRefresh) {
       return;
@@ -40,17 +56,21 @@ export default function OnhandInventoryPage() {
     
     const loadingToast = showToast ? toast.loading("Loading onhand inventory...") : null;
     try {
-      // Use mock data directly - no API calls
-      console.log('📦 Using mock data for onhand inventory');
+      console.log('📦 Loading onhand inventory from API...');
       
-      const onhand: InventoryItem[] = mockProducts
-        .filter((p: any) => p.product_type === "onhand" || p.product_type === "preorder_and_onhand")
-        .map((p: any) => ({
-          ...p,
-          product_type: "onhand" as const,
-          status: (p.stock > 0 ? 'active' : 'out_of_stock') as 'active' | 'inactive' | 'out_of_stock',
-          minStock: 10,
-        }));
+      // Fetch onhand products from API
+      const response = await productService.getOnhandProducts({
+        page: 1,
+        limit: 1000, // Get all products
+      });
+
+      // Map onhand products
+      const onhand: InventoryItem[] = (response.data || []).map((p) => ({
+        ...p,
+        product_type: (p.product_type === "onhand" || p.product_type === "preorder_and_onhand" ? "onhand" : p.product_type) as "onhand" | "preorder" | "kr_website" | "preorder_and_onhand",
+        status: (p.status || (p.stock > 0 ? 'active' : 'out_of_stock')) as 'active' | 'inactive' | 'out_of_stock',
+        minStock: p.min_threshold || 10,
+      }));
 
       setItems(onhand);
       
@@ -58,11 +78,12 @@ export default function OnhandInventoryPage() {
         toast.dismiss(loadingToast);
         toast.success(`Onhand inventory loaded: ${onhand.length} items`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load onhand inventory:", error);
       if (loadingToast) {
         toast.dismiss(loadingToast);
-        toast.error("Failed to load inventory. Please try again.");
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to load inventory. Please try again.";
+        toast.error(errorMessage);
       }
       setItems([]);
     } finally {
@@ -353,8 +374,8 @@ export default function OnhandInventoryPage() {
                               setDeletingId(item.id);
                               const deleteToast = toast.loading(`Deleting ${item.name}...`);
                               try {
-                                // Use mock data - just update local state
-                                console.log('🗑️ Deleting product (mock):', item.id);
+                                console.log('🗑️ Deleting product via API:', item.id);
+                                await productService.deleteProduct(item.id);
                                 toast.dismiss(deleteToast);
                                 toast.success(`"${item.name}" has been deleted successfully`);
                                 loadingRef.current = false;

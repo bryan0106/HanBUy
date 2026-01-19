@@ -41,16 +41,44 @@ export default function EditInventoryItemPage() {
     brand: "",
     sku: "",
     stock: 0,
+    reserved_stock: 0,
+    min_threshold: 10,
     weight: 0,
     status: "active" as "active" | "inactive" | "out_of_stock",
-    product_type: "onhand" as "onhand" | "preorder" | "kr_website",
+    product_type: "onhand" as "onhand" | "preorder" | "kr_website" | "preorder_and_onhand",
     order_date: "",
+    order_deadline: "",
     release_date: "",
+    expected_delivery: "",
+    deposit_percentage: 50,
+    preorder_available_stock: 0,
+    preorders_claimed: 0,
+    shipping_time_days: 14,
+    is_preorder_available: false,
+    is_onhand_available: true,
+    is_new_arrival: false,
     dimensions: {
       length: 0,
       width: 0,
       height: 0,
     },
+    length: 0,
+    width: 0,
+    height: 0,
+    seo_title: "",
+    seo_description: "",
+    php_price: 0,
+    price_conversion_rate: 0,
+    currency_rate: 0,
+    original_price_markup: 0,
+    tags: [] as string[],
+    full_description: "",
+    specifications: {} as Record<string, any>,
+    item_type: "",
+    artist: "",
+    max_price_filter: 0,
+    shipping_estimate: "",
+    new_arrival_days: 14,
   });
 
   useEffect(() => {
@@ -76,7 +104,9 @@ export default function EditInventoryItemPage() {
       
       // Format dates for input fields
       const orderDate = product.order_date ? new Date(product.order_date).toISOString().split('T')[0] : "";
+      const orderDeadline = product.order_deadline ? new Date(product.order_deadline).toISOString().split('T')[0] : "";
       const releaseDate = product.release_date ? new Date(product.release_date).toISOString().split('T')[0] : "";
+      const expectedDelivery = product.expected_delivery ? new Date(product.expected_delivery).toISOString().split('T')[0] : "";
       
       setFormData({
         name: product.name || "",
@@ -88,6 +118,8 @@ export default function EditInventoryItemPage() {
         brand: product.brand || "",
         sku: product.sku || "",
         stock: product.stock || 0,
+        reserved_stock: product.reserved_stock || 0,
+        min_threshold: product.min_threshold || 10,
         weight: product.weight || 0,
         status: product.status || "active",
         product_type: (
@@ -100,8 +132,34 @@ export default function EditInventoryItemPage() {
             : "onhand"
         ) as "onhand" | "preorder" | "kr_website",
         order_date: orderDate,
+        order_deadline: orderDeadline,
         release_date: releaseDate,
+        expected_delivery: expectedDelivery,
+        deposit_percentage: product.deposit_percentage || 50,
+        preorder_available_stock: product.preorder_available_stock || 0,
+        preorders_claimed: product.preorders_claimed || 0,
+        shipping_time_days: product.shipping_time_days || 14,
+        is_preorder_available: product.is_preorder_available ?? false,
+        is_onhand_available: product.is_onhand_available ?? true,
+        is_new_arrival: product.is_new_arrival || false,
         dimensions: product.dimensions || { length: 0, width: 0, height: 0 },
+        length: product.length || 0,
+        width: product.width || 0,
+        height: product.height || 0,
+        seo_title: product.seo_title || "",
+        seo_description: product.seo_description || "",
+        php_price: product.php_price || 0,
+        price_conversion_rate: product.price_conversion_rate || 0,
+        currency_rate: product.currency_rate || 0,
+        original_price_markup: product.original_price_markup || 0,
+        tags: Array.isArray(product.tags) ? product.tags : [],
+        full_description: product.full_description || "",
+        specifications: product.specifications || {},
+        item_type: product.item_type || "",
+        artist: product.artist || "",
+        max_price_filter: product.max_price_filter || 0,
+        shipping_estimate: product.shipping_estimate || "",
+        new_arrival_days: product.new_arrival_days || 14,
       });
 
       // Load variations if available
@@ -173,11 +231,25 @@ export default function EditInventoryItemPage() {
       toast.error(errorMsg);
       return;
     }
-    if (formData.product_type === "preorder" && (!formData.order_date || !formData.release_date)) {
-      const errorMsg = "Order date and release date are required for preorder products";
+    if (!formData.category || !formData.category.trim() || formData.category === "all") {
+      const errorMsg = "Please select a valid category";
       setError(errorMsg);
       toast.error(errorMsg);
       return;
+    }
+    if (formData.product_type === "preorder") {
+      if (!formData.order_date) {
+        const errorMsg = "Order date is required for preorder products";
+        setError(errorMsg);
+        toast.error(errorMsg);
+        return;
+      }
+      if (!formData.release_date) {
+        const errorMsg = "Release date is required for preorder products";
+        setError(errorMsg);
+        toast.error(errorMsg);
+        return;
+      }
     }
 
     setSaving(true);
@@ -207,8 +279,38 @@ export default function EditInventoryItemPage() {
       // Add preorder-specific fields if product_type is preorder
       if (formData.product_type === "preorder") {
         payload.order_date = formData.order_date ? new Date(formData.order_date).toISOString() : undefined;
+        payload.order_deadline = formData.order_deadline ? new Date(formData.order_deadline).toISOString() : undefined;
         payload.release_date = formData.release_date ? new Date(formData.release_date).toISOString() : undefined;
+        payload.expected_delivery = formData.expected_delivery ? new Date(formData.expected_delivery).toISOString() : undefined;
+        payload.deposit_percentage = formData.deposit_percentage || undefined;
+        payload.preorder_available_stock = formData.preorder_available_stock > 0 ? formData.preorder_available_stock : undefined;
+        payload.preorders_claimed = formData.preorders_claimed > 0 ? formData.preorders_claimed : undefined;
+        payload.shipping_time_days = formData.shipping_time_days > 0 ? formData.shipping_time_days : undefined;
+        payload.is_preorder_available = formData.is_preorder_available !== undefined ? formData.is_preorder_available : true;
+        payload.is_onhand_available = formData.is_onhand_available !== undefined ? formData.is_onhand_available : false;
       }
+      
+      // Add other fields
+      payload.reserved_stock = formData.reserved_stock > 0 ? formData.reserved_stock : undefined;
+      payload.min_threshold = formData.min_threshold > 0 ? formData.min_threshold : undefined;
+      payload.is_new_arrival = formData.is_new_arrival || undefined;
+      payload.seo_title = formData.seo_title.trim() || undefined;
+      payload.seo_description = formData.seo_description.trim() || undefined;
+      payload.php_price = formData.php_price > 0 ? formData.php_price : undefined;
+      payload.price_conversion_rate = formData.price_conversion_rate > 0 ? formData.price_conversion_rate : undefined;
+      payload.currency_rate = formData.currency_rate > 0 ? formData.currency_rate : undefined;
+      payload.original_price_markup = formData.original_price_markup > 0 ? formData.original_price_markup : undefined;
+      payload.tags = formData.tags.length > 0 ? formData.tags : undefined;
+      payload.full_description = formData.full_description.trim() || undefined;
+      payload.specifications = Object.keys(formData.specifications).length > 0 ? formData.specifications : undefined;
+      payload.item_type = formData.item_type.trim() || undefined;
+      payload.artist = formData.artist.trim() || undefined;
+      payload.max_price_filter = formData.max_price_filter > 0 ? formData.max_price_filter : undefined;
+      payload.shipping_estimate = formData.shipping_estimate.trim() || undefined;
+      payload.new_arrival_days = formData.new_arrival_days > 0 ? formData.new_arrival_days : undefined;
+      payload.length = formData.length > 0 ? formData.length : undefined;
+      payload.width = formData.width > 0 ? formData.width : undefined;
+      payload.height = formData.height > 0 ? formData.height : undefined;
 
       console.log("Updating product with payload:", payload);
       updateToast = toast.loading("Updating product...");
@@ -247,7 +349,11 @@ export default function EditInventoryItemPage() {
       toast.dismiss(updateToast);
       toast.success("Product updated successfully!");
       // Add query parameter to trigger refresh on inventory page
-      router.push("/admin/inventory?refreshed=true");
+      // Redirect to appropriate page based on product type
+      const redirectPath = formData.product_type === "preorder" 
+        ? "/admin/inventory/preorder?refreshed=true"
+        : "/admin/inventory?refreshed=true";
+      router.push(redirectPath);
       router.refresh(); // Force Next.js to refresh the page
     } catch (err: any) {
       console.error("Failed to update product:", err);
@@ -402,7 +508,7 @@ export default function EditInventoryItemPage() {
                 <label className="mb-2 block text-sm font-medium">Product Type *</label>
                 <select
                   value={formData.product_type}
-                  onChange={(e) => setFormData({ ...formData, product_type: e.target.value as "onhand" | "preorder" | "kr_website" })}
+                  onChange={(e) => setFormData({ ...formData, product_type: e.target.value as "onhand" | "preorder" | "kr_website" | "preorder_and_onhand" })}
                   required
                   className="w-full rounded-lg border border-border bg-background px-4 py-2"
                 >
@@ -488,30 +594,162 @@ export default function EditInventoryItemPage() {
             </div>
 
             {formData.product_type === "preorder" && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Order Date *</label>
-                  <input
-                    type="date"
-                    value={formData.order_date}
-                    onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
-                    required={formData.product_type === "preorder"}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2"
-                  />
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Order Date *</label>
+                    <input
+                      type="date"
+                      value={formData.order_date}
+                      onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
+                      required={formData.product_type === "preorder"}
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Release Date *</label>
+                    <input
+                      type="date"
+                      value={formData.release_date}
+                      onChange={(e) => setFormData({ ...formData, release_date: e.target.value })}
+                      required={formData.product_type === "preorder"}
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Order Deadline</label>
+                    <input
+                      type="date"
+                      value={formData.order_deadline}
+                      onChange={(e) => setFormData({ ...formData, order_deadline: e.target.value })}
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Expected Delivery</label>
+                    <input
+                      type="date"
+                      value={formData.expected_delivery}
+                      onChange={(e) => setFormData({ ...formData, expected_delivery: e.target.value })}
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Release Date *</label>
-                  <input
-                    type="date"
-                    value={formData.release_date}
-                    onChange={(e) => setFormData({ ...formData, release_date: e.target.value })}
-                    required={formData.product_type === "preorder"}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2"
-                  />
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Deposit Percentage (%)</label>
+                    <input
+                      type="number"
+                      value={formData.deposit_percentage}
+                      onChange={(e) => setFormData({ ...formData, deposit_percentage: parseInt(e.target.value) || 50 })}
+                      min="0"
+                      max="100"
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Preorder Available Stock</label>
+                    <input
+                      type="number"
+                      value={formData.preorder_available_stock}
+                      onChange={(e) => setFormData({ ...formData, preorder_available_stock: parseInt(e.target.value) || 0 })}
+                      min="0"
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Preorders Claimed</label>
+                    <input
+                      type="number"
+                      value={formData.preorders_claimed}
+                      onChange={(e) => setFormData({ ...formData, preorders_claimed: parseInt(e.target.value) || 0 })}
+                      min="0"
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Shipping Time (Days)</label>
+                    <input
+                      type="number"
+                      value={formData.shipping_time_days}
+                      onChange={(e) => setFormData({ ...formData, shipping_time_days: parseInt(e.target.value) || 14 })}
+                      min="0"
+                      className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                    />
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* Stock Management Fields */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium">Reserved Stock</label>
+                <input
+                  type="number"
+                  value={formData.reserved_stock}
+                  onChange={(e) => setFormData({ ...formData, reserved_stock: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium">Low Stock Threshold</label>
+                <input
+                  type="number"
+                  value={formData.min_threshold}
+                  onChange={(e) => setFormData({ ...formData, min_threshold: parseInt(e.target.value) || 10 })}
+                  min="0"
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2"
+                />
+              </div>
+            </div>
+
+            {/* Product Flags */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Product Flags</label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_onhand_available}
+                    onChange={(e) => setFormData({ ...formData, is_onhand_available: e.target.checked })}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm">Available Onhand</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_preorder_available}
+                    onChange={(e) => setFormData({ ...formData, is_preorder_available: e.target.checked })}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm">Preorder Available</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_new_arrival}
+                    onChange={(e) => setFormData({ ...formData, is_new_arrival: e.target.checked })}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm">New Arrival</span>
+                </label>
+              </div>
+            </div>
 
             {/* Dimensions */}
             <div>

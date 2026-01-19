@@ -1,7 +1,6 @@
 import apiClient from '@/lib/apiClient';
 import { handleApiError } from '@/utils/errorHandler';
-import { shouldUseMockData } from '@/utils/env';
-import { mockPreorderService } from '@/lib/mockPreorderData';
+import { shouldUseMockData, getApiBaseUrl, isLocalhost } from '@/utils/env';
 import type { ProductVariation } from '@/types';
 import { mockProducts } from '@/lib/mockData';
 
@@ -16,32 +15,64 @@ export interface Product {
   brand?: string;
   sku?: string;
   
-  // Stock Management (Option 2: Separate Onhand Stock Field)
+  // Stock Management
   stock: number;                    // Available onhand stock
   preorder_stock?: number;          // Preorder stock (if still accepting preorders)
+  reserved_stock?: number;          // Reserved stock
+  min_threshold?: number;           // Low stock threshold (default: 10)
   
   status: 'active' | 'inactive' | 'out_of_stock';
   product_type: 'onhand' | 'preorder' | 'kr_website' | 'preorder_and_onhand';
   
-  // Flags (Option 2)
+  // Flags
   is_preorder_available?: boolean;  // Accepting preorders?
   is_onhand_available?: boolean;    // Available now?
+  is_new_arrival?: boolean;         // New arrival flag (default: false)
   
   // Preorder fields (optional, NULL for onhand-only products)
-  order_date?: string;              // When preorder started
-  order_deadline?: string;          // When preorders close
-  release_date?: string;            // Expected release date
-  deposit_percentage?: number;      // e.g., 50 for 50%
+  order_date?: string;              // When preorder started (ISO date)
+  order_deadline?: string;          // When preorders close (ISO date)
+  release_date?: string;            // Expected release date (ISO date)
+  expected_delivery?: string;       // Expected delivery date (ISO date)
+  deposit_percentage?: number;      // e.g., 50 for 50% (default: 50)
   preorder_available_stock?: number; // Max preorders allowed
-  preorders_claimed?: number;       // How many preorders made
-  shipping_time_days?: number;      // Days from release to delivery
+  preorders_claimed?: number;       // How many preorders made (default: 0)
+  shipping_time_days?: number;      // Days from release to delivery (default: 14)
   
+  // Physical properties
   weight?: number;
   dimensions?: {
     length: number;
     width: number;
     height: number;
   };
+  length?: number;                 // Individual dimension fields
+  width?: number;
+  height?: number;
+  
+  // SEO fields
+  seo_title?: string;
+  seo_description?: string;
+  
+  // Pricing fields
+  php_price?: number;               // Price in PHP
+  price_conversion_rate?: number;  // Conversion rate
+  currency_rate?: number;           // Currency rate
+  original_price_markup?: number;   // Price markup
+  
+  // Additional product info
+  tags?: string[];                  // Product tags (array)
+  full_description?: string;        // Full description
+  specifications?: Record<string, any>; // Product specs (object)
+  item_type?: string;               // Item type (Album, Ticket, Bag, etc.)
+  artist?: string;                  // Artist name
+  
+  // Filtering and display
+  max_price_filter?: number;        // Max price filter
+  shipping_estimate?: string;       // Shipping estimate
+  new_arrival_days?: number;        // New arrival period (default: 14)
+  
+  // Timestamps
   created_at?: string;
   updated_at?: string;
   
@@ -51,15 +82,6 @@ export interface Product {
   // Reviews summary
   reviews_count?: number;
   average_rating?: number;
-  
-  // Currency rate info
-  currency_rate?: {
-    krw_to_php: number;
-    updated_at: string;
-  };
-  
-  // Item type (Album, Ticket, Bag, Accessories, Poster, Clothing, Item)
-  item_type?: string;
 }
 
 export interface GetProductsParams {
@@ -120,53 +142,34 @@ export const productService = {
    * Get single product by ID
    */
   async getProductById(id: string): Promise<Product> {
-    // Use mock data for testing on localhost
-    if (shouldUseMockData()) {
-      console.log('📦 Using mock data for product by ID (localhost)');
-      
-      // Check preorder products first
-      const preorderResponse = await mockPreorderService.getPreorderProducts({ limit: 1000 });
-      const preorderProduct = preorderResponse.data.find(p => p.id === id);
-      if (preorderProduct) {
-        return preorderProduct;
-      }
-      
-      // Check onhand products
-      const onhandProduct = mockProducts.find(p => p.id === id);
-      if (onhandProduct) {
-        // Convert to Product format expected by service
-        return {
-          id: onhandProduct.id,
-          name: onhandProduct.name,
-          description: onhandProduct.description || '',
-          price: onhandProduct.price,
-          currency: onhandProduct.currency,
-          images: onhandProduct.images || [],
-          category: onhandProduct.category,
-          brand: onhandProduct.brand,
-          sku: onhandProduct.sku,
-          stock: onhandProduct.stock,
-          status: 'active',
-          product_type: 'onhand',
-          is_preorder_available: false,
-          is_onhand_available: true,
-          weight: onhandProduct.weight,
-          dimensions: onhandProduct.dimensions,
-          created_at: onhandProduct.createdAt.toISOString(),
-          updated_at: onhandProduct.updatedAt.toISOString(),
-        };
-      }
-      
-      // If not found in mock data, throw error
-      throw new Error('Product not found');
-    }
-
+    // Always use API - no mock data fallback
     try {
-      console.log('🔗 Fetching product from API:', `/products/${id}`);
+      const apiUrl = getApiBaseUrl();
+      const fullUrl = `${apiUrl}/products/${id}`;
+      console.log('🔗 Fetching product from API:', fullUrl);
+      console.log('📡 API Base URL:', apiUrl);
+      console.log('🆔 Product ID:', id);
+      console.log('🌐 Using API (mock data disabled)');
+      
       const response = await apiClient.get<GetProductResponse>(`/products/${id}`);
+      console.log('✅ Product fetched successfully:', response.data);
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching product:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+        baseURL: error?.config?.baseURL,
+      });
+      
+      // If API fails, show helpful message but don't fall back to mock
+      if (isLocalhost() && !process.env.NEXT_PUBLIC_USE_MOCK_DATA) {
+        console.warn('⚠️ API call failed. Make sure your backend is running on localhost:3001');
+        console.warn('💡 To use mock data temporarily, set NEXT_PUBLIC_USE_MOCK_DATA=true in .env.local');
+      }
+      
       throw handleApiError(error);
     }
   },
@@ -177,11 +180,27 @@ export const productService = {
    */
   async getOnhandProducts(params?: GetProductsParams): Promise<GetProductsResponse> {
     try {
-      console.log('🔗 Fetching onhand products from API: https://hanbuy-api.onrender.com/api/products/onhand', params);
+      const apiUrl = getApiBaseUrl();
+      console.log('🔗 Fetching onhand products from API:', `${apiUrl}/products/onhand`);
+      console.log('📡 Query params:', params);
+      
       const response = await apiClient.get<GetProductsResponse>('/products/onhand', { params });
+      
+      console.log('✅ Onhand API response:', {
+        success: response.data.success,
+        dataLength: response.data.data?.length || 0,
+        total: response.data.pagination?.total || 0,
+      });
+      
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching onhand products:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
       throw handleApiError(error);
     }
   },
@@ -191,12 +210,32 @@ export const productService = {
    * Query params: page, limit, category, brand, search, min_price, max_price, sort
    */
   async getPreorderProducts(params?: Omit<GetProductsParams, 'in_stock'>): Promise<GetProductsResponse> {
+    // Always use API - no mock data fallback
     try {
-      console.log('🔗 Fetching preorder products from API: https://hanbuy-api.onrender.com/api/products/preorder', params);
+      const apiUrl = getApiBaseUrl();
+      console.log('🔗 Fetching preorder products from API:', `${apiUrl}/products/preorder`);
+      console.log('📡 Query params:', params);
+      console.log('🌐 Using API (mock data disabled)');
+      
       const response = await apiClient.get<GetProductsResponse>('/products/preorder', { params });
+      console.log('✅ Preorder products fetched:', response.data.data?.length || 0, 'items');
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching preorder products:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+        baseURL: error?.config?.baseURL,
+      });
+      
+      // If API fails, show helpful message but don't fall back to mock
+      if (isLocalhost() && !process.env.NEXT_PUBLIC_USE_MOCK_DATA) {
+        console.warn('⚠️ API call failed. Make sure your backend is running on localhost:3001');
+        console.warn('💡 To use mock data temporarily, set NEXT_PUBLIC_USE_MOCK_DATA=true in .env.local');
+      }
+      
       throw handleApiError(error);
     }
   },
@@ -229,23 +268,55 @@ export const productService = {
 
   /**
    * Update an existing product
+   * Requires Admin authentication
+   * Only include fields you want to update
    */
   async updateProduct(id: string, productData: Partial<Product>): Promise<Product> {
     try {
+      const apiUrl = getApiBaseUrl();
+      console.log('🔗 Updating product via API:', `${apiUrl}/products/${id}`);
+      console.log('📝 Fields to update:', Object.keys(productData));
+      
       const response = await apiClient.put<GetProductResponse>(`/products/${id}`, productData);
+      console.log('✅ Product updated successfully:', response.data.data?.id);
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Error updating product:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
       throw handleApiError(error);
     }
   },
 
   /**
    * Delete a product
+   * Requires Admin authentication
+   * Returns 204 No Content on success
    */
   async deleteProduct(id: string): Promise<void> {
     try {
-      await apiClient.delete(`/products/${id}`);
-    } catch (error) {
+      const apiUrl = getApiBaseUrl();
+      console.log('🔗 Deleting product via API:', `${apiUrl}/products/${id}`);
+      
+      const response = await apiClient.delete(`/products/${id}`);
+      console.log('✅ Product deleted successfully');
+      
+      // Handle 204 No Content response
+      if (response.status === 204) {
+        return;
+      }
+    } catch (error: any) {
+      console.error('❌ Error deleting product:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
       throw handleApiError(error);
     }
   },

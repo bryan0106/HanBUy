@@ -88,32 +88,53 @@ export default function PreorderImportPage() {
     const scrapeToast = toast.loading("Scraping product data...");
 
     try {
-      // Use mock data mapping instead of API call
-      const mockData = getMockScrapedData(url);
+      // Use real API scraper - supports all websites via generic scraper
+      console.log("🔗 Scraping URL via API:", url);
       
-      if (!mockData) {
-        throw new Error("Unsupported URL. Please use a Ktown4u event URL.");
+      const response = await fetch("/api/products/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to scrape product");
       }
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const data = mockData;
+      const data = result.data;
+      console.log("✅ Scraped data:", data);
+      
+      if (!data || !data.name) {
+        throw new Error("Could not extract product data from URL. The website may not be supported or the page structure may have changed.");
+      }
         
-        // Create scrapedData object for preview
-        setScrapedData({
-          sourceSite: url.includes("ktown4u") ? "ktown4u" : "unknown",
-          sourceUrl: url,
-          name: data.name || "",
-          price: data.price || 0,
-          releaseDate: data.releaseDate || data.release_date || "",
-          preorderDeadline: data.preorderDeadline || data.order_deadline || "",
-          preorderStartDate: data.order_date || "",
-          description: data.description || "",
-          images: Array.isArray(data.images) ? data.images : [],
-          brand: data.brand || "",
-          category: data.category || "k-pop",
-        });
+      // Create scrapedData object for preview
+      const hostname = new URL(url).hostname.toLowerCase();
+      const sourceSite = hostname.includes("ktown4u") ? "ktown4u" :
+                        hostname.includes("cnakpop") ? "cnakpop" :
+                        hostname.includes("mnetplus") ? "mnetplus" :
+                        hostname.includes("makestar") ? "makestar" :
+                        hostname.includes("gqkorea") ? "gqkorea" :
+                        hostname.includes("gmarket") ? "gmarket" :
+                        hostname.includes("coupang") ? "coupang" : "generic";
+      
+      setScrapedData({
+        sourceSite,
+        sourceUrl: url,
+        name: data.name || "",
+        price: data.price || 0,
+        releaseDate: data.releaseDate || data.release_date || "",
+        preorderDeadline: data.preorderDeadline || data.order_deadline || "",
+        preorderStartDate: data.order_date || data.preorderStartDate || "",
+        description: data.description || "",
+        images: Array.isArray(data.images) ? data.images : [],
+        brand: data.brand || "",
+        category: data.category || "k-pop",
+      });
         
         // Pre-fill form with scraped data
         setProductData({
@@ -159,44 +180,50 @@ export default function PreorderImportPage() {
     const createToast = toast.loading("Creating preorder product...");
 
     try {
-      // Prepare payload (no API call - using mock data)
+      // Prepare payload for API call
+      const { productService } = await import("@/services/productService");
+      
       const payload = {
         name: productData.name.trim(),
         description: productData.description.trim() || undefined,
         price: parseFloat(productData.price),
         currency: productData.currency as "KRW" | "PHP",
-        images: productData.images,
+        images: productData.images.length > 0 ? productData.images : undefined,
         category: productData.category || undefined,
         brand: productData.brand.trim() || undefined,
         product_type: "preorder" as const,
         stock: 0,
         status: "active" as const,
+        is_preorder_available: true,
+        is_onhand_available: false,
+        // Preorder-specific fields
         order_date: productData.orderDate ? new Date(productData.orderDate).toISOString() : undefined,
         order_deadline: productData.orderDeadline ? new Date(productData.orderDeadline).toISOString() : undefined,
         release_date: productData.releaseDate ? new Date(productData.releaseDate).toISOString() : undefined,
-        deposit_percentage: productData.depositPercentage,
-        preorder_available_stock: productData.preorderAvailableStock,
-        shipping_time_days: productData.shippingTimeDays,
+        deposit_percentage: productData.depositPercentage || 50,
+        preorder_available_stock: productData.preorderAvailableStock || 500,
+        preorders_claimed: 0,
+        shipping_time_days: productData.shippingTimeDays || 14,
       };
 
-      // Use mock data storage instead of API call
-      // Generate a new product ID
-      const newProductId = `preorder-${Date.now()}`;
-      const createdProduct = {
-        id: newProductId,
-        ...payload,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Store in localStorage or mock data store (for demo purposes)
-      console.log("Mock product created:", createdProduct);
+      console.log("📤 Creating preorder product via API:", payload);
       
-      // In a real implementation, you would add this to mockPreorderProducts array
-      // For now, we'll just log it and show success
+      // Create product via API
+      const createdProduct = await productService.createProduct(payload);
+      
+      console.log("✅ Preorder product created:", {
+        id: createdProduct.id,
+        name: createdProduct.name,
+        product_type: createdProduct.product_type,
+      });
       
       toast.dismiss(createToast);
-      toast.success("Preorder product created successfully! (Mock - stored in console)");
+      toast.success("Preorder product created successfully!");
+      
+      // Redirect to inventory page
+      setTimeout(() => {
+        window.location.href = "/admin/inventory/preorder?refreshed=true";
+      }, 1000);
       
       // Reset form
       setUrl("");
@@ -232,7 +259,7 @@ export default function PreorderImportPage() {
       <div className="container mx-auto px-4 py-6">
         <h1 className="mb-6 text-2xl font-bold">Import Pre-Order Product</h1>
         <p className="mb-6 text-muted-foreground">
-          Enter a URL from Ktown4u, Mnet Plus, Makestar, or GQ Korea to automatically extract product information.
+          Enter a URL from any supported website (Ktown4u, CNAKPop, Mnet Plus, Makestar, GQ Korea, Gmarket, Coupang, Amazon, eBay, Shopee, Lazada, or any website with Open Graph meta tags) to automatically extract product information.
         </p>
 
         {/* URL Input */}
@@ -243,7 +270,7 @@ export default function PreorderImportPage() {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://www.ktown4u.com/eventinfo?eve_no=..."
+              placeholder="https://cnakpop.com/proc or https://www.ktown4u.com/eventinfo?eve_no=..."
               className="flex-1 rounded-lg border border-border bg-background px-4 py-2"
             />
             <Button onClick={handleScrape} disabled={loading}>

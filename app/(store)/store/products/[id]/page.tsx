@@ -11,6 +11,7 @@ import { getProductReviews, getAverageRating, mockProducts } from "@/lib/mockDat
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import { mockCartService, mockOrderService } from "@/lib/mockOrdersData";
 import type { Product } from "@/services/productService";
+import { productService } from "@/services/productService";
 import { PriceComparison } from "@/components/store/PriceComparison";
 import { PriceComparisonInline } from "@/components/store/PriceComparisonInline";
 import { ProductImageSkeleton, ProductInfoSkeleton, ReviewSkeleton } from "@/components/ui/skeleton";
@@ -115,60 +116,41 @@ export default function ProductDetailPage() {
       setError(null);
     }
     try {
-      // Use mock data - check both onhand and preorder products using direct .find()
-      let data = mockProducts.find(p => p.id === productId);
-      if (!data) {
-        data = mockPreorderProducts.find(p => p.id === productId) as any;
-      }
+      // Use API service to fetch product from backend API
+      console.log('🔗 Fetching product from API:', productId);
+      const productData = await productService.getProductById(productId);
       
-      if (!data) {
+      if (!productData) {
         throw new Error("Product not found");
       }
       
-      // Convert to Product format expected by component
-      const productData: any = {
-        ...data,
-        id: data.id,
-        name: data.name,
-        description: data.description || '',
-        price: data.price,
-        currency: data.currency,
-        images: data.images || [],
-        category: data.category,
-        brand: data.brand,
-        stock: data.stock || 0,
-        weight: data.weight,
-        dimensions: data.dimensions,
-      };
+      setProduct(productData as ProductWithVariations);
       
-      setProduct(productData);
+      // Load reviews for this product (using mock reviews for now)
+      const productReviews = getProductReviews(productData.id);
+      setReviews(productReviews);
       
-      // Load reviews for this product
-      if (data) {
-        const productReviews = getProductReviews(data.id);
-        setReviews(productReviews);
-        
-        // Load related products - mix of same category and popular products
-        const allProducts = [...mockProducts];
-        
-        // Get products from same category
-        const sameCategoryProducts = allProducts
-          .filter((p) => p.id !== data.id && p.category === data.category)
-          .slice(0, 2);
-        
-        // Get popular products from other categories (high stock or different categories)
-        const otherCategoryProducts = allProducts
-          .filter((p) => p.id !== data.id && p.category !== data.category)
-          .sort((a, b) => (b.stock || 0) - (a.stock || 0)) // Sort by stock (popularity indicator)
-          .slice(0, 6);
-        
-        // Mix and shuffle recommendations
-        const mixed = [...sameCategoryProducts, ...otherCategoryProducts]
-          .sort(() => Math.random() - 0.5) // Shuffle
-          .slice(0, 8); // Get 8 products
-        
-        setRelatedProducts(mixed as any);
-      }
+      // Load related products - mix of same category and popular products
+      // For now, use mock data for related products. In future, can add API endpoint
+      const allProducts = [...mockProducts];
+      
+      // Get products from same category
+      const sameCategoryProducts = allProducts
+        .filter((p) => p.id !== productData.id && p.category === productData.category)
+        .slice(0, 2);
+      
+      // Get popular products from other categories (high stock or different categories)
+      const otherCategoryProducts = allProducts
+        .filter((p) => p.id !== productData.id && p.category !== productData.category)
+        .sort((a, b) => (b.stock || 0) - (a.stock || 0)) // Sort by stock (popularity indicator)
+        .slice(0, 6);
+      
+      // Mix and shuffle recommendations
+      const mixed = [...sameCategoryProducts, ...otherCategoryProducts]
+        .sort(() => Math.random() - 0.5) // Shuffle
+        .slice(0, 8); // Get 8 products
+      
+      setRelatedProducts(mixed as any);
       setRetryCount(0);
     } catch (error: any) {
       console.error("Error loading product:", error);

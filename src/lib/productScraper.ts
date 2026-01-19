@@ -7,7 +7,7 @@ export interface ScrapedProduct {
   price: number;
   currency: string;
   images: string[];
-  brand?: string;
+  // brand removed - not accurate from scraping
   sku?: string;
   category?: string;
   stock?: number;
@@ -17,26 +17,45 @@ export interface ScrapedProduct {
     width?: number;
     height?: number;
   };
+  // SEO fields (auto-extracted from meta tags)
+  seo_title?: string;
+  seo_description?: string;
   // Preorder-specific fields (optional)
   releaseDate?: string;
   preorderDeadline?: string;
   preorderStartDate?: string;
   sourceUrl?: string;
+  // Additional fields
+  artist?: string;
+  item_type?: string;
+  tags?: string[];
+  full_description?: string;
 }
 
 // Detect website type from URL
 export function detectWebsite(url: string): string {
   const hostname = new URL(url).hostname.toLowerCase();
   
+  // K-pop and event sites
+  if (hostname.includes("ktown4u.com")) return "ktown4u";
+  if (hostname.includes("cnakpop.com")) return "cnakpop";
+  if (hostname.includes("mnetplus.com") || hostname.includes("mnetplus")) return "mnetplus";
+  if (hostname.includes("makestar.com") || hostname.includes("makestar")) return "makestar";
+  if (hostname.includes("gqkorea.com") || hostname.includes("gqkorea")) return "gqkorea";
+  
+  // Korean e-commerce
   if (hostname.includes("gmarket.co.kr")) return "gmarket";
   if (hostname.includes("coupang.com")) return "coupang";
   if (hostname.includes("11st.co.kr")) return "11st";
   if (hostname.includes("auction.co.kr")) return "auction";
+  
+  // International e-commerce
   if (hostname.includes("amazon.com") || hostname.includes("amazon.co.kr")) return "amazon";
   if (hostname.includes("ebay.com")) return "ebay";
   if (hostname.includes("shopee")) return "shopee";
   if (hostname.includes("lazada")) return "lazada";
   
+  // Default to generic scraper (works with Open Graph and meta tags)
   return "generic";
 }
 
@@ -131,10 +150,12 @@ async function scrapeKtown4u(url: string): Promise<ScrapedProduct> {
     }
   }
   
-  // Extract brand/artist (often in the title or event info)
-  const brand = $('.event-artist, .artist-name, [class*="artist"]').first().text().trim() ||
-                $('meta[property="product:brand"]').attr("content") ||
-                undefined;
+  // Extract artist (brand removed - not accurate from scraping)
+  const artist = $('.event-artist, .artist-name, [class*="artist"]').first().text().trim() || undefined;
+  
+  // Extract SEO fields
+  const seoTitle = name || "";
+  const seoDescription = description || "";
   
   return {
     name,
@@ -142,11 +163,14 @@ async function scrapeKtown4u(url: string): Promise<ScrapedProduct> {
     price,
     currency: "KRW",
     images: images.slice(0, 10),
-    brand,
+    // brand removed - not accurate from scraping
     category: "k-pop",
     releaseDate,
     preorderDeadline,
     sourceUrl: url,
+    seo_title: seoTitle,
+    seo_description: seoDescription,
+    artist,
   };
 }
 
@@ -339,20 +363,27 @@ async function scrapeGeneric(url: string): Promise<ScrapedProduct> {
     });
   }
   
-  // Extract brand
-  const brand = $('meta[property="product:brand"]').attr("content") || 
-                $('meta[property="brand"]').attr("content") ||
-                $('[itemprop="brand"]').text().trim() ||
-                $('[class*="brand"]').first().text().trim() || 
-                undefined;
+  // Extract SEO fields (prioritize OG tags, then meta tags, then title)
+  const seoTitle = $('meta[property="og:title"]').attr("content") || 
+                   $('meta[name="twitter:title"]').attr("content") ||
+                   $("title").text().trim() || "";
+  const seoDescription = $('meta[property="og:description"]').attr("content") ||
+                         $('meta[name="twitter:description"]').attr("content") ||
+                         $('meta[name="description"]').attr("content") ||
+                         ogDescription || "";
+  
+  const name = ogTitle || $("title").text() || "";
+  const description = ogDescription || $('meta[name="description"]').attr("content") || "";
   
   return {
-    name: ogTitle || $("title").text() || "",
-    description: ogDescription || $('meta[name="description"]').attr("content") || "",
+    name,
+    description,
     price,
     currency,
     images: images.slice(0, 10), // Limit to 10 images
-    brand,
+    // brand removed - not accurate from scraping
+    seo_title: seoTitle,
+    seo_description: seoDescription,
   };
 }
 
@@ -430,12 +461,23 @@ async function scrapeGmarket(url: string): Promise<ScrapedProduct> {
                      $('meta[property="og:description"]').attr("content") ||
                      $('meta[name="description"]').attr("content") || "";
   
+  // Extract SEO fields
+  const seoTitle = $('meta[property="og:title"]').attr("content") || 
+                   $('meta[name="twitter:title"]').attr("content") ||
+                   name || "";
+  const seoDescription = $('meta[property="og:description"]').attr("content") ||
+                         $('meta[name="twitter:description"]').attr("content") ||
+                         $('meta[name="description"]').attr("content") ||
+                         description || "";
+  
   return {
     name,
     description,
     price,
     currency: "KRW",
     images: images.slice(0, 10),
+    seo_title: seoTitle,
+    seo_description: seoDescription,
   };
 }
 
@@ -537,12 +579,23 @@ async function scrapeCoupang(url: string): Promise<ScrapedProduct> {
                      $('meta[property="og:description"]').attr("content") ||
                      $('meta[name="description"]').attr("content") || "";
   
+  // Extract SEO fields
+  const seoTitle = $('meta[property="og:title"]').attr("content") || 
+                   $('meta[name="twitter:title"]').attr("content") ||
+                   name || "";
+  const seoDescription = $('meta[property="og:description"]').attr("content") ||
+                         $('meta[name="twitter:description"]').attr("content") ||
+                         $('meta[name="description"]').attr("content") ||
+                         description || "";
+  
   return {
     name,
     description,
     price,
     currency: "KRW",
     images: images.slice(0, 10),
+    seo_title: seoTitle,
+    seo_description: seoDescription,
   };
 }
 

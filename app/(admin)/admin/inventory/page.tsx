@@ -3,9 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
-import { type Product } from "@/services/productService";
-import { mockProducts } from "@/lib/mockData";
-import { mockPreorderProducts } from "@/lib/mockPreorderData";
+import { type Product, productService } from "@/services/productService";
 import toast from "react-hot-toast";
 
 interface InventoryItem extends Product {
@@ -38,13 +36,15 @@ export default function InventoryPage() {
         // Force refresh by resetting refs
         loadingRef.current = false;
         hasLoadedRef.current = false;
-        // Force refresh immediately with a small delay to ensure state is reset
+        // Force refresh with a longer delay to ensure backend has processed the insert
+        // and to avoid race conditions
         setTimeout(() => {
+          console.log('🔄 Refreshing inventory after product creation...');
           loadInventory(true, true).then(() => {
             // Clean up URL after refresh completes
             window.history.replaceState({}, '', '/admin/inventory');
           });
-        }, 50);
+        }, 1000); // Increased delay to 1 second
       }
     }
   }, []);
@@ -68,29 +68,66 @@ export default function InventoryPage() {
     
     const loadingToast = showToast ? toast.loading("Loading inventory...") : null;
     try {
-      // Use mock data directly - no API calls
-      console.log('📦 Using mock data for inventory (no API calls)');
+      console.log('📦 Loading inventory from API...');
       
-      // Map onhand products from mock data
-      const onhand: InventoryItem[] = mockProducts
-        .filter((p: any) => p.product_type === "onhand" || p.product_type === "preorder_and_onhand")
-        .map((p: any) => ({
-          ...p,
-          product_type: "onhand" as const,
-          status: (p.stock > 0 ? 'active' : 'out_of_stock') as 'active' | 'inactive' | 'out_of_stock',
-          minStock: 10,
-        }));
+      // First, try to fetch ALL products to verify they exist in database
+      try {
+        const allProductsResponse = await productService.getProducts({
+          page: 1,
+          limit: 1000,
+        });
+        console.log('🔍 ALL products in database:', allProductsResponse.data?.length || 0);
+        console.log('🔍 All product IDs:', allProductsResponse.data?.map(p => ({ id: p.id, name: p.name, product_type: p.product_type, status: p.status, is_onhand_available: p.is_onhand_available, is_preorder_available: p.is_preorder_available })));
+      } catch (err) {
+        console.warn('⚠️ Could not fetch all products:', err);
+      }
+      
+      // Fetch onhand products from API
+      const onhandResponse = await productService.getOnhandProducts({
+        page: 1,
+        limit: 1000, // Get all products
+      });
+      
+      // Fetch preorder products from API
+      const preorderResponse = await productService.getPreorderProducts({
+        page: 1,
+        limit: 1000, // Get all products
+      });
 
-      // Map preorder products from mock data
-      const preorder: InventoryItem[] = mockPreorderProducts.map((p) => ({
+      console.log('📥 Raw API responses:');
+      console.log('Onhand response:', {
+        success: onhandResponse.success,
+        dataLength: onhandResponse.data?.length || 0,
+        pagination: onhandResponse.pagination,
+        firstItem: onhandResponse.data?.[0],
+      });
+      console.log('Preorder response:', {
+        success: preorderResponse.success,
+        dataLength: preorderResponse.data?.length || 0,
+        pagination: preorderResponse.pagination,
+        firstItem: preorderResponse.data?.[0],
+      });
+
+      // Map onhand products
+      const onhand: InventoryItem[] = (onhandResponse.data || []).map((p) => ({
+        ...p,
+        product_type: (p.product_type === "onhand" || p.product_type === "preorder_and_onhand" ? "onhand" : p.product_type) as "onhand" | "preorder" | "kr_website" | "preorder_and_onhand",
+        status: (p.status || (p.stock > 0 ? 'active' : 'out_of_stock')) as 'active' | 'inactive' | 'out_of_stock',
+        minStock: p.min_threshold || 10,
+      }));
+
+      // Map preorder products
+      const preorder: InventoryItem[] = (preorderResponse.data || []).map((p) => ({
         ...p,
         product_type: "preorder" as const,
         status: (p.status || (p.stock > 0 ? 'active' : 'out_of_stock')) as 'active' | 'inactive' | 'out_of_stock',
-        minStock: 10,
+        minStock: p.min_threshold || 10,
       }));
 
-      console.log("Mapped onhand items:", onhand.length);
-      console.log("Mapped preorder items:", preorder.length);
+      console.log("✅ Loaded onhand items:", onhand.length);
+      console.log("✅ Loaded preorder items:", preorder.length);
+      console.log("📊 All onhand product IDs:", onhand.map(p => ({ id: p.id, name: p.name, product_type: p.product_type, is_onhand_available: p.is_onhand_available, status: p.status })));
+      console.log("📊 All preorder product IDs:", preorder.map(p => ({ id: p.id, name: p.name, product_type: p.product_type, is_preorder_available: p.is_preorder_available, status: p.status })));
 
       // Combine both product types
       const allProducts: InventoryItem[] = [...onhand, ...preorder];
@@ -103,11 +140,12 @@ export default function InventoryPage() {
         toast.dismiss(loadingToast);
         toast.success(`Inventory loaded: ${allProducts.length} items`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load inventory:", error);
       if (loadingToast) {
         toast.dismiss(loadingToast);
-        toast.error("Failed to load inventory. Please try again.");
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to load inventory. Please try again.";
+        toast.error(errorMessage);
       }
       // Fallback to empty array on error
       setItems([]);
@@ -546,9 +584,8 @@ export default function InventoryPage() {
                               setDeletingId(item.id);
                               const deleteToast = toast.loading(`Deleting ${item.name}...`);
                               try {
-                                // Use mock data - just update local state
-                                console.log('🗑️ Deleting product (mock):', item.id);
-                                // In a real app, this would call the API, but for mock data we just refresh
+                                console.log('🗑️ Deleting product via API:', item.id);
+                                await productService.deleteProduct(item.id);
                                 toast.dismiss(deleteToast);
                                 toast.success(`"${item.name}" has been deleted successfully`);
                                 // Force refresh inventory and update counts (without toast since we already showed success)
@@ -557,7 +594,8 @@ export default function InventoryPage() {
                               } catch (error: any) {
                                 console.error("Failed to delete product:", error);
                                 toast.dismiss(deleteToast);
-                                toast.error("Failed to delete product");
+                                const errorMessage = error?.response?.data?.message || error?.message || "Failed to delete product";
+                                toast.error(errorMessage);
                               } finally {
                                 setDeletingId(null);
                               }

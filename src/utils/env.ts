@@ -31,13 +31,21 @@ export function isProduction(): boolean {
 /**
  * Check if we should use mock data
  * Uses mock data if:
- * - Running on localhost
+ * - Running on localhost AND NEXT_PUBLIC_USE_MOCK_DATA is not 'false'
  * - OR environment variable USE_MOCK_DATA is set to 'true'
+ * 
+ * To force API usage on localhost, set NEXT_PUBLIC_USE_MOCK_DATA=false
  */
 export function shouldUseMockData(): boolean {
+  // If explicitly set to 'false', force API usage (even on localhost)
+  if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'false') {
+    return false;
+  }
+  // If explicitly set to 'true', use mock data
   if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
     return true;
   }
+  // Default: use mock data on localhost
   return isLocalhost();
 }
 
@@ -51,7 +59,7 @@ export function getApiBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
     // If someone configured a relative "/api" baseURL (typical for Next.js route handlers),
     // force the real backend when running locally. Otherwise product pages will call
-    // `http://localhost:3000/api/...` instead of the backend `http://localhost:3001/api/...`.
+    // the frontend server's API routes instead of the backend API server.
     if (
       isLocalhost() &&
       (process.env.NEXT_PUBLIC_API_URL === '/api' ||
