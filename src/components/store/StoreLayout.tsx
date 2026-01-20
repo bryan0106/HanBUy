@@ -144,7 +144,7 @@ export function StoreLayout({ children }: StoreLayoutProps) {
           <div className="flex items-center gap-3">
             {/* Cart Icon */}
             <Link
-              href="/store/orders?tab=cart"
+              href="/store/cart"
               className="relative flex items-center justify-center p-2 text-[#2C2C2C] hover:text-[#FF85A2] transition-colors"
               aria-label="Shopping Cart"
             >

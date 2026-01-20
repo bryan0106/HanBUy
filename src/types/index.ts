@@ -16,6 +16,7 @@ export interface Address {
   province: string;
   zipCode: string;
   country: string;
+  region?: string;
 }
 
 export interface Box {

@@ -12,6 +12,8 @@ import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import type { CartItem } from "@/services/cartService";
 import { Button } from "@/components/ui/button";
 import { calculateShippingFee } from "@/lib/shipping";
+import toast from "react-hot-toast";
+import Link from "next/link";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -20,12 +22,23 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [customerMessage, setCustomerMessage] = useState<string>("");
-  const [isMessageOpen, setIsMessageOpen] = useState<boolean>(false);
   const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [walletAmount, setWalletAmount] = useState<number>(0);
   const [paymentOption, setPaymentOption] = useState<"split" | "full">("split"); // "split" = 3-way, "full" = 1-time
   const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
+  const [shippingAddress, setShippingAddress] = useState({
+    country: "Philippines",
+    firstName: "",
+    lastName: "",
+    address: "",
+    apartment: "",
+    postalCode: "",
+    city: "",
+    province: "",
+    region: "",
+    phone: "",
+  });
+  const [discountCode, setDiscountCode] = useState("");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -34,6 +47,21 @@ export default function CheckoutPage() {
     }
     if (!authLoading && isAuthenticated && user) {
       loadCart();
+      // Load saved address from user if available
+      if (user.address) {
+        setShippingAddress({
+          country: user.address.country || "Philippines",
+          firstName: user.name?.split(' ')[0] || "",
+          lastName: user.name?.split(' ').slice(1).join(' ') || "",
+          address: user.address.street || "",
+          apartment: "",
+          postalCode: user.address.zipCode || "",
+          city: user.address.city || "",
+          province: user.address.province || "",
+          region: user.address.region || "",
+          phone: user.phone || "",
+        });
+      }
     }
   }, [isAuthenticated, authLoading, router, user]);
 
@@ -234,12 +262,12 @@ export default function CheckoutPage() {
         payment_type: paymentOption === "full" ? ("full_payment" as const) : ("item_only" as const),
         box_type_preference: boxTypePreference,
         shipping_address: {
-          street: "",
-          city: "",
-          province: "",
-          zipCode: "",
-          country: "Philippines",
-        }, // Will be filled when requesting shipping
+          street: shippingAddress.address + (shippingAddress.apartment ? `, ${shippingAddress.apartment}` : ""),
+          city: shippingAddress.city,
+          province: shippingAddress.province || shippingAddress.city,
+          zipCode: shippingAddress.postalCode,
+          country: shippingAddress.country,
+        },
         storage_status: paymentOption === "full" ? "shipping_requested" as const : "pending" as const,
         ...(hasPreorder && {
           preorder_status: "pending_approval" as const,
@@ -249,7 +277,7 @@ export default function CheckoutPage() {
           shipping_requested_at: new Date().toISOString(),
         }),
         order_items: orderItems,
-        customer_message: customerMessage.trim() || undefined,
+        customer_message: typeof window !== 'undefined' ? (sessionStorage.getItem('order_message') || undefined) : undefined,
       };
 
       console.log('Creating order with data (mock):', JSON.stringify(orderData, null, 2));
@@ -323,365 +351,289 @@ export default function CheckoutPage() {
 
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-          Checkout
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Review your order and shipping details
-        </p>
+      {/* Breadcrumb Navigation */}
+      <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
+        <span className="hover:text-foreground cursor-pointer">Cart</span>
+        <span>/</span>
+        <span className="text-foreground font-medium">Information</span>
+        <span>/</span>
+        <span className="hover:text-foreground cursor-pointer">Shipping</span>
+        <span>/</span>
+        <span className="hover:text-foreground cursor-pointer">Payment</span>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Order Items & Shipping */}
+        {/* Left Column: Shipping Address */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Order Items */}
+          {/* Shipping Address */}
           <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-xl font-semibold">Order Items</h2>
+            <h2 className="mb-4 text-lg font-semibold">Shipping address</h2>
             <div className="space-y-4">
-              {cartItems.map((item) => (
-                <div key={item.id} className="flex gap-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium">Country/Region</label>
+                <select
+                  value={shippingAddress.country}
+                  onChange={(e) => setShippingAddress({ ...shippingAddress, country: e.target.value })}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                >
+                  <option value="Philippines">Philippines</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium">First name</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.firstName}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, firstName: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                    placeholder="First name"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Last name</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.lastName}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, lastName: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                    placeholder="Last name"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Address <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={shippingAddress.address}
+                  onChange={(e) => setShippingAddress({ ...shippingAddress, address: e.target.value })}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                  placeholder="Address"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  * Please enter your address correctly!
+                </p>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Apartment, suite, etc. (optional)
+                </label>
+                <input
+                  type="text"
+                  value={shippingAddress.apartment}
+                  onChange={(e) => setShippingAddress({ ...shippingAddress, apartment: e.target.value })}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                  placeholder="Apartment, suite, etc."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Postal code</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.postalCode}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, postalCode: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                    placeholder="Postal code"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium">City</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.city}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                    placeholder="City"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">Region</label>
+                <select
+                  value={shippingAddress.region}
+                  onChange={(e) => setShippingAddress({ ...shippingAddress, region: e.target.value })}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                >
+                  <option value="">Select Region</option>
+                  <option value="Metro Manila">Metro Manila</option>
+                  <option value="Camarines Norte">Camarines Norte</option>
+                  <option value="Camarines Sur">Camarines Sur</option>
+                  <option value="Albay">Albay</option>
+                  <option value="Sorsogon">Sorsogon</option>
+                  <option value="Catanduanes">Catanduanes</option>
+                  <option value="Masbate">Masbate</option>
+                  <option value="Laguna">Laguna</option>
+                  <option value="Cavite">Cavite</option>
+                  <option value="Batangas">Batangas</option>
+                  <option value="Rizal">Rizal</option>
+                  <option value="Quezon">Quezon</option>
+                  <option value="Other">Other</option>
+                </select>
+                    </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">Phone</label>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <select
+                      className="rounded-lg border border-border bg-background px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                      defaultValue="PH"
+                    >
+                      <option value="PH">🇵🇭 +63</option>
+                    </select>
+                  </div>
+                  <input
+                    type="tel"
+                    value={shippingAddress.phone}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
+                    className="flex-1 rounded-lg border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                    placeholder="Phone number"
+                  />
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground p-2"
+                    title="Help"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Navigation Buttons */}
+            <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
+              <Link
+                href="/store/cart"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Return to cart
+              </Link>
+              <Button
+                onClick={() => {
+                  // Save shipping address to sessionStorage
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('shippingAddress', JSON.stringify(shippingAddress));
+                  }
+                  router.push("/store/shipping");
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
+              >
+                Continue to shipping
+              </Button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right Column: Order Summary */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-4 rounded-lg border border-border bg-card p-6">
+            {/* Product List */}
+            <div className="mb-6 space-y-4">
+              {cartItems.map((item) => {
+                const itemPricePHP = item.product?.price 
+                  ? (parseFloat(String(item.product.price)) * (item.product?.price_conversion_rate || 0.042))
+                  : ((item.price || 0) * 0.042);
+                const itemTotalPHP = itemPricePHP * item.quantity;
+                
+                return (
+                  <div key={item.id} className="flex gap-3">
                   {item.image_url || (item.product && item.product.images && item.product.images.length > 0) ? (
                     <img
                       src={item.image_url || (item.product?.images?.[0] || '')}
                       alt={item.product_name}
-                      className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                        className="h-16 w-16 shrink-0 rounded-lg object-cover border border-border"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = '/placeholder-product.png';
                       }}
                     />
                   ) : (
-                    <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
-                  )}
-                  <div className="flex-1">
-                    <h3 className="font-semibold">{item.product_name}</h3>
-                    <p className="text-sm text-muted-foreground">
+                      <div className="h-16 w-16 shrink-0 rounded-lg bg-grey-200 border border-border"></div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-foreground truncate">
+                        {item.product_name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
                       {item.product_type === "preorder" ? "Pre-Order" : 
                        item.product_type === "kr_website" ? "KR Website" : "Onhand"}
                     </p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
                         Qty: {item.quantity}
                       </span>
-                      <span className="font-semibold">
-                        {formatCurrency(((item.price || 0) * item.quantity) * 0.042, "PHP")}
+                        <span className="text-sm font-semibold">
+                          {formatCurrency(itemTotalPHP, "PHP")}
                       </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                );
+              })}
           </div>
 
-          {/* Customer Message Accordion */}
-          <div className="rounded-lg border border-border bg-card">
-            <button
-              onClick={() => setIsMessageOpen(!isMessageOpen)}
-              className="w-full flex items-center justify-between p-4 text-left hover:bg-grey-50 transition-colors"
-            >
-              <div>
-                <h2 className="text-lg font-semibold">Order Message (Optional)</h2>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Leave a message about your order
-                </p>
-              </div>
-              <svg
-                className={`h-5 w-5 text-muted-foreground transition-transform ${isMessageOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {isMessageOpen && (
-              <div className="px-4 pb-4 border-t border-border">
-                <p className="mt-4 mb-3 text-sm text-muted-foreground">
-                  Leave a message about your order if you have any special instructions or requests.
-                </p>
-                <textarea
-                  value={customerMessage}
-                  onChange={(e) => setCustomerMessage(e.target.value)}
-                  placeholder="E.g., Please handle with care, special packaging instructions, etc."
-                  className="w-full rounded-lg border border-border bg-background px-4 py-3 min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
-                  maxLength={500}
+            {/* Discount Code */}
+            <div className="mb-6">
+              <label className="mb-2 block text-sm font-medium">Discount code or gift card</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value)}
+                  className="flex-1 rounded-lg border border-border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF85A2]"
+                  placeholder="Discount code"
                 />
-                <p className="mt-2 text-xs text-muted-foreground text-right">
-                  {customerMessage.length}/500 characters
-                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // TODO: Apply discount code
+                    toast.success("Discount code applied");
+                  }}
+                  className="shrink-0"
+                >
+                  Apply
+                </Button>
               </div>
-            )}
           </div>
 
-        </div>
-
-        {/* Order Summary */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4 rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-xl font-semibold">Order Summary</h2>
+            {/* Order Totals */}
+            <div className="border-t border-border pt-4">
+              <h2 className="mb-4 text-lg font-semibold">Order Summary</h2>
             
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Items Subtotal</span>
+                <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-medium">
                   {formatCurrency(totals.subtotalPHP, "PHP")}
                 </span>
               </div>
-              {/* Wallet Balance Display */}
-              <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <p className="text-sm font-semibold text-green-800">💰 Wallet Balance</p>
-                    <p className="text-lg font-bold text-green-900">
-                      {formatCurrency(walletBalance, "PHP")}
-                    </p>
-                  </div>
-                </div>
-                {walletBalance > 0 ? (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer flex-1">
-                        <input
-                          type="checkbox"
-                          checked={useWalletBalance}
-                          onChange={(e) => {
-                            setUseWalletBalance(e.target.checked);
-                            if (e.target.checked) {
-                              setWalletAmount(Math.min(walletBalance, totals.total));
-                            } else {
-                              setWalletAmount(0);
-                            }
-                          }}
-                          className="rounded border-border text-[#FF85A2] focus:ring-[#FF85A2]"
-                        />
-                        <span className="text-sm text-green-700">
-                          Use wallet balance to reduce payment
-                        </span>
-                      </label>
-                      <button
-                        onClick={() => {
-                          if (!useWalletBalance) {
-                            setUseWalletBalance(true);
-                            setWalletAmount(Math.min(walletBalance, totals.total));
-                          } else {
-                            setUseWalletBalance(false);
-                            setWalletAmount(0);
-                          }
-                        }}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                          useWalletBalance
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-[#FF85A2] text-white hover:bg-[#FF85A2]/90'
-                        }`}
-                      >
-                        {useWalletBalance ? 'Remove' : 'Use Balance'}
-                      </button>
-                    </div>
-                    {useWalletBalance && (
-                      <div className="mt-3 space-y-2">
-                        <div>
-                          <label className="block text-xs text-green-700 mb-1">
-                            Amount to use from wallet (max: {formatCurrency(maxWalletUsage, "PHP")})
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max={maxWalletUsage}
-                            step="0.01"
-                            value={walletAmount}
-                            onChange={(e) => {
-                              const value = Math.max(0, Math.min(maxWalletUsage, parseFloat(e.target.value) || 0));
-                              setWalletAmount(value);
-                            }}
-                            className="w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-sm"
-                          />
-                        </div>
-                        <div className="text-xs text-green-600 space-y-1">
-                          <div className="flex justify-between">
-                            <span>Order Total:</span>
-                            <span>{formatCurrency(totals.total, "PHP")}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Wallet Payment:</span>
-                            <span>-{formatCurrency(actualWalletAmount, "PHP")}</span>
-                          </div>
-                          <div className="flex justify-between font-semibold border-t border-green-300 pt-1 mt-1">
-                            <span>Remaining to Pay:</span>
-                            <span>{formatCurrency(remainingAmount, "PHP")}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-xs text-green-700 mt-1">
-                    No wallet balance available
-                  </p>
-                )}
-              </div>
-              {/* Payment Option Selection */}
-              <div className="rounded-lg border border-border bg-card p-4 mt-4">
-                <h3 className="text-sm font-semibold mb-3">Payment Option</h3>
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentOption("split")}
-                    className={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
-                      paymentOption === "split"
-                        ? "border-pink-500 bg-pink-50"
-                        : "border-border bg-background hover:bg-grey-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold">3-Way Payment</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Pay items now, shipping later
-                        </div>
-                      </div>
-                      <div className="text-xs font-medium text-pink-600">
-                        {formatCurrency(totals.subtotalPHP, "PHP")}
-                      </div>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentOption("full")}
-                    className={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
-                      paymentOption === "full"
-                        ? "border-pink-500 bg-pink-50"
-                        : "border-border bg-background hover:bg-grey-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold">1-Time Payment</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Pay everything now (items + shipping)
-                        </div>
-                      </div>
-                      <div className="text-xs font-medium text-pink-600">
-                        {formatCurrency(totals.total, "PHP")}
-                      </div>
-                    </div>
-                  </button>
-                </div>
-                
                 {paymentOption === "full" && (
-                  <div className="mt-4 space-y-2">
-                    <div className="text-xs text-muted-foreground">
-                      <p className="font-medium mb-2">Box Type:</p>
-                      <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setBoxTypePreference("solo")}
-                        className={`flex-1 rounded-lg border p-2 text-xs transition-colors ${
-                          boxTypePreference === "solo"
-                            ? "border-pink-500 bg-pink-50 font-semibold"
-                            : "border-border bg-background"
-                        }`}
-                      >
-                        Solo Box
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBoxTypePreference("shared")}
-                        className={`flex-1 rounded-lg border p-2 text-xs transition-colors ${
-                          boxTypePreference === "shared"
-                            ? "border-pink-500 bg-pink-50 font-semibold"
-                            : "border-border bg-background"
-                        }`}
-                      >
-                        Shared Box (Save {formatCurrency(totals.soloShippingFee - totals.sharedShippingFee, "PHP")})
-                      </button>
-                    </div>
-                    </div>
-                    <div className="rounded-lg bg-green-50 border border-green-200 p-2 mt-2">
-                      <div className="text-xs space-y-1">
-                        <div className="flex justify-between">
-                          <span>Items:</span>
-                          <span>{formatCurrency(totals.subtotalPHP, "PHP")}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Shipping (Korea → Manila):</span>
-                          <span>{formatCurrency(totals.isf, "PHP")}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Local Shipping (Manila → You):</span>
-                          <span>{formatCurrency(totals.lsf, "PHP")}</span>
-                        </div>
-                        {boxTypePreference === "shared" && totals.estimatedLocalShipping > 0 && (
-                          <div className="flex justify-between text-green-700">
-                            <span>Estimated COD Fee:</span>
-                            <span>{formatCurrency(totals.estimatedLocalShipping, "PHP")}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="mt-4 border-t border-border pt-3">
-                {totals.hasPreorder && paymentOption === "split" ? (
-                  <div className="space-y-2">
-                    <div className="rounded-lg bg-pink-50 border border-pink-200 p-3">
-                      <p className="text-xs font-semibold text-pink-800 mb-2">📦 Pre-Order Payment</p>
-                      <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-pink-700">Deposit (50%):</span>
-                          <span className="font-semibold text-pink-800">{formatCurrency(totals.depositAmount, "PHP")}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-pink-600">Balance (on release):</span>
-                          <span className="text-pink-600">{formatCurrency(totals.balanceAmount, "PHP")}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-semibold">Pay Now (Deposit)</span>
-                      <span className="text-xl font-bold text-pink-600">
-                        {formatCurrency(remainingAmount, "PHP")}
-                      </span>
-                    </div>
-                    {useWalletBalance && actualWalletAmount > 0 && (
-                      <div className="mt-1 text-xs text-green-600">
-                        (Wallet: -{formatCurrency(actualWalletAmount, "PHP")})
-                      </div>
-                    )}
-                    <p className="text-xs text-pink-600 mt-2">
-                      Pay 50% deposit to secure your pre-order. Balance will be paid when item arrives.
-                </p>
-              </div>
-                ) : (
-                  <>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Total to Pay</span>
-                  <span className="text-xl font-bold text-[#FF85A2]">
-                    {formatCurrency(remainingAmount, "PHP")}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span className="font-medium">
+                    {formatCurrency(totals.shippingFee, "PHP")}
                   </span>
-                </div>
-                {useWalletBalance && actualWalletAmount > 0 && (
-                  <div className="mt-1 text-xs text-green-600">
-                    (Wallet: -{formatCurrency(actualWalletAmount, "PHP")})
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-2">
-                      {paymentOption === "full" 
-                        ? "Items will be shipped directly to you after payment"
-                        : "Items will be stored after payment"}
-                </p>
-                  </>
-                )}
+              <div className="flex justify-between items-center pt-2 border-t border-border">
+                <span className="text-base font-semibold">Total</span>
+                <span className="text-lg font-bold">
+                  {formatCurrency(
+                    paymentOption === "full" ? totals.total : totals.subtotalPHP,
+                    "PHP"
+                  )}
+                </span>
               </div>
             </div>
-
-            <Button
-              onClick={handleCreateOrder}
-              disabled={processing}
-              className="mt-6 w-full"
-            >
-              {processing ? "Processing..." : "Proceed to Payment"}
-            </Button>
+            </div>
           </div>
         </div>
       </div>

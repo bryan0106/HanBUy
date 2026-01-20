@@ -81,10 +81,63 @@ When solving issues or making changes, ALWAYS follow these patterns to prevent b
   - If type is only in mock data, ensure it's re-exported from mock file
   - Use `export type { TypeName }` syntax for type-only re-exports
 
+### Type Consistency Pattern
+- **Problem**: Property does not exist on type (e.g., "Property 'region' does not exist")
+- **Solution**: When adding a new property to an interface/type, ALWAYS update ALL related types:
+  1. Update the base type definition (e.g., `src/types/index.ts` for `Address`)
+  2. Update all inline type definitions that use the same structure (e.g., `User.address` in `src/lib/auth.ts`)
+  3. Update API response types (e.g., `ApiUser.address` in `src/services/api.ts`)
+  4. Update type conversions/mappings (e.g., `ApiUser` → `User` conversion in `src/services/api.ts`)
+  5. Search for all usages: `grep -r "address\." path/to/files` to find all places that need updating
+  6. Use optional chaining (`?.`) when accessing nested optional properties
+- **Example**: When adding `region` to `Address`:
+  ```typescript
+  // 1. Update base type
+  export interface Address {
+    street: string;
+    city: string;
+    province: string;
+    zipCode: string;
+    country: string;
+    region?: string; // Added
+  }
+  
+  // 2. Update inline types
+  address?: {
+    street?: string;
+    city?: string;
+    province?: string;
+    zipCode?: string;
+    country?: string;
+    region?: string; // Added
+  }
+  
+  // 3. Update API types
+  address?: {
+    street: string;
+    city: string;
+    province: string;
+    zipCode: string;
+    country: string;
+    region?: string; // Added
+  }
+  
+  // 4. Update conversions
+  address: user.address ? {
+    street: user.address.street,
+    city: user.address.city,
+    province: user.address.province,
+    zipCode: user.address.zipCode,
+    country: user.address.country,
+    region: user.address.region, // Added
+  } : undefined
+  ```
+
 ### Verification Pattern
 - **ALWAYS run build after making changes**: `pnpm run build` or `npm run build`
 - **Check for TypeScript errors**: Look for "Type error" or "Module declares" errors
 - **Fix all occurrences**: When fixing a pattern, search for ALL similar patterns in the codebase
+- **Type consistency check**: After adding/modifying properties, verify all related types are updated
 
 ## File Structure
 - Services: src/services/

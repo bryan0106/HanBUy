@@ -7,9 +7,7 @@ import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { initializeMockOrders, mockOrderService } from "@/lib/mockOrdersData";
-import { cartService, type CartItem } from "@/services/cartService";
 import type { Order as OrderType } from "@/services/orderService";
-import toast from "react-hot-toast";
 
 interface Order {
   id: string;
@@ -29,20 +27,18 @@ function StoreOrdersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"cart" | "orders" | "receive" | "rate" | "payments">(
-    (searchParams.get("tab") as "cart" | "orders" | "receive" | "rate" | "payments") || "cart"
+  const [activeTab, setActiveTab] = useState<"orders" | "receive" | "rate" | "payments">(
+    (searchParams.get("tab") as "orders" | "receive" | "rate" | "payments") || "orders"
   );
   const [orderDetails, setOrderDetails] = useState<Record<string, any>>({});
   const [loadingOrderDetails, setLoadingOrderDetails] = useState<Record<string, boolean>>({});
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   // Update active tab when URL changes
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["cart", "orders", "receive", "rate", "payments"].includes(tab)) {
-      setActiveTab(tab as "cart" | "orders" | "receive" | "rate" | "payments");
+    if (tab && ["orders", "receive", "rate", "payments"].includes(tab)) {
+      setActiveTab(tab as "orders" | "receive" | "rate" | "payments");
     }
   }, [searchParams]);
 
@@ -56,138 +52,6 @@ function StoreOrdersContent() {
     }
   }, [isAuthenticated, authLoading, router, user]);
 
-  const loadCart = async () => {
-    if (user?.id) {
-      try {
-        console.log('=== LOADING CART (Using Real API) ===');
-        console.log('User ID:', user.id);
-        
-        // Use real API
-        const cartItemsData = await cartService.getCartItems(user.id);
-        
-        console.log('=== CART ITEMS RECEIVED ===');
-        console.log('Cart items count:', cartItemsData?.length || 0);
-        console.log('Cart items data:', JSON.stringify(cartItemsData, null, 2));
-        
-        // Map cart items - extract data from nested product object
-        const cartItemsWithImages = cartItemsData.map((item) => {
-          const product = item.product;
-          
-          // Extract product data from nested product object
-          const productName = item.product_name || product?.name || 'Unknown Product';
-          const productPrice = product?.price ? parseFloat(String(product.price)) : (item.price || 0);
-          const productCurrency = product?.currency || 'KRW';
-          const productImages = product?.images || [];
-          const imageUrl = item.image_url || (productImages.length > 0 ? productImages[0] : '');
-          const productType = item.product_type || (product?.product_type as 'onhand' | 'preorder' | 'kr_website') || 'onhand';
-          
-          return {
-            ...item,
-            product_name: productName,
-            price: productPrice,
-            currency: productCurrency,
-            image_url: imageUrl,
-            product_type: productType,
-            // Keep the nested product object for reference
-            product: product || item.product,
-          };
-        });
-        
-        setCartItems(cartItemsWithImages);
-        // Select all items by default when cart loads
-        if (cartItemsWithImages.length > 0) {
-          setSelectedItems(new Set(cartItemsWithImages.map(item => item.id)));
-        } else {
-          setSelectedItems(new Set());
-        }
-      } catch (cartError) {
-        console.error("Error loading cart:", cartError);
-        setCartItems([]);
-        setSelectedItems(new Set());
-      }
-    }
-  };
-
-  // Update selected items when cart items change (remove invalid selections)
-  useEffect(() => {
-    if (cartItems.length > 0 && selectedItems.size > 0) {
-      // Remove selections for items that no longer exist in cart
-      const currentItemIds = new Set(cartItems.map(item => item.id));
-      const validSelectedItems = new Set(
-        Array.from(selectedItems).filter(id => currentItemIds.has(id))
-      );
-      if (validSelectedItems.size !== selectedItems.size) {
-        setSelectedItems(validSelectedItems);
-      }
-    } else if (cartItems.length === 0) {
-      setSelectedItems(new Set());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems]);
-
-  const handleUpdateQuantity = async (cartItemId: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    
-    try {
-      await cartService.updateCartItem(cartItemId, newQuantity);
-      await loadCart(); // Reload cart to get updated data
-      
-      // Dispatch event to update cart count in header
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('cartItemUpdated'));
-        window.dispatchEvent(new CustomEvent('cartUpdated'));
-      }
-      
-      toast.success("Cart updated");
-    } catch (error: any) {
-      console.error("Error updating cart item:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to update cart item";
-      toast.error(errorMessage);
-    }
-  };
-
-  const handleRemoveItem = async (cartItemId: string) => {
-    if (!confirm("Remove this item from cart?")) return;
-    
-    try {
-      await cartService.removeCartItem(cartItemId);
-      await loadCart(); // Reload cart
-      
-      // Dispatch event to update cart count in header
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('cartItemRemoved'));
-        window.dispatchEvent(new CustomEvent('cartUpdated'));
-      }
-      
-      toast.success("Item removed from cart");
-    } catch (error: any) {
-      console.error("Error removing cart item:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to remove item";
-      toast.error(errorMessage);
-    }
-  };
-
-  const handleClearCart = async () => {
-    if (!confirm("Clear all items from cart? This action cannot be undone.")) return;
-    
-    try {
-      await cartService.clearCart();
-      await loadCart(); // Reload cart
-      setSelectedItems(new Set());
-      
-      // Dispatch event to update cart count in header
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('cartCleared'));
-        window.dispatchEvent(new CustomEvent('cartUpdated'));
-      }
-      
-      toast.success("Cart cleared");
-    } catch (error: any) {
-      console.error("Error clearing cart:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to clear cart";
-      toast.error(errorMessage);
-    }
-  };
 
   const loadData = async () => {
     setLoading(true);
@@ -219,9 +83,6 @@ function StoreOrdersContent() {
         
         setOrders(mappedOrders);
       }
-
-      // Fetch cart items from API (cart service already uses mock data on localhost)
-      await loadCart();
     } catch (error) {
       console.error("Error loading data:", error);
       setOrders([]);
@@ -287,19 +148,6 @@ function StoreOrdersContent() {
         <div className="flex gap-1 border-b border-border overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:gap-2">
           <button
             onClick={() => {
-              setActiveTab("cart");
-              router.push("/store/orders?tab=cart");
-            }}
-            className={`shrink-0 px-2 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
-              activeTab === "cart"
-                ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Cart ({cartItems.length})
-          </button>
-          <button
-            onClick={() => {
               setActiveTab("orders");
               router.push("/store/orders?tab=orders");
             }}
@@ -352,190 +200,6 @@ function StoreOrdersContent() {
           </button>
         </div>
       </div>
-
-      {/* Cart Tab */}
-      {activeTab === "cart" && (
-        <div>
-          {loading ? (
-            <div className="py-8 text-center sm:py-12">
-              <p className="text-muted-foreground">Loading cart...</p>
-            </div>
-          ) : cartItems.length === 0 ? (
-            <div className="rounded-lg border border-border bg-card p-12 text-center">
-              <div className="mb-4 text-6xl">🛒</div>
-              <h2 className="mb-2 text-xl font-semibold">Your cart is empty</h2>
-              <p className="mb-6 text-muted-foreground">
-                Add items to your cart to see them here
-              </p>
-              <Link
-                href="/store/products"
-                className="inline-block rounded-lg bg-soft-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-soft-blue-700"
-              >
-                Browse Products
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Select All Checkbox and Clear Cart Button */}
-              <div className="rounded-lg border border-border bg-card p-4">
-                <div className="flex items-center justify-between">
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.size === cartItems.length && cartItems.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedItems(new Set(cartItems.map(item => item.id)));
-                        } else {
-                          setSelectedItems(new Set());
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-grey-300 text-[#FF85A2] focus:ring-[#FF85A2] focus:ring-2"
-                    />
-                    <span className="text-sm font-medium text-foreground">
-                      Select All ({selectedItems.size} of {cartItems.length} selected)
-                    </span>
-                  </label>
-                  <button
-                    onClick={handleClearCart}
-                    className="text-sm text-error hover:underline font-medium"
-                    disabled={cartItems.length === 0}
-                  >
-                    Clear Cart
-                  </button>
-                </div>
-              </div>
-              
-              {cartItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-lg border border-border bg-card p-4"
-                >
-                  <div className="flex gap-4">
-                    {/* Checkbox */}
-                    <div className="flex items-start pt-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedItems.has(item.id)}
-                        onChange={(e) => {
-                          const newSelected = new Set(selectedItems);
-                          if (e.target.checked) {
-                            newSelected.add(item.id);
-                          } else {
-                            newSelected.delete(item.id);
-                          }
-                          setSelectedItems(newSelected);
-                        }}
-                        className="h-4 w-4 rounded border-grey-300 text-[#FF85A2] focus:ring-[#FF85A2] focus:ring-2"
-                      />
-                    </div>
-                    
-                    {item.image_url || (item.product && item.product.images && item.product.images.length > 0) ? (
-                      <img
-                        src={item.image_url || (item.product?.images?.[0] || '')}
-                        alt={item.product_name || item.product?.name || 'Product'}
-                        className="h-20 w-20 shrink-0 rounded-lg object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/placeholder-product.png';
-                        }}
-                      />
-                    ) : (
-                      <div className="h-20 w-20 shrink-0 rounded-lg bg-grey-200"></div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        href={`/store/products/${item.product_id}`}
-                        className="font-semibold text-foreground hover:text-[#FF85A2] hover:underline transition-colors"
-                      >
-                        {item.product_name || item.product?.name || 'Unknown Product'}
-                      </Link>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {item.product_type === "preorder" ? "Pre-Order" : 
-                         item.product_type === "kr_website" ? "KR Website" : "Onhand"}
-                      </p>
-                      <div className="mt-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">Qty:</span>
-                          <span className="font-medium">{item.quantity}</span>
-                        </div>
-                        <p className="text-lg font-bold text-soft-blue-600">
-                          {formatCurrency((item.price || 0) * item.quantity, "PHP")}
-                        </p>
-                      </div>
-                      <div className="mt-2 flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              if (item.quantity > 1) {
-                                handleUpdateQuantity(item.id, item.quantity - 1);
-                              }
-                            }}
-                            disabled={item.quantity <= 1}
-                            className="h-6 w-6 rounded border border-border bg-background text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-grey-50"
-                          >
-                            -
-                          </button>
-                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                          <button
-                            onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                            className="h-6 w-6 rounded border border-border bg-background text-sm font-medium hover:bg-grey-50"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <button 
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="text-sm text-error hover:underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <div className="rounded-lg border border-border bg-card p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <span className="text-lg font-semibold">Total:</span>
-                  <span className="text-2xl font-bold text-soft-blue-600">
-                    {formatCurrency(
-                      cartItems
-                        .filter(item => selectedItems.has(item.id))
-                        .reduce((sum, item) => {
-                          // Get price from product object or item
-                          const productPrice = item.product?.price ? parseFloat(String(item.product.price)) : (item.price || 0);
-                          const currency = item.product?.currency || 'KRW';
-                          
-                          // Convert to PHP if needed
-                          const conversionRate = item.product?.price_conversion_rate || 0.042;
-                          const priceInPHP = currency === 'KRW' ? productPrice * conversionRate : productPrice;
-                          
-                          return sum + priceInPHP * item.quantity;
-                        }, 0),
-                      "PHP"
-                    )}
-                  </span>
-                </div>
-                <Link
-                  href={`/store/checkout${selectedItems.size > 0 ? `?items=${Array.from(selectedItems).join(',')}` : ''}`}
-                  className={`block w-full rounded-lg px-6 py-3 text-center font-semibold text-white transition-colors ${
-                    selectedItems.size > 0
-                      ? 'bg-soft-blue-600 hover:bg-soft-blue-700'
-                      : 'bg-grey-400 cursor-not-allowed'
-                  }`}
-                  onClick={(e) => {
-                    if (selectedItems.size === 0) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
-                  Proceed to Checkout ({selectedItems.size} {selectedItems.size === 1 ? 'item' : 'items'})
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Orders Tab */}
       {activeTab === "orders" && (

@@ -15,6 +15,7 @@ export interface User {
     province: string;
     zipCode: string;
     country: string;
+    region?: string;
   };
   created_at?: string;
   updated_at?: string;
@@ -47,6 +48,7 @@ export interface UpdateUserRequest {
     province: string;
     zipCode: string;
     country: string;
+    region?: string;
   };
   client_level?: 'solobox' | 'box_sharing' | 'kr_to_kr' | 'international';
   approval_status?: 'pending' | 'approved' | 'rejected';

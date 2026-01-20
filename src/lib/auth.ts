@@ -9,6 +9,7 @@ export interface User {
   role: "customer" | "admin" | "solobox_client";
   clientLevel?: "solobox" | "box_sharing" | "kr_to_kr" | "international";
   approvalStatus?: "pending" | "approved" | "rejected";
+  installmentApproved?: boolean; // Whether customer is approved for installment payment
   isAuthenticated: boolean;
   phone?: string;
   address?: {
@@ -17,6 +18,7 @@ export interface User {
     province?: string;
     zipCode?: string;
     country?: string;
+    region?: string;
   };
 }
 

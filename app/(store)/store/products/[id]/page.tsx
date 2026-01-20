@@ -415,23 +415,22 @@ export default function ProductDetailPage() {
       });
     }
 
-    // Store order data in sessionStorage for payment page
-    const orderData = {
-      productId: product.id,
-      name: product.name,
-      price: basePrice,
-      quantity: qty,
-      // Box selection will be done on request shipping page
-      variations: Object.keys(variationData).length > 0 ? variationData : undefined,
-      selectedVariationIds: Object.values(variations).length > 0 
-        ? Object.values(variations) 
-        : undefined,
-    };
-    
-    sessionStorage.setItem("temp_order", JSON.stringify(orderData));
-    
-    // Navigate to payment page
-    router.push(`/store/payment?orderId=temp-order-${Date.now()}`);
+    // Add to cart first, then navigate to checkout
+    (async () => {
+      try {
+        await cartService.addToCart({
+          user_id: user?.id || "",
+          product_id: product.id,
+          quantity: qty,
+        });
+        
+        // Navigate to checkout flow instead of direct payment
+        router.push("/store/checkout");
+      } catch (error: any) {
+        console.error("Error adding to cart:", error);
+        toast.error(error?.message || "Failed to add to cart. Please try again.");
+      }
+    })();
   };
 
   // Early return if no product

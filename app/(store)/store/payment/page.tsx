@@ -253,6 +253,13 @@ function PaymentPageContent() {
     }
   }, [isAuthenticated, authLoading, router, loadData, walletAmountParam]);
 
+  // Reset payment type to "full" if user is not approved for installment
+  useEffect(() => {
+    if (paymentType === "installment" && !user?.installment_approved) {
+      setPaymentType("full");
+    }
+  }, [user?.installment_approved, paymentType]);
+
   const handlePaymentComplete = async () => {
     // Validate courier selection for local shipping
     if (paymentTypeParam === "local_shipping" && !selectedCourier) {
@@ -512,7 +519,7 @@ function PaymentPageContent() {
           {paymentType !== "balance" && paymentTypeParam !== "full_payment" && (
             <div className="mb-6 rounded-lg border border-border bg-card p-4">
               <h2 className="mb-3 text-base font-semibold">Payment Type</h2>
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid gap-2 ${user?.installment_approved ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <button
                   onClick={() => setPaymentType("full")}
                   className={`rounded-lg border-2 p-3 text-left transition-colors ${
@@ -529,27 +536,29 @@ function PaymentPageContent() {
                     {formatCurrency(basePaymentAmount, "PHP")}
                   </div>
                 </button>
-                <button
-                  onClick={() => setPaymentType("installment")}
-                  className={`rounded-lg border-2 p-3 text-left transition-colors ${
-                    paymentType === "installment"
-                      ? "border-[#FF85A2] bg-[#FFF5F7] text-[#FF85A2]"
-                      : "border-border bg-background hover:bg-grey-50"
-                  }`}
-                >
-                  <div className="text-sm font-semibold">Installment</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    50% now, 50% later
-                  </div>
-                  <div className="mt-1.5 space-y-0.5">
-                    <div className="text-xs font-bold">
-                      Now: {formatCurrency(basePaymentAmount * 0.5, "PHP")}
+                {user?.installment_approved && (
+                  <button
+                    onClick={() => setPaymentType("installment")}
+                    className={`rounded-lg border-2 p-3 text-left transition-colors ${
+                      paymentType === "installment"
+                        ? "border-[#FF85A2] bg-[#FFF5F7] text-[#FF85A2]"
+                        : "border-border bg-background hover:bg-grey-50"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold">Installment</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      50% now, 50% later
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Later: {formatCurrency(basePaymentAmount * 0.5, "PHP")}
+                    <div className="mt-1.5 space-y-0.5">
+                      <div className="text-xs font-bold">
+                        Now: {formatCurrency(basePaymentAmount * 0.5, "PHP")}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Later: {formatCurrency(basePaymentAmount * 0.5, "PHP")}
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -22,18 +22,20 @@ export interface User {
   role: 'customer' | 'admin' | 'solobox_client';
   client_level?: 'solobox' | 'box_sharing' | 'kr_to_kr' | 'international';
   approval_status?: 'pending' | 'approved' | 'rejected';
+  installment_approved?: boolean; // Whether customer is approved for installment payment
   address?: {
     street: string;
     city: string;
     province: string;
     zipCode: string;
     country: string;
+    region?: string;
   };
   created_at?: string;
   updated_at?: string;
 }
 
-// Raw response from backend (may have different formats)
+  // Raw response from backend (may have different formats)
 export interface LoginResponseRaw {
   success?: boolean;
   user?: User;
@@ -51,6 +53,7 @@ export interface LoginResponseRaw {
   role?: 'customer' | 'admin' | 'solobox_client';
   client_level?: 'solobox' | 'box_sharing' | 'kr_to_kr' | 'international';
   approval_status?: 'pending' | 'approved' | 'rejected';
+  installment_approved?: boolean; // Whether customer is approved for installment payment
   address?: {
     street?: string;
     city?: string;
@@ -58,6 +61,7 @@ export interface LoginResponseRaw {
     zipCode?: string;
     zipcode?: string;
     country?: string;
+    region?: string;
   };
   created_at?: string;
   updated_at?: string;
@@ -128,6 +132,7 @@ export const authService = {
           role: data.role || 'customer',
           client_level: data.client_level,
           approval_status: data.approval_status,
+          installment_approved: data.installment_approved,
           address: data.address ? {
             street: data.address.street || '',
             city: data.address.city || '',

@@ -467,12 +467,14 @@ export interface ApiUser {
   role: "customer" | "admin" | "solobox_client";
   client_level?: "solobox" | "box_sharing" | "kr_to_kr" | "international";
   approval_status?: "pending" | "approved" | "rejected";
+  installment_approved?: boolean; // Whether customer is approved for installment payment
   address?: {
     street: string;
     city: string;
     province: string;
     zipCode: string;
     country: string;
+    region?: string;
   };
   created_at?: string;
   updated_at?: string;
@@ -800,7 +802,17 @@ export const authService = {
         role: user.role,
         clientLevel: user.client_level,
         approvalStatus: user.approval_status,
+        installmentApproved: user.installment_approved,
         isAuthenticated: true,
+        phone: user.phone,
+        address: user.address ? {
+          street: user.address.street,
+          city: user.address.city,
+          province: user.address.province,
+          zipCode: user.address.zipCode,
+          country: user.address.country,
+          region: user.address.region,
+        } : undefined,
       };
       
       return {
