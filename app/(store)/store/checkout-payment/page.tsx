@@ -395,6 +395,16 @@ export default function CheckoutPaymentPage() {
         
         setCreatedOrderId(orderId);
         console.log("✅ Order created successfully with ID:", orderId);
+        
+        // Clear cart after order is successfully created
+        try {
+          await cartService.clearCart();
+          console.log("✅ Cart cleared after order creation");
+        } catch (cartError) {
+          console.error("⚠️ Failed to clear cart, but order was created:", cartError);
+          // Don't throw - order was successful, cart clearing is secondary
+        }
+        
         toast.success("Order created successfully!");
       } catch (error: any) {
         console.error("Error creating order:", error);

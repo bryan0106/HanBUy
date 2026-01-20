@@ -775,9 +775,143 @@ export const productService = {
     product_url?: string;
     product_name?: string;
     comment?: string;
-  }): Promise<{ success: boolean; message: string }> {
+  }): Promise<{ success: boolean; message: string; data?: { id: string; request_number: string } }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string }>('/products/pasabuy', request);
+      const response = await apiClient.post<{ success: boolean; message: string; data?: { id: string; request_number: string } }>('/pasabuy', request);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get pasabuy requests for the current user
+   */
+  async getPasabuyRequests(params?: {
+    status?: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      request_number: string;
+      customer_id: string;
+      customer_name: string;
+      customer_email: string;
+      product_url?: string;
+      product_name?: string;
+      comment?: string;
+      estimated_price?: number;
+      currency: 'KRW' | 'PHP';
+      status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+      images?: string[];
+      category?: string;
+      sku?: string;
+      created_at: string;
+      updated_at: string;
+      approved_at?: string;
+      paid_at?: string;
+      bought_at?: string;
+      in_storage_at?: string;
+      rejected_at?: string;
+      rejection_reason?: string;
+      admin_notes?: string;
+    }>;
+  }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: Array<{
+          id: string;
+          request_number: string;
+          customer_id: string;
+          customer_name: string;
+          customer_email: string;
+          product_url?: string;
+          product_name?: string;
+          comment?: string;
+          estimated_price?: number;
+          currency: 'KRW' | 'PHP';
+          status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+          images?: string[];
+          category?: string;
+          sku?: string;
+          created_at: string;
+          updated_at: string;
+          approved_at?: string;
+          paid_at?: string;
+          bought_at?: string;
+          in_storage_at?: string;
+          rejected_at?: string;
+          rejection_reason?: string;
+          admin_notes?: string;
+        }>;
+      }>('/pasabuy', { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get single pasabuy request by ID
+   */
+  async getPasabuyRequestById(id: string): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      request_number: string;
+      customer_id: string;
+      customer_name: string;
+      customer_email: string;
+      product_url?: string;
+      product_name?: string;
+      comment?: string;
+      estimated_price?: number;
+      currency: 'KRW' | 'PHP';
+      status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+      images?: string[];
+      category?: string;
+      sku?: string;
+      created_at: string;
+      updated_at: string;
+      approved_at?: string;
+      paid_at?: string;
+      bought_at?: string;
+      in_storage_at?: string;
+      rejected_at?: string;
+      rejection_reason?: string;
+      admin_notes?: string;
+    };
+  }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: {
+          id: string;
+          request_number: string;
+          customer_id: string;
+          customer_name: string;
+          customer_email: string;
+          product_url?: string;
+          product_name?: string;
+          comment?: string;
+          estimated_price?: number;
+          currency: 'KRW' | 'PHP';
+          status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+          images?: string[];
+          category?: string;
+          sku?: string;
+          created_at: string;
+          updated_at: string;
+          approved_at?: string;
+          paid_at?: string;
+          bought_at?: string;
+          in_storage_at?: string;
+          rejected_at?: string;
+          rejection_reason?: string;
+          admin_notes?: string;
+        };
+      }>(`/pasabuy/${id}`);
       return response.data;
     } catch (error) {
       throw handleApiError(error);

@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { orderService, type Order as OrderType } from "@/services/orderService";
+import { productService } from "@/services/productService";
+import toast from "react-hot-toast";
 
 interface Order {
   id: string;
@@ -27,17 +29,19 @@ function StoreOrdersContent() {
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"orders" | "receive" | "rate" | "payments">(
-    (searchParams.get("tab") as "orders" | "receive" | "rate" | "payments") || "orders"
+  const [activeTab, setActiveTab] = useState<"orders" | "receive" | "rate" | "payments" | "pasabuy">(
+    (searchParams.get("tab") as "orders" | "receive" | "rate" | "payments" | "pasabuy") || "orders"
   );
   const [orderDetails, setOrderDetails] = useState<Record<string, any>>({});
   const [loadingOrderDetails, setLoadingOrderDetails] = useState<Record<string, boolean>>({});
+  const [pasabuyRequests, setPasabuyRequests] = useState<any[]>([]);
+  const [loadingPasabuy, setLoadingPasabuy] = useState(false);
 
   // Update active tab when URL changes
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["orders", "receive", "rate", "payments"].includes(tab)) {
-      setActiveTab(tab as "orders" | "receive" | "rate" | "payments");
+    if (tab && ["orders", "receive", "rate", "payments", "pasabuy"].includes(tab)) {
+      setActiveTab(tab as "orders" | "receive" | "rate" | "payments" | "pasabuy");
     }
   }, [searchParams]);
 
@@ -110,6 +114,29 @@ function StoreOrdersContent() {
       });
     }
   }, [activeTab, orders]);
+
+  // Load pasabuy requests when Pasabuy tab is active
+  const loadPasabuyRequests = async () => {
+    if (!user?.id) return;
+    
+    setLoadingPasabuy(true);
+    try {
+      const response = await productService.getPasabuyRequests();
+      setPasabuyRequests(response.data || []);
+    } catch (error) {
+      console.error("Error loading pasabuy requests:", error);
+      toast.error("Failed to load pasabuy requests");
+      setPasabuyRequests([]);
+    } finally {
+      setLoadingPasabuy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "pasabuy" && isAuthenticated && user?.id) {
+      loadPasabuyRequests();
+    }
+  }, [activeTab, isAuthenticated, user?.id]);
 
   const statusColors: Record<string, string> = {
     pending: "bg-warning/10 text-warning",
@@ -192,6 +219,19 @@ function StoreOrdersContent() {
             }`}
           >
             Payments
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("pasabuy");
+              router.push("/store/orders?tab=pasabuy");
+            }}
+            className={`shrink-0 px-2 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
+              activeTab === "pasabuy"
+                ? "border-b-2 border-soft-blue-600 text-soft-blue-600"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Pasabuy ({pasabuyRequests.length})
           </button>
         </div>
       </div>
@@ -687,6 +727,177 @@ function StoreOrdersContent() {
                 </div>
               )}
             </>
+          )}
+        </div>
+      )}
+
+      {/* Pasabuy Tab */}
+      {activeTab === "pasabuy" && (
+        <div>
+          {loadingPasabuy ? (
+            <div className="py-12 text-center">
+              <p className="text-muted-foreground">Loading pasabuy requests...</p>
+            </div>
+          ) : pasabuyRequests.length === 0 ? (
+            <div className="rounded-lg border border-border bg-card p-12 text-center">
+              <div className="mb-4 text-6xl">🛍️</div>
+              <h2 className="mb-2 text-xl font-semibold">No pasabuy requests yet</h2>
+              <p className="mb-6 text-muted-foreground">
+                Request products that aren't in our store and we'll find them for you!
+              </p>
+              <Link
+                href="/store/products/onhand"
+                className="inline-block rounded-lg bg-pink-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-pink-600"
+              >
+                Request Pasabuy
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pasabuyRequests.map((request) => {
+                const statusColors: Record<string, string> = {
+                  pending: "bg-warning/10 text-warning",
+                  approved: "bg-info/10 text-info",
+                  paid: "bg-success/10 text-success",
+                  bought: "bg-soft-blue-50 text-soft-blue-700",
+                  in_storage: "bg-success/10 text-success",
+                  rejected: "bg-error/10 text-error",
+                };
+
+                const statusLabels: Record<string, string> = {
+                  pending: "Pending Approval",
+                  approved: "Approved",
+                  paid: "Paid",
+                  bought: "Purchased",
+                  in_storage: "In Storage",
+                  rejected: "Rejected",
+                };
+
+                return (
+                  <div
+                    key={request.id}
+                    className="rounded-lg border border-border bg-card p-4 sm:p-6"
+                  >
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex-1">
+                        <div className="mb-2 flex items-center gap-3">
+                          <h3 className="font-semibold text-foreground text-base sm:text-lg">
+                            {request.request_number || request.id}
+                          </h3>
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-medium ${
+                              statusColors[request.status] || "bg-grey-100 text-grey-700"
+                            }`}
+                          >
+                            {statusLabels[request.status] || request.status.toUpperCase()}
+                          </span>
+                        </div>
+                        {request.product_name && (
+                          <p className="mb-1 font-medium text-foreground">
+                            {request.product_name}
+                          </p>
+                        )}
+                        {request.product_url && (
+                          <a
+                            href={request.product_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mb-2 block text-sm text-soft-blue-600 hover:underline"
+                          >
+                            View Product URL →
+                          </a>
+                        )}
+                        {request.comment && (
+                          <p className="mb-2 text-sm text-muted-foreground line-clamp-2">
+                            {request.comment}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Requested on {formatDate(new Date(request.created_at))}
+                        </p>
+                        {request.estimated_price && (
+                          <p className="mt-2 text-sm font-semibold">
+                            Estimated: {formatCurrency(request.estimated_price, request.currency || "KRW")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status-specific information */}
+                    {request.status === "approved" && (
+                      <div className="mt-4 rounded-lg bg-info/10 p-3 text-sm text-info">
+                        <p className="font-medium">✓ Request Approved</p>
+                        {request.admin_notes && (
+                          <p className="mt-1 text-xs">{request.admin_notes}</p>
+                        )}
+                        {request.estimated_price && (
+                          <p className="mt-2 font-semibold">
+                            Please pay: {formatCurrency(request.estimated_price, request.currency || "KRW")}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {request.status === "paid" && (
+                      <div className="mt-4 rounded-lg bg-success/10 p-3 text-sm text-success">
+                        <p className="font-medium">✓ Payment Received</p>
+                        <p className="mt-1 text-xs">
+                          Paid on {request.paid_at ? formatDate(new Date(request.paid_at)) : "N/A"}
+                        </p>
+                        <p className="mt-2 text-xs">We're now purchasing the item for you.</p>
+                      </div>
+                    )}
+
+                    {request.status === "bought" && (
+                      <div className="mt-4 rounded-lg bg-soft-blue-50 p-3 text-sm text-soft-blue-700">
+                        <p className="font-medium">✓ Item Purchased</p>
+                        <p className="mt-1 text-xs">
+                          Purchased on {request.bought_at ? formatDate(new Date(request.bought_at)) : "N/A"}
+                        </p>
+                        <p className="mt-2 text-xs">Item is being shipped to our storage facility.</p>
+                      </div>
+                    )}
+
+                    {request.status === "in_storage" && (
+                      <div className="mt-4 rounded-lg bg-success/10 p-3 text-sm text-success">
+                        <p className="font-medium">✓ Item in Storage</p>
+                        <p className="mt-1 text-xs">
+                          Arrived on {request.in_storage_at ? formatDate(new Date(request.in_storage_at)) : "N/A"}
+                        </p>
+                        <p className="mt-2 text-xs font-semibold">
+                          Your item is ready! It has been added to your cart.
+                        </p>
+                        <Link
+                          href="/store/cart"
+                          className="mt-3 inline-block rounded-lg bg-success px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-success/90"
+                        >
+                          View in Cart →
+                        </Link>
+                      </div>
+                    )}
+
+                    {request.status === "rejected" && (
+                      <div className="mt-4 rounded-lg bg-error/10 p-3 text-sm text-error">
+                        <p className="font-medium">✗ Request Rejected</p>
+                        {request.rejection_reason && (
+                          <p className="mt-1 text-xs">{request.rejection_reason}</p>
+                        )}
+                        <p className="mt-2 text-xs">
+                          Rejected on {request.rejected_at ? formatDate(new Date(request.rejected_at)) : "N/A"}
+                        </p>
+                      </div>
+                    )}
+
+                    {request.admin_notes && request.status !== "approved" && (
+                      <div className="mt-3 rounded-lg bg-grey-50 p-3 text-xs text-muted-foreground">
+                        <p className="font-medium">Admin Notes:</p>
+                        <p className="mt-1">{request.admin_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}

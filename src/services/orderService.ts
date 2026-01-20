@@ -154,6 +154,7 @@ export interface CreateOrderResponse {
   success: boolean;
   data: Order;
   message?: string;
+  error?: string;
 }
 
 export interface UpdateOrderStatusRequest {
@@ -215,15 +216,19 @@ export const orderService = {
    * Create new order
    */
   async createOrder(data: CreateOrderRequest): Promise<Order> {
-    // Use mock data for testing
-    if (shouldUseMockData()) {
-      return mockOrderService.createOrder(data);
-    }
-
     try {
       console.log('🔗 Creating order via API:', '/orders', data);
       const response = await apiClient.post<CreateOrderResponse>('/orders', data);
       console.log('✅ Order created successfully:', response.data);
+      
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || response.data?.error || 'Failed to create order');
+      }
+      
+      if (!response.data.data) {
+        throw new Error('Invalid response format from server');
+      }
+      
       return response.data.data;
     } catch (error: any) {
       console.error('❌ Error creating order:', error);
@@ -231,6 +236,13 @@ export const orderService = {
       if (error?.response?.data) {
         console.error('❌ API Error Response:', error.response.data);
       }
+      
+      // Fallback to mock service only if API fails AND mock data is enabled
+      if (shouldUseMockData() && process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Falling back to mock order service (API unavailable)');
+        return mockOrderService.createOrder(data);
+      }
+      
       throw handleApiError(error);
     }
   },

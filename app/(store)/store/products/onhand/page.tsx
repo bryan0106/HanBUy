@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { FilterSidebar } from "@/components/store/FilterSidebar";
 import { productService } from "@/services/productService";
 import type { Product as ServiceProduct } from "@/services/productService";
+import toast from "react-hot-toast";
 
 type ViewType = "list" | "single" | "grid";
 
@@ -151,10 +152,13 @@ export default function OnhandProductsPage() {
 
   const handleSubmitPasabuy = async (request: PasabuyRequest) => {
     try {
-      // Mock pasabuy request - no API call
-      console.log("Pasabuy request (mock):", request);
-      alert("Pasabuy request submitted successfully! We'll contact you once we find the product.");
+      console.log("Submitting pasabuy request:", request);
+      const response = await productService.submitPasabuyRequest(request);
+      console.log("Pasabuy request submitted successfully:", response);
+      toast.success(response.message || "Pasabuy request submitted successfully! We'll contact you once we find the product.");
     } catch (error: any) {
+      console.error("Error submitting pasabuy request:", error);
+      toast.error(error.message || "Failed to submit pasabuy request. Please try again.");
       throw new Error(error.message || "Failed to submit pasabuy request");
     }
   };

@@ -292,6 +292,15 @@ export default function CheckoutPage() {
 
       console.log('Order created successfully (mock):', createdOrder);
 
+      // Clear cart after order is successfully created
+      try {
+        await cartService.clearCart();
+        console.log("✅ Cart cleared after order creation");
+      } catch (cartError) {
+        console.error("⚠️ Failed to clear cart, but order was created:", cartError);
+        // Don't throw - order was successful, cart clearing is secondary
+      }
+
       // Redirect to payment page with order ID and wallet info
       const paymentUrl = useWalletBalance && actualWalletAmount > 0
         ? `/store/payment?orderId=${createdOrder.id}&walletAmount=${actualWalletAmount}&type=${paymentOption === "full" ? "full_payment" : "item_only"}`
