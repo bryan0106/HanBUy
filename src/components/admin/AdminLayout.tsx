@@ -32,11 +32,28 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
     ]
   },
   { label: "Orders", href: "/admin/orders", icon: "🛒" },
+  {
+    label: "Payments",
+    href: "/admin/payments",
+    icon: "💳",
+    subItems: [
+      { label: "Manila Office", href: "/admin/manila/payments", icon: "🏢" },
+      { label: "All Payments", href: "/admin/payments", icon: "📋" },
+    ]
+  },
   { label: "Receiving", href: "/admin/fulfillment/receiving", icon: "📬" },
   { label: "Consolidation", href: "/admin/fulfillment/consolidation", icon: "📦" },
   { label: "Courier", href: "/admin/fulfillment/courier", icon: "🚚" },
   { label: "Invoices", href: "/admin/invoices", icon: "🧾" },
-  { label: "Box Tracking", href: "/admin/boxes", icon: "📦" },
+  {
+    label: "Boxes",
+    href: "/admin/boxes",
+    icon: "📦",
+    subItems: [
+      { label: "Box Tracking", href: "/admin/boxes", icon: "📍" },
+      { label: "Approvals", href: "/admin/boxes/approvals", icon: "✅" },
+    ]
+  },
   { label: "Clients", href: "/admin/clients", icon: "👥" },
   { label: "Social Media", href: "/admin/social", icon: "📱" },
   { label: "Notifications", href: "/admin/notifications", icon: "🔔" },
@@ -124,6 +141,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 (pathname?.startsWith("/admin/inventory/onhand") || 
                  pathname?.startsWith("/admin/inventory/preorder") || 
                  pathname?.startsWith("/admin/inventory/pasabuy"));
+              const isPaymentsActive = item.href === "/admin/payments" && 
+                (pathname?.startsWith("/admin/payments") || 
+                 pathname?.startsWith("/admin/manila/payments"));
+              const isBoxesActive = item.href === "/admin/boxes" && 
+                (pathname?.startsWith("/admin/boxes") || 
+                 pathname?.startsWith("/admin/boxes/approvals"));
               
               return (
                 <li key={item.href}>
@@ -132,7 +155,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     onClick={handleNavClick}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      (isActive || isInventoryActive)
+                      (isActive || isInventoryActive || isPaymentsActive || isBoxesActive)
                         ? "bg-soft-blue-50 text-soft-blue-700"
                         : "text-grey-700 hover:bg-grey-50 hover:text-grey-900"
                     )}
@@ -140,7 +163,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     <span className="text-lg">{item.icon}</span>
                     {item.label}
                   </Link>
-                  {hasSubItems && (isActive || isInventoryActive) && (
+                  {hasSubItems && (isActive || isInventoryActive || isPaymentsActive || isBoxesActive) && (
                     <ul className="ml-4 mt-1 space-y-1 border-l-2 border-soft-blue-200 pl-4">
                       {(item.subItems ?? []).map((subItem) => {
                         const isSubActive = pathname === subItem.href || pathname?.startsWith(subItem.href + "/");

@@ -11,11 +11,12 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { calculateShippingFee } from "@/lib/shipping";
 import { QRPayment } from "@/components/payment/QRPayment";
-import { utilityService, type BankType } from "@/services/utilityService";
+import { paymentService } from "@/services/paymentService";
+import type { BankType as PaymentBankType } from "@/services/paymentService";
+import type { BankType } from "@/services/api";
 import { orderService } from "@/services/orderService";
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import toast from "react-hot-toast";
-import { shouldUseMockData } from "@/utils/env";
 
 export default function CheckoutPaymentPage() {
   const router = useRouter();
@@ -124,13 +125,21 @@ export default function CheckoutPaymentPage() {
 
   const loadBanks = async () => {
     try {
-      const banks = await utilityService.getBankTypes();
-      setBankTypes(banks);
-      console.log("✅ Bank types loaded:", banks);
+      // Use paymentService.getBankTypes() which calls /api/payments/bank-type
+      const banks = await paymentService.getBankTypes();
+      // Map to BankType format expected by QRPayment component
+      // BankType from @/services/api requires 'code' property
+      const mappedBanks: BankType[] = banks.map(bank => ({
+        code: bank.id, // Use bank.id as code for QRPayment compatibility
+        name: bank.name,
+        color: bank.color || 'bg-blue-500',
+      }));
+      setBankTypes(mappedBanks);
+      console.log("✅ Bank types loaded:", mappedBanks);
     } catch (error) {
-      console.warn("Failed to fetch bank types, utilityService will use defaults:", error);
-      // utilityService.getBankTypes() now returns defaults, so set empty array
-      // QRPayment component will use its DEFAULT_BANKS
+      console.error("Error loading banks:", error);
+      toast.error("Failed to load payment methods. Please refresh the page.");
+      // Set empty array - don't use fallback mock data
       setBankTypes([]);
     }
   };
@@ -383,14 +392,12 @@ export default function CheckoutPaymentPage() {
           }
         }
         
-        // Validate UUID format only in real API mode
-        if (!shouldUseMockData()) {
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          if (!uuidRegex.test(orderId)) {
-            console.error("Invalid order ID format after normalization:", { original: createdOrder.id, normalized: orderId });
-            console.error("Full order response:", createdOrder);
-            throw new Error(`Invalid order ID format: ${createdOrder.id}. Expected UUID format.`);
-          }
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(orderId)) {
+          console.error("Invalid order ID format after normalization:", { original: createdOrder.id, normalized: orderId });
+          console.error("Full order response:", createdOrder);
+          throw new Error(`Invalid order ID format: ${createdOrder.id}. Expected UUID format.`);
         }
         
         setCreatedOrderId(orderId);

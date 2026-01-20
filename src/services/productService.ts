@@ -917,4 +917,143 @@ export const productService = {
       throw handleApiError(error);
     }
   },
+
+  /**
+   * Get all pasabuy requests (Admin only)
+   */
+  async getAdminPasabuyRequests(params?: {
+    status?: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+    customer_id?: string;
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      request_number: string;
+      customer_id: string;
+      customer_name: string;
+      customer_email: string;
+      product_url?: string;
+      product_name?: string;
+      comment?: string;
+      estimated_price?: number;
+      currency: 'KRW' | 'PHP';
+      status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+      images?: string[];
+      category?: string;
+      sku?: string;
+      created_at: string;
+      updated_at: string;
+      approved_at?: string;
+      paid_at?: string;
+      bought_at?: string;
+      in_storage_at?: string;
+      rejected_at?: string;
+      rejection_reason?: string;
+      admin_notes?: string;
+    }>;
+  }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: Array<{
+          id: string;
+          request_number: string;
+          customer_id: string;
+          customer_name: string;
+          customer_email: string;
+          product_url?: string;
+          product_name?: string;
+          comment?: string;
+          estimated_price?: number;
+          currency: 'KRW' | 'PHP';
+          status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+          images?: string[];
+          category?: string;
+          sku?: string;
+          created_at: string;
+          updated_at: string;
+          approved_at?: string;
+          paid_at?: string;
+          bought_at?: string;
+          in_storage_at?: string;
+          rejected_at?: string;
+          rejection_reason?: string;
+          admin_notes?: string;
+        }>;
+      }>('/admin/pasabuy', { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Update pasabuy request status (Admin only)
+   */
+  async updatePasabuyStatus(id: string, data: {
+    status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+    admin_notes?: string;
+    rejection_reason?: string;
+  }): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      request_number: string;
+      customer_id: string;
+      customer_name: string;
+      customer_email: string;
+      product_url?: string;
+      product_name?: string;
+      comment?: string;
+      estimated_price?: number;
+      currency: 'KRW' | 'PHP';
+      status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+      images?: string[];
+      category?: string;
+      sku?: string;
+      created_at: string;
+      updated_at: string;
+      approved_at?: string;
+      paid_at?: string;
+      bought_at?: string;
+      in_storage_at?: string;
+      rejected_at?: string;
+      rejection_reason?: string;
+      admin_notes?: string;
+    };
+  }> {
+    try {
+      const response = await apiClient.patch<{
+        success: boolean;
+        data: {
+          id: string;
+          request_number: string;
+          customer_id: string;
+          customer_name: string;
+          customer_email: string;
+          product_url?: string;
+          product_name?: string;
+          comment?: string;
+          estimated_price?: number;
+          currency: 'KRW' | 'PHP';
+          status: 'pending' | 'approved' | 'paid' | 'bought' | 'in_storage' | 'rejected';
+          images?: string[];
+          category?: string;
+          sku?: string;
+          created_at: string;
+          updated_at: string;
+          approved_at?: string;
+          paid_at?: string;
+          bought_at?: string;
+          in_storage_at?: string;
+          rejected_at?: string;
+          rejection_reason?: string;
+          admin_notes?: string;
+        };
+      }>(`/admin/pasabuy/${id}/status`, data);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
 };

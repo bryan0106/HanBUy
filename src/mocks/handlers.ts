@@ -6,16 +6,182 @@ import { http, HttpResponse } from 'msw';
 // In-memory storage for orders (simulates database)
 const ordersStore: Map<string, any[]> = new Map();
 
+// Initialize with sample orders for testing
+const initializeSampleOrders = () => {
+  // Only initialize if store is empty
+  if (ordersStore.size > 0) return;
+  
+  const sampleUserId = 'user-test-customer-1';
+  const sampleOrders = [
+    {
+      id: 'order-test-1',
+      user_id: sampleUserId,
+      order_number: 'ORD-2024-001',
+      subtotal: 68000,
+      isf: 1500,
+      lsf: 800,
+      shipping_fee: 2300,
+      total: 70300,
+      currency: 'PHP',
+      status: 'pending',
+      payment_status: 'pending',
+      payment_type: 'full',
+      box_type_preference: 'solo',
+      customer_name: 'John Doe',
+      customer_email: 'john@example.com',
+      customer_phone: '+639123456789',
+      shipping_address: {
+        street: '123 Test Street',
+        city: 'Manila',
+        province: 'Metro Manila',
+        zipCode: '1000',
+        country: 'Philippines',
+      },
+      order_items: [
+        {
+          id: 'item-1',
+          product_id: 'prod-test-1',
+          product_name: 'COSRX Advanced Snail 96 Mucin Power Essence',
+          product_type: 'onhand',
+          quantity: 2,
+          unit_price: 25000,
+          total: 50000,
+          image_url: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=500',
+        },
+        {
+          id: 'item-2',
+          product_id: 'prod-test-2',
+          product_name: 'Beauty of Joseon Relief Sun SPF50+',
+          product_type: 'onhand',
+          quantity: 1,
+          unit_price: 18000,
+          total: 18000,
+        },
+      ],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 'order-test-2',
+      user_id: sampleUserId,
+      order_number: 'ORD-2024-002',
+      subtotal: 50000,
+      isf: 1500,
+      lsf: 600,
+      shipping_fee: 2100,
+      total: 52100,
+      currency: 'PHP',
+      status: 'confirmed',
+      payment_status: 'paid',
+      payment_type: 'downpayment',
+      downpayment_amount: 26050,
+      balance: 26050,
+      box_type_preference: 'shared',
+      customer_name: 'John Doe',
+      customer_email: 'john@example.com',
+      customer_phone: '+639123456789',
+      shipping_address: {
+        street: '456 Sample Avenue',
+        city: 'Quezon City',
+        province: 'Metro Manila',
+        zipCode: '1100',
+        country: 'Philippines',
+      },
+      order_items: [
+        {
+          id: 'item-3',
+          product_id: 'prod-test-3',
+          product_name: 'Limited Edition K-Beauty Set',
+          product_type: 'preorder',
+          quantity: 1,
+          unit_price: 50000,
+          total: 50000,
+          preorder_release_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      ],
+      payment_history: [
+        {
+          payment_type: 'downpayment',
+          amount: 26050,
+          currency: 'PHP',
+          created_at: new Date().toISOString(),
+          verified: true,
+        },
+      ],
+      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      paid_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
+  
+  ordersStore.set(sampleUserId, sampleOrders);
+  console.log('🎭 MSW: Initialized with sample orders', { count: sampleOrders.length });
+};
+
+// Initialize sample data immediately when module loads
+initializeSampleOrders();
+
 // In-memory storage for pasabuy requests (simulates database)
 const pasabuyStore: Map<string, any[]> = new Map();
 
 // In-memory storage for cart items (simulates database)
 const cartStore: Map<string, any[]> = new Map();
 
+// In-memory storage for payments (simulates database)
+// Key: payment_id, Value: payment object
+const paymentsStore: Map<string, any> = new Map();
+
 export const handlers = [
-  // Mock bank types endpoint
+  // Mock bank types endpoint (new endpoint per guide)
+  // Matches: */api/payments/bank-type (any base URL)
+  http.get('*/api/payments/bank-type', () => {
+    console.log('🎭 MSW: Fetching payment bank types');
+    return HttpResponse.json({
+      success: true,
+      data: [
+        { 
+          id: 'GCASH', 
+          name: 'GCash', 
+          type: 'qr_code', 
+          icon: 'gcash', 
+          description: 'Pay via GCash QR code'
+        },
+        { 
+          id: 'MAYA', 
+          name: 'Maya', 
+          type: 'qr_code', 
+          icon: 'maya', 
+          description: 'Pay via Maya QR code'
+        },
+        { 
+          id: 'BPI', 
+          name: 'BPI', 
+          type: 'qr_code', 
+          icon: 'bpi', 
+          description: 'Pay via BPI QR code'
+        },
+        { 
+          id: 'BDO', 
+          name: 'BDO', 
+          type: 'qr_code', 
+          icon: 'bdo', 
+          description: 'Pay via BDO QR code'
+        },
+        { 
+          id: 'GOTYME', 
+          name: 'GoTyme', 
+          type: 'qr_code', 
+          icon: 'gotyme', 
+          description: 'Pay via GoTyme QR code'
+        },
+      ],
+    });
+  }),
+
+  // Mock bank types endpoint (for backward compatibility)
   // Matches: */api/bank-type (any base URL)
   http.get('*/api/bank-type', () => {
+    console.log('🎭 MSW: Fetching bank types (legacy endpoint)');
     return HttpResponse.json({
       success: true,
       data: [
@@ -119,14 +285,96 @@ export const handlers = [
   http.post('*/api/payments/confirm', async ({ request }) => {
     const formData = await request.formData().catch(() => null);
     
-    console.log('🎭 MSW: Mocking payment confirmation - Auto-verified');
+    const paymentId = formData?.get('payment_id')?.toString() || '';
+    const orderId = formData?.get('order_id')?.toString() || '';
+    const amount = Number(formData?.get('amount') || 0);
+    const proofOfPayment = formData?.get('proof_of_payment')?.toString() || '';
+    
+    console.log('🎭 MSW: Mocking payment confirmation - Auto-verified', { paymentId, orderId, amount });
+
+    // Update payment record
+    const paymentRecord = paymentsStore.get(paymentId);
+    if (paymentRecord) {
+      paymentRecord.status = 'verified';
+      paymentRecord.verified = true;
+      paymentRecord.verified_at = new Date().toISOString();
+      paymentRecord.proof_of_payment = proofOfPayment;
+      paymentRecord.updated_at = new Date().toISOString();
+      paymentsStore.set(paymentId, paymentRecord);
+    } else {
+      // Create new payment record if not found
+      const newPayment = {
+        id: paymentId || crypto.randomUUID(),
+        order_id: orderId,
+        amount: amount,
+        currency: 'PHP',
+        payment_type: 'full_payment',
+        payment_method: { type: 'qr_code', bank: 'GCASH' },
+        status: 'verified',
+        verified: true,
+        verified_at: new Date().toISOString(),
+        proof_of_payment: proofOfPayment,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      paymentsStore.set(newPayment.id, newPayment);
+    }
+
+    // Update order payment_status and payment_history
+    if (orderId) {
+      for (const [userId, orders] of ordersStore.entries()) {
+        const orderIndex = orders.findIndex((o: any) => o.id === orderId);
+        if (orderIndex !== -1) {
+          const order = orders[orderIndex];
+          
+          // Update payment_status
+          order.payment_status = 'paid';
+          order.status = order.status === 'pending' ? 'confirmed' : order.status;
+          order.paid_at = new Date().toISOString();
+          order.proof_of_payment = proofOfPayment;
+          
+          // Update payment_history
+          if (!order.payment_history) {
+            order.payment_history = [];
+          }
+          
+          // Find existing payment in history or add new one
+          const paymentHistoryIndex = order.payment_history.findIndex((p: any) => p.id === paymentId);
+          if (paymentHistoryIndex !== -1) {
+            order.payment_history[paymentHistoryIndex].status = 'verified';
+            order.payment_history[paymentHistoryIndex].verified = true;
+            order.payment_history[paymentHistoryIndex].verified_at = new Date().toISOString();
+            order.payment_history[paymentHistoryIndex].proof_of_payment = proofOfPayment;
+          } else {
+            order.payment_history.push({
+              id: paymentId || crypto.randomUUID(),
+              payment_type: order.payment_type || 'full_payment',
+              amount: amount,
+              currency: order.currency || 'PHP',
+              payment_method: order.payment_method || { type: 'qr_code', bank: 'GCASH' },
+              status: 'verified',
+              verified: true,
+              verified_at: new Date().toISOString(),
+              proof_of_payment: proofOfPayment,
+              created_at: new Date().toISOString(),
+            });
+          }
+          
+          order.updated_at = new Date().toISOString();
+          orders[orderIndex] = order;
+          ordersStore.set(userId, orders);
+          console.log('✅ MSW: Updated order payment_status and payment_history', { orderId, paymentId });
+          break;
+        }
+      }
+    }
 
     return HttpResponse.json({
       success: true,
       data: {
-        payment_id: formData?.get('payment_id')?.toString() || crypto.randomUUID(),
-        order_id: formData?.get('order_id')?.toString() || '',
-        amount: Number(formData?.get('amount') || 0),
+        payment_id: paymentId || crypto.randomUUID(),
+        order_id: orderId,
+        amount: amount,
         status: 'verified' as const,
         verified: true,
       },
@@ -164,66 +412,103 @@ export const handlers = [
   // Mock create order endpoint
   // Matches: */api/orders (any base URL)
   http.post('*/api/orders', async ({ request }) => {
-    const body: any = await request.json().catch(() => ({}));
-    
-    console.log('🎭 MSW: Creating order', { userId: body.user_id, orderNumber: body.order_number });
+    try {
+      const body: any = await request.json().catch(() => ({}));
+      
+      console.log('🎭 MSW: Intercepted POST /api/orders');
+      console.log('🎭 MSW: Order data received:', { 
+        userId: body.user_id, 
+        orderNumber: body.order_number,
+        total: body.total,
+        itemCount: body.order_items?.length || 0,
+        hasShippingAddress: !!body.shipping_address,
+      });
 
-    const userId = body.user_id;
-    if (!userId) {
+      const userId = body.user_id;
+      if (!userId) {
+        console.error('❌ MSW: Missing user_id');
+        return HttpResponse.json(
+          { success: false, error: 'user_id is required' },
+          { status: 400 }
+        );
+      }
+
+      // Initialize user's orders array if not exists
+      if (!ordersStore.has(userId)) {
+        ordersStore.set(userId, []);
+      }
+
+      const userOrders = ordersStore.get(userId)!;
+
+      // Create new order - accept any shipping address (even incomplete)
+      const orderId = crypto.randomUUID();
+      const orderNumber = body.order_number || `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      
+      const newOrder = {
+        id: orderId,
+        user_id: userId,
+        order_number: orderNumber,
+        subtotal: body.subtotal || 0,
+        isf: body.isf || 0,
+        lsf: body.lsf || 0,
+        shipping_fee: body.shipping_fee || 0,
+        solo_shipping_fee: body.solo_shipping_fee,
+        shared_shipping_fee: body.shared_shipping_fee,
+        total: body.total || 0,
+        currency: body.currency || 'PHP',
+        status: body.status || 'pending',
+        payment_status: body.payment_status || 'pending',
+        payment_type: body.payment_type || 'full_payment',
+        payment_method: body.payment_method,
+        box_type_preference: body.box_type_preference || 'solo',
+        box_size: body.box_size,
+        shared_box_id: body.shared_box_id,
+        // Accept any shipping address, even if incomplete
+        shipping_address: body.shipping_address || {
+          street: '',
+          city: '',
+          province: '',
+          zipCode: '',
+          country: 'Philippines',
+        },
+        storage_status: body.storage_status || 'pending',
+        shipping_payment_status: body.shipping_payment_status,
+        shipping_requested_at: body.shipping_requested_at,
+        order_items: body.order_items || [],
+        customer_message: body.customer_message,
+        preorder_status: body.preorder_status,
+        // Include customer info for admin API compatibility
+        customer_name: body.customer_name || `Customer ${userId.slice(-6)}`,
+        customer_email: body.customer_email || `customer${userId.slice(-6)}@example.com`,
+        customer_phone: body.customer_phone,
+        // Initialize payment_history as empty array
+        payment_history: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Add order to store
+      userOrders.unshift(newOrder);
+      ordersStore.set(userId, userOrders);
+
+      console.log('✅ MSW: Order created successfully', { 
+        orderId: newOrder.id, 
+        orderNumber: newOrder.order_number,
+        total: newOrder.total,
+      });
+
+      return HttpResponse.json({
+        success: true,
+        data: newOrder,
+        message: 'Order created successfully',
+      });
+    } catch (error: any) {
+      console.error('❌ MSW: Error in order creation handler:', error);
       return HttpResponse.json(
-        { success: false, error: 'user_id is required' },
-        { status: 400 }
+        { success: false, error: error.message || 'Failed to create order' },
+        { status: 500 }
       );
     }
-
-    // Initialize user's orders array if not exists
-    if (!ordersStore.has(userId)) {
-      ordersStore.set(userId, []);
-    }
-
-    const userOrders = ordersStore.get(userId)!;
-
-    // Create new order
-    const newOrder = {
-      id: crypto.randomUUID(),
-      user_id: userId,
-      order_number: body.order_number || `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
-      subtotal: body.subtotal || 0,
-      isf: body.isf || 0,
-      lsf: body.lsf || 0,
-      shipping_fee: body.shipping_fee || 0,
-      solo_shipping_fee: body.solo_shipping_fee,
-      shared_shipping_fee: body.shared_shipping_fee,
-      total: body.total || 0,
-      currency: body.currency || 'PHP',
-      status: body.status || 'pending',
-      payment_status: body.payment_status || 'pending',
-      payment_type: body.payment_type || 'full_payment',
-      box_type_preference: body.box_type_preference || 'solo',
-      box_size: body.box_size,
-      shared_box_id: body.shared_box_id,
-      shipping_address: body.shipping_address || {},
-      storage_status: body.storage_status || 'pending',
-      shipping_payment_status: body.shipping_payment_status,
-      shipping_requested_at: body.shipping_requested_at,
-      order_items: body.order_items || [],
-      customer_message: body.customer_message,
-      preorder_status: body.preorder_status,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // Add order to store
-    userOrders.unshift(newOrder);
-    ordersStore.set(userId, userOrders);
-
-    console.log('✅ MSW: Order created successfully', { orderId: newOrder.id, orderNumber: newOrder.order_number });
-
-    return HttpResponse.json({
-      success: true,
-      data: newOrder,
-      message: 'Order created successfully',
-    });
   }),
 
   // Mock get orders endpoint
@@ -231,29 +516,58 @@ export const handlers = [
   http.get('*/api/orders', ({ request }) => {
     const url = new URL(request.url);
     const userId = url.searchParams.get('user_id');
+    const status = url.searchParams.get('status');
+    const payment_status = url.searchParams.get('payment_status');
     
-    console.log('🎭 MSW: Fetching orders', { userId });
+    // Ensure sample data is initialized
+    initializeSampleOrders();
+    
+    console.log('🎭 MSW: Fetching orders', { userId, status, payment_status });
+    console.log('🎭 MSW: OrdersStore keys:', Array.from(ordersStore.keys()));
+    console.log('🎭 MSW: OrdersStore size:', ordersStore.size);
+
+    let orders: any[] = [];
 
     if (userId) {
       // Get orders for specific user
-      const userOrders = ordersStore.get(userId) || [];
-      return HttpResponse.json({
-        success: true,
-        data: userOrders,
-        total: userOrders.length,
-      });
+      const userOrders = ordersStore.get(userId);
+      console.log('🎭 MSW: Orders for user', userId, ':', userOrders?.length || 0);
+      orders = userOrders || [];
+      
+      // Also check if userId matches any order's user_id (in case of format mismatch)
+      if (orders.length === 0) {
+        console.log('🎭 MSW: No orders found for userId, searching all orders...');
+        ordersStore.forEach((allUserOrders, storedUserId) => {
+          const matchingOrders = allUserOrders.filter((order: any) => 
+            order.user_id === userId || storedUserId === userId
+          );
+          if (matchingOrders.length > 0) {
+            console.log('🎭 MSW: Found', matchingOrders.length, 'orders with matching user_id');
+            orders.push(...matchingOrders);
+          }
+        });
+      }
     } else {
       // Get all orders (admin view)
-      const allOrders: any[] = [];
-      ordersStore.forEach((orders) => {
-        allOrders.push(...orders);
-      });
-      return HttpResponse.json({
-        success: true,
-        data: allOrders,
-        total: allOrders.length,
+      ordersStore.forEach((userOrders) => {
+        orders.push(...userOrders);
       });
     }
+
+    // Apply filters
+    if (status && status !== 'all') {
+      orders = orders.filter(order => order.status === status);
+    }
+    if (payment_status && payment_status !== 'all') {
+      orders = orders.filter(order => order.payment_status === payment_status);
+    }
+
+    console.log('🎭 MSW: Returning', orders.length, 'orders');
+    return HttpResponse.json({
+      success: true,
+      data: orders,
+      total: orders.length,
+    });
   }),
 
   // Mock get order by ID endpoint
@@ -276,6 +590,403 @@ export const handlers = [
 
     return HttpResponse.json(
       { success: false, error: 'Order not found' },
+      { status: 404 }
+    );
+  }),
+
+  // ========== ADMIN API ENDPOINTS ==========
+
+  // Mock admin get all orders endpoint
+  // Matches: */api/admin/orders (any base URL)
+  http.get('*/api/admin/orders', ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const payment_status = url.searchParams.get('payment_status');
+    const order_type = url.searchParams.get('order_type');
+    const search = url.searchParams.get('search');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    
+    // Ensure sample data is initialized
+    initializeSampleOrders();
+    
+    console.log('🎭 MSW: Fetching admin orders', { status, payment_status, order_type, search });
+
+    let orders: any[] = [];
+
+    // Get all orders from store
+    ordersStore.forEach((userOrders) => {
+      orders.push(...userOrders);
+    });
+
+    // Apply filters
+    if (status && status !== 'all') {
+      orders = orders.filter(order => order.status === status);
+    }
+    if (payment_status && payment_status !== 'all') {
+      orders = orders.filter(order => order.payment_status === payment_status);
+    }
+    if (order_type && order_type !== 'all') {
+      orders = orders.filter(order => {
+        const orderItems = order.order_items || [];
+        const productTypes = new Set(orderItems.map((item: any) => item.product_type || 'onhand'));
+        if (order_type === 'pasabuy') {
+          return productTypes.has('pasabuy') || orderItems.some((item: any) => item.product_id?.startsWith('pasabuy-'));
+        } else if (order_type === 'preorder') {
+          return productTypes.has('preorder') && !productTypes.has('onhand');
+        } else if (order_type === 'onhand') {
+          return !productTypes.has('preorder') && !productTypes.has('pasabuy');
+        }
+        return true;
+      });
+    }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      orders = orders.filter(order => 
+        order.order_number.toLowerCase().includes(searchLower) ||
+        order.customer_name?.toLowerCase().includes(searchLower) ||
+        order.customer_email?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Pagination
+    const total = orders.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedOrders = orders.slice(startIndex, endIndex);
+
+    // Transform to admin API format (include customer info)
+    const adminOrders = paginatedOrders.map((order: any) => ({
+      id: order.id,
+      order_number: order.order_number,
+      customer_name: order.customer_name || `Customer ${order.user_id?.slice(-6) || 'Unknown'}`,
+      customer_email: order.customer_email || `customer${order.user_id?.slice(-6) || 'unknown'}@example.com`,
+      customer_phone: order.customer_phone,
+      status: order.status,
+      payment_status: order.payment_status,
+      storage_status: order.storage_status || 'pending',
+      fulfillment_status: order.fulfillment_status || (order.status === 'pending' ? 'pending_packing' : undefined),
+      preorder_status: order.preorder_status || null,
+      total: order.total,
+      subtotal: order.subtotal,
+      shipping_fee: order.shipping_fee || order.isf + order.lsf,
+      item_count: order.order_items?.length || 0,
+      created_at: order.created_at,
+      shipping_address: order.shipping_address,
+      order_items: order.order_items,
+      payment_history: order.payment_history,
+    }));
+
+    return HttpResponse.json({
+      success: true,
+      data: adminOrders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
+  }),
+
+  // Mock admin get single order endpoint
+  // Matches: */api/admin/orders/:id (any base URL)
+  http.get('*/api/admin/orders/:id', ({ params }) => {
+    const orderId = params.id as string;
+    
+    console.log('🎭 MSW: Fetching admin order by ID', { orderId });
+
+    // Search through all users' orders
+    for (const [userId, orders] of ordersStore.entries()) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        // Transform to admin API format
+        const adminOrder = {
+          id: order.id,
+          order_number: order.order_number,
+          customer_name: order.customer_name || `Customer ${order.user_id?.slice(-6) || 'Unknown'}`,
+          customer_email: order.customer_email || `customer${order.user_id?.slice(-6) || 'unknown'}@example.com`,
+          customer_phone: order.customer_phone,
+          status: order.status,
+          payment_status: order.payment_status,
+          storage_status: order.storage_status || 'pending',
+          fulfillment_status: order.fulfillment_status || (order.status === 'pending' ? 'pending_packing' : undefined),
+          preorder_status: order.preorder_status || null,
+          total: order.total,
+          subtotal: order.subtotal,
+          shipping_fee: order.shipping_fee || order.isf + order.lsf,
+          shipping_address: order.shipping_address,
+          order_items: order.order_items || [],
+          payment_history: order.payment_history || [],
+        };
+        
+        return HttpResponse.json({
+          success: true,
+          data: adminOrder,
+        });
+      }
+    }
+
+    return HttpResponse.json(
+      { success: false, error: 'Order not found' },
+      { status: 404 }
+    );
+  }),
+
+  // Mock admin update order status endpoint
+  // Matches: */api/admin/orders/:id/status (any base URL)
+  http.patch('*/api/admin/orders/:id/status', async ({ params, request }) => {
+    const orderId = params.id as string;
+    const body: any = await request.json().catch(() => ({}));
+    
+    console.log('🎭 MSW: Updating admin order status', { orderId, status: body.status });
+
+    // Search through all users' orders
+    for (const [userId, orders] of ordersStore.entries()) {
+      const orderIndex = orders.findIndex(o => o.id === orderId);
+      if (orderIndex !== -1) {
+        const order = orders[orderIndex];
+        const updatedOrder = {
+          ...order,
+          status: body.status,
+          admin_notes: body.admin_notes || order.admin_notes,
+          updated_at: new Date().toISOString(),
+        };
+        orders[orderIndex] = updatedOrder;
+        ordersStore.set(userId, orders);
+        
+        return HttpResponse.json({
+          success: true,
+          data: updatedOrder,
+          message: 'Order status updated successfully',
+        });
+      }
+    }
+
+    return HttpResponse.json(
+      { success: false, error: 'Order not found' },
+      { status: 404 }
+    );
+  }),
+
+  // Mock admin update order payment status endpoint
+  // Matches: */api/admin/orders/:id/payment-status (any base URL)
+  http.patch('*/api/admin/orders/:id/payment-status', async ({ params, request }) => {
+    const orderId = params.id as string;
+    const body: any = await request.json().catch(() => ({}));
+    
+    console.log('🎭 MSW: Updating admin order payment status', { orderId, payment_status: body.payment_status });
+
+    // Search through all users' orders
+    for (const [userId, orders] of ordersStore.entries()) {
+      const orderIndex = orders.findIndex(o => o.id === orderId);
+      if (orderIndex !== -1) {
+        const order = orders[orderIndex];
+        const updatedOrder = {
+          ...order,
+          payment_status: body.payment_status,
+          admin_notes: body.admin_notes || order.admin_notes,
+          rejection_reason: body.rejection_reason,
+          downpayment_paid: body.downpayment_paid || order.downpayment_paid,
+          balance: body.payment_status === 'partial' && body.downpayment_paid 
+            ? order.total - body.downpayment_paid 
+            : order.balance,
+          // Auto-update order status if payment verified
+          status: body.payment_status === 'paid' && order.status === 'pending' ? 'confirmed' : order.status,
+          updated_at: new Date().toISOString(),
+          paid_at: body.payment_status === 'paid' ? new Date().toISOString() : order.paid_at,
+        };
+        orders[orderIndex] = updatedOrder;
+        ordersStore.set(userId, orders);
+        
+        return HttpResponse.json({
+          success: true,
+          data: updatedOrder,
+          message: 'Payment status updated successfully',
+        });
+      }
+    }
+
+    return HttpResponse.json(
+      { success: false, error: 'Order not found' },
+      { status: 404 }
+    );
+  }),
+
+  // Mock admin get all payments endpoint
+  // Matches: */api/admin/payments (any base URL)
+  http.get('*/api/admin/payments', ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const payment_type = url.searchParams.get('payment_type');
+    const search = url.searchParams.get('search');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    
+    // Ensure sample data is initialized
+    initializeSampleOrders();
+    
+    console.log('🎭 MSW: Fetching admin payments', { status, payment_type, search });
+
+    let payments: any[] = [];
+
+    // Get all orders and create payment records
+    ordersStore.forEach((userOrders) => {
+      userOrders.forEach((order: any) => {
+        // Create payment record from order
+        if (order.payment_status === 'pending' || order.payment_status === 'partial' || order.payment_status === 'paid') {
+          payments.push({
+            id: `${order.id}-main`,
+            order_id: order.id,
+            order_number: order.order_number,
+            amount: order.total,
+            status: order.payment_status === 'paid' ? 'verified' : order.payment_status === 'failed' ? 'rejected' : 'pending',
+            proof_of_payment: order.proof_of_payment,
+            payment_method: order.payment_method,
+            customer_name: order.customer_name || `Customer ${order.user_id?.slice(-6) || 'Unknown'}`,
+            customer_email: order.customer_email || `customer${order.user_id?.slice(-6) || 'unknown'}@example.com`,
+            customer_phone: order.customer_phone,
+            order_total: order.total,
+            order_subtotal: order.subtotal,
+            order_payment_status: order.payment_status,
+            order_status: order.status,
+            created_at: order.created_at,
+          });
+        }
+      });
+    });
+
+    // Apply filters
+    if (status && status !== 'all') {
+      payments = payments.filter(p => {
+        if (status === 'pending') return p.status === 'pending';
+        if (status === 'verified') return p.status === 'verified';
+        if (status === 'failed' || status === 'rejected') return p.status === 'rejected';
+        return true;
+      });
+    }
+    if (payment_type) {
+      payments = payments.filter(p => p.payment_method?.type === payment_type);
+    }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      payments = payments.filter(p => 
+        p.order_number.toLowerCase().includes(searchLower) ||
+        p.customer_name?.toLowerCase().includes(searchLower) ||
+        p.customer_email?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Pagination
+    const total = payments.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedPayments = payments.slice(startIndex, endIndex);
+
+    return HttpResponse.json({
+      success: true,
+      data: paginatedPayments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
+  }),
+
+  // Mock admin get single payment endpoint
+  // Matches: */api/admin/payments/:id (any base URL)
+  http.get('*/api/admin/payments/:id', ({ params }) => {
+    const paymentId = params.id as string;
+    
+    console.log('🎭 MSW: Fetching admin payment by ID', { paymentId });
+
+    // Extract order ID from payment ID (format: orderId-main or orderId-timestamp)
+    const orderId = paymentId.includes('-main') ? paymentId.replace('-main', '') : paymentId.split('-').slice(0, -1).join('-');
+
+    // Search through all users' orders
+    for (const [userId, orders] of ordersStore.entries()) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        const payment = {
+          id: paymentId,
+          order_id: order.id,
+          order_number: order.order_number,
+          amount: order.total,
+          status: order.payment_status === 'paid' ? 'verified' : order.payment_status === 'failed' ? 'rejected' : 'pending',
+          proof_of_payment: order.proof_of_payment,
+          payment_method: order.payment_method,
+          customer_name: order.customer_name || `Customer ${order.user_id?.slice(-6) || 'Unknown'}`,
+          customer_email: order.customer_email || `customer${order.user_id?.slice(-6) || 'unknown'}@example.com`,
+          customer_phone: order.customer_phone,
+          order_total: order.total,
+          order_subtotal: order.subtotal,
+          shipping_fee: order.shipping_fee || order.isf + order.lsf,
+          order_payment_status: order.payment_status,
+          order_status: order.status,
+          storage_status: order.storage_status || 'pending',
+          shipping_address: order.shipping_address,
+          payment_history: order.payment_history || [],
+        };
+        
+        return HttpResponse.json({
+          success: true,
+          data: payment,
+        });
+      }
+    }
+
+    return HttpResponse.json(
+      { success: false, error: 'Payment not found' },
+      { status: 404 }
+    );
+  }),
+
+  // Mock admin update payment status endpoint
+  // Matches: */api/admin/payments/:id/status (any base URL)
+  http.patch('*/api/admin/payments/:id/status', async ({ params, request }) => {
+    const paymentId = params.id as string;
+    const body: any = await request.json().catch(() => ({}));
+    
+    console.log('🎭 MSW: Updating admin payment status', { paymentId, status: body.status });
+
+    // Extract order ID from payment ID
+    const orderId = paymentId.includes('-main') ? paymentId.replace('-main', '') : paymentId.split('-').slice(0, -1).join('-');
+
+    // Search through all users' orders
+    for (const [userId, orders] of ordersStore.entries()) {
+      const orderIndex = orders.findIndex(o => o.id === orderId);
+      if (orderIndex !== -1) {
+        const order = orders[orderIndex];
+        const updatedOrder = {
+          ...order,
+          payment_status: body.status === 'verified' ? 'paid' : body.status === 'rejected' ? 'failed' : order.payment_status,
+          admin_notes: body.admin_notes || order.admin_notes,
+          rejection_reason: body.rejection_reason,
+          // Auto-update order status if payment verified
+          status: body.status === 'verified' && order.status === 'pending' ? 'confirmed' : order.status,
+          updated_at: new Date().toISOString(),
+          paid_at: body.status === 'verified' ? new Date().toISOString() : order.paid_at,
+        };
+        orders[orderIndex] = updatedOrder;
+        ordersStore.set(userId, orders);
+        
+        return HttpResponse.json({
+          success: true,
+          message: 'Payment status updated successfully',
+        });
+      }
+    }
+
+    return HttpResponse.json(
+      { success: false, error: 'Payment not found' },
       { status: 404 }
     );
   }),

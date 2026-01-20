@@ -5,6 +5,8 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { orderService } from "@/services/orderService";
+import { cartService } from "@/services/cartService";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Order {
   id: string;
@@ -30,6 +32,7 @@ interface CartItem {
 }
 
 export default function OrdersPage() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +40,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
     setLoading(true);
@@ -69,29 +72,28 @@ export default function OrdersPage() {
         setOrders([]);
       }
       
-      // Cart items - using mock for now since dashboard might not have user context
-      const mockCart: CartItem[] = [
-        {
-          id: "cart-1",
-          productId: "550e8400-e29b-41d4-a716-446655440010",
-          productName: "COSRX Advanced Snail 96 Mucin Power Essence",
-          quantity: 2,
-          price: 25000,
-          imageUrl: "https://www.lookfantastic.com/images?url=https://static.thcdn.com/productimg/original/11401174-1325238016812216.jpg&format=webp&auto=avif&width=985&height=985&fit=cover&dpr=2",
-          productType: "onhand",
-        },
-        {
-          id: "cart-2",
-          productId: "550e8400-e29b-41d4-a716-446655440011",
-          productName: "Beauty of Joseon Relief Sun SPF50+",
-          quantity: 1,
-          price: 18000,
-          imageUrl: "https://tse3.mm.bing.net/th/id/OIP._2Hg_yZs7nF3_uMRIuW99AHaHa?pid=Api&P=0&h=220",
-          productType: "onhand",
-        },
-      ];
-      
-      setCartItems(mockCart);
+      // Fetch cart items from API (only if user is available)
+      if (user?.id) {
+        try {
+          const cartData = await cartService.getCart(user.id);
+          const mappedCartItems: CartItem[] = cartData.map((item: any) => ({
+            id: item.id,
+            productId: item.product_id,
+            productName: item.product_name || item.product?.name || 'Unknown Product',
+            quantity: item.quantity,
+            price: item.unit_price || item.price || 0,
+            imageUrl: item.image_url || item.product?.image_url,
+            productType: (item.product_type || item.product?.product_type || 'onhand') as "onhand" | "preorder",
+          }));
+          setCartItems(mappedCartItems);
+        } catch (cartError) {
+          console.error("Error loading cart:", cartError);
+          setCartItems([]);
+        }
+      } else {
+        // No user, set empty cart
+        setCartItems([]);
+      }
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {

@@ -28,4 +28,12 @@ export * from './shippingService';
 export * from './documentService';
 export * from './notificationService';
 export * from './likedService';
-export * from './utilityService';
+// Export utilityService but exclude BankType and GetBankTypesResponse to avoid conflict with paymentService
+export {
+  utilityService,
+  type BoxType,
+  type GetBoxTypesResponse,
+  type Courier,
+  type GetCouriersResponse,
+  type HealthCheckResponse,
+} from './utilityService';

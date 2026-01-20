@@ -15,12 +15,13 @@ export function MSWProvider({ children }: { children: React.ReactNode }) {
       typeof window !== 'undefined' &&
       process.env.NODE_ENV === 'development'
     ) {
-      // Check if MSW should be enabled via environment variable
-      // Default to true in development, but can be disabled with NEXT_PUBLIC_DISABLE_MSW=true
+      // Check if MSW should be disabled via environment variable
+      // Default to enabled in development, disable with NEXT_PUBLIC_DISABLE_MSW=true
       const disableMSW = process.env.NEXT_PUBLIC_DISABLE_MSW === 'true';
       
       if (disableMSW) {
-        console.log('🚫 MSW is disabled via NEXT_PUBLIC_DISABLE_MSW');
+        console.log('🚫 MSW is disabled via NEXT_PUBLIC_DISABLE_MSW=true');
+        console.log('🔗 Using real API:', process.env.NEXT_PUBLIC_API_URL || 'https://hanbuy-api.onrender.com/api');
         setMswReady(true);
         return;
       }

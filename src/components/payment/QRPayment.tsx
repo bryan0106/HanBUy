@@ -5,7 +5,6 @@ import { formatCurrency } from "@/lib/currency";
 import type { BankType } from "@/services/api";
 import { paymentService } from "@/services/paymentService";
 import toast from "react-hot-toast";
-import { shouldUseMockData } from "@/utils/env";
 
 interface QRPaymentProps {
   amount: number; // Pre-identified amount (exact amount to pay)
@@ -87,7 +86,7 @@ export function QRPayment({
       return trimmed;
     }
     
-    // Otherwise return trimmed (for mock data)
+    // Otherwise return trimmed
     return trimmed;
   };
 
@@ -103,15 +102,13 @@ export function QRPayment({
       // Normalize order ID to extract UUID if needed
       const cleanOrderId = normalizeOrderId(orderId);
       
-      // Validate UUID format only in real API mode
-      if (!shouldUseMockData()) {
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(cleanOrderId)) {
-          console.error("Invalid order ID format after normalization:", { original: orderId, normalized: cleanOrderId });
-          throw new Error(
-            `Invalid order ID format: ${orderId}. Expected UUID format.`
-          );
-        }
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(cleanOrderId)) {
+        console.error("Invalid order ID format after normalization:", { original: orderId, normalized: cleanOrderId });
+        throw new Error(
+          `Invalid order ID format: ${orderId}. Expected UUID format.`
+        );
       }
       
       const paymentAmount = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance" && amount)
@@ -153,7 +150,7 @@ export function QRPayment({
       
       // Log QR code type detection
       if (qrData.qr_code?.startsWith('data:image/svg+xml')) {
-        console.log('✅ TEST MODE: Mock QR code received (SVG data URL)');
+        console.log('✅ QR code received (SVG data URL)');
         console.log('📦 Payment ID:', qrData.payment_id);
         console.log('💰 Amount:', qrData.amount);
       } else if (qrData.qr_code?.startsWith('http://') || qrData.qr_code?.startsWith('https://')) {
@@ -184,24 +181,9 @@ export function QRPayment({
       const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to generate QR code';
       toast.error(errorMessage);
       
-      // Fallback to mock QR code only if API call failed
-      const paymentAmount = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance" && amount)
-        ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
-        : amount;
-      const amountText = formatCurrency(paymentAmount || 0, "PHP");
-      const svgContent = `
-        <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-          <rect width="200" height="200" fill="white"/>
-          <text x="100" y="80" text-anchor="middle" font-size="14" font-weight="bold">QR Code</text>
-          <text x="100" y="100" text-anchor="middle" font-size="11">${bank}</text>
-          <text x="100" y="120" text-anchor="middle" font-size="10" font-weight="bold">Amount:</text>
-          <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="bold">${amountText}</text>
-          <text x="100" y="160" text-anchor="middle" font-size="9" fill="red">(Fallback - API Error)</text>
-        </svg>
-      `.trim();
-      const encodedSvg = encodeURIComponent(svgContent);
-      setQrCode(`data:image/svg+xml;charset=utf-8,${encodedSvg}`);
-      console.log('⚠️ Using fallback mock QR code due to API error');
+      // Don't set fallback QR code - let user retry
+      setQrCode("");
+      setPaymentId(null);
     } finally {
       setGeneratingQR(false);
     }
@@ -422,16 +404,13 @@ export function QRPayment({
                   ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
                   : amount;
 
-                // Ensure orderId is a valid UUID in real API mode.
-                // In mock mode, order IDs are not UUIDs, so skip validation.
-                const cleanOrderId = orderId.trim();
-                if (!shouldUseMockData()) {
-                  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                  if (!uuidRegex.test(cleanOrderId)) {
-                    toast.error(`Invalid order ID format. Please refresh and try again.`);
-                    setUploading(false);
-                    return;
-                  }
+                // Ensure orderId is a valid UUID
+                const cleanOrderId = normalizeOrderId(orderId);
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(cleanOrderId)) {
+                  toast.error(`Invalid order ID format. Please refresh and try again.`);
+                  setUploading(false);
+                  return;
                 }
                 
                 const confirmation = await paymentService.confirmPayment({

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { formatCurrency, type Currency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
+import { productService } from "@/services/productService";
 import toast from "react-hot-toast";
 
 interface PasabuyRequest {
@@ -182,57 +183,90 @@ export default function PasabuyInventoryPage() {
     
     const loadingToast = showToast ? toast.loading("Loading pasabuy requests...") : null;
     try {
-      // Use mock data directly - no API calls
-      console.log('📦 Using mock data for pasabuy requests');
+      // Use API to fetch pasabuy requests
+      const { productService } = await import("@/services/productService");
+      const response = await productService.getAdminPasabuyRequests(
+        statusFilter !== "all" ? { status: statusFilter as any } : undefined
+      );
       
-      setRequests(mockPasabuyRequests);
+      const requestsData = response.data.map((req) => ({
+        id: req.id,
+        request_number: req.request_number,
+        customer_id: req.customer_id,
+        customer_name: req.customer_name,
+        customer_email: req.customer_email,
+        product_url: req.product_url,
+        product_name: req.product_name,
+        comment: req.comment,
+        estimated_price: req.estimated_price,
+        currency: req.currency,
+        status: req.status,
+        images: req.images,
+        category: req.category,
+        sku: req.sku,
+        created_at: req.created_at,
+        updated_at: req.updated_at,
+        approved_at: req.approved_at,
+        paid_at: req.paid_at,
+        bought_at: req.bought_at,
+        in_storage_at: req.in_storage_at,
+        rejected_at: req.rejected_at,
+        rejection_reason: req.rejection_reason,
+        admin_notes: req.admin_notes,
+      }));
+      
+      setRequests(requestsData);
       
       if (loadingToast) {
         toast.dismiss(loadingToast);
-        toast.success(`Pasabuy requests loaded: ${mockPasabuyRequests.length} items`);
+        toast.success(`Pasabuy requests loaded: ${requestsData.length} items`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load pasabuy requests:", error);
       if (loadingToast) {
         toast.dismiss(loadingToast);
-        toast.error("Failed to load requests. Please try again.");
+        toast.error(error.message || "Failed to load requests. Please try again.");
       }
-      setRequests([]);
+      // Fallback to mock data if API fails
+      if (process.env.NODE_ENV === 'development') {
+        setRequests(mockPasabuyRequests);
+      } else {
+        setRequests([]);
+      }
     } finally {
       setLoading(false);
       loadingRef.current = false;
     }
   };
 
-  const handleStatusChange = async (requestId: string, newStatus: PasabuyRequest["status"], notes?: string) => {
+  const handleStatusChange = async (requestId: string, newStatus: PasabuyRequest["status"], notes?: string, rejectionReason?: string) => {
     setProcessingId(requestId);
     const actionToast = toast.loading(`Updating request status...`);
     
     try {
-      // Update local state (in real app, this would be an API call)
+      // Call API to update status
+      const { productService } = await import("@/services/productService");
+      const response = await productService.updatePasabuyStatus(requestId, {
+        status: newStatus,
+        admin_notes: notes,
+        rejection_reason: rejectionReason,
+      });
+      
+      // Update local state with API response
       setRequests(prev => prev.map(req => {
         if (req.id === requestId) {
-          const updated: PasabuyRequest = {
+          return {
             ...req,
-            status: newStatus,
-            updated_at: new Date().toISOString(),
-            admin_notes: notes || req.admin_notes,
+            status: response.data.status,
+            updated_at: response.data.updated_at,
+            admin_notes: response.data.admin_notes,
+            rejection_reason: response.data.rejection_reason,
+            approved_at: response.data.approved_at,
+            paid_at: response.data.paid_at,
+            bought_at: response.data.bought_at,
+            in_storage_at: response.data.in_storage_at,
+            rejected_at: response.data.rejected_at,
           };
-          
-          // Set timestamps based on status
-          if (newStatus === "approved" && !req.approved_at) {
-            updated.approved_at = new Date().toISOString();
-          } else if (newStatus === "paid" && !req.paid_at) {
-            updated.paid_at = new Date().toISOString();
-          } else if (newStatus === "bought" && !req.bought_at) {
-            updated.bought_at = new Date().toISOString();
-          } else if (newStatus === "in_storage" && !req.in_storage_at) {
-            updated.in_storage_at = new Date().toISOString();
-          } else if (newStatus === "rejected" && !req.rejected_at) {
-            updated.rejected_at = new Date().toISOString();
-          }
-          
-          return updated;
         }
         return req;
       }));
@@ -249,10 +283,10 @@ export default function PasabuyInventoryPage() {
       };
       
       toast.success(statusMessages[newStatus] || "Status updated successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update status:", error);
       toast.dismiss(actionToast);
-      toast.error("Failed to update status. Please try again.");
+      toast.error(error.message || "Failed to update status. Please try again.");
     } finally {
       setProcessingId(null);
     }
@@ -647,11 +681,7 @@ export default function PasabuyInventoryPage() {
                           onClick={() => {
                             const reason = prompt("Rejection reason:");
                             if (reason) {
-                              handleStatusChange(request.id, "rejected");
-                              // In real app, update rejection_reason
-                              setRequests(prev => prev.map(r => 
-                                r.id === request.id ? { ...r, rejection_reason: reason } : r
-                              ));
+                              handleStatusChange(request.id, "rejected", undefined, reason);
                             }
                           }}
                           disabled={isProcessing}

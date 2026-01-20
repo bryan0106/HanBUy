@@ -1,7 +1,5 @@
 import apiClient from '@/lib/apiClient';
 import { handleApiError } from '@/utils/errorHandler';
-import { shouldUseMockData } from '@/utils/env';
-import { mockOrderService } from '@/lib/mockOrdersData';
 
 export interface OrderItem {
   id: string;
@@ -76,6 +74,11 @@ export interface Order {
     verified?: boolean;
     installment_number?: number;
   }>;
+  installment_plan?: {
+    total_installments: number;
+    installment_amount: number;
+    frequency: 'monthly' | 'weekly' | 'biweekly';
+  } | null;
 }
 
 export interface GetOrdersParams {
@@ -179,13 +182,6 @@ export const orderService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ Error fetching orders from API:', error);
-      
-      // Fallback to mock data only if explicitly enabled AND API fails
-      if (shouldUseMockData() && process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ Falling back to mock data (API unavailable)');
-        return mockOrderService.getOrders(params);
-      }
-      
       throw handleApiError(error);
     }
   },
@@ -201,13 +197,6 @@ export const orderService = {
       return response.data.data;
     } catch (error: any) {
       console.error('❌ Error fetching order from API:', error);
-      
-      // Fallback to mock data only if explicitly enabled AND API fails
-      if (shouldUseMockData() && process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ Falling back to mock data (API unavailable)');
-        return mockOrderService.getOrderById(id);
-      }
-      
       throw handleApiError(error);
     }
   },
@@ -235,12 +224,6 @@ export const orderService = {
       console.error('❌ Request data:', data);
       if (error?.response?.data) {
         console.error('❌ API Error Response:', error.response.data);
-      }
-      
-      // Fallback to mock service only if API fails AND mock data is enabled
-      if (shouldUseMockData() && process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ Falling back to mock order service (API unavailable)');
-        return mockOrderService.createOrder(data);
       }
       
       throw handleApiError(error);
@@ -281,11 +264,6 @@ export const orderService = {
     };
     courier_id?: string; // For solo boxes - direct delivery courier
   }): Promise<Order> {
-    // Use mock data for testing
-    if (shouldUseMockData()) {
-      return mockOrderService.requestShipping(orderId, data);
-    }
-
     try {
       const response = await apiClient.post<{ success: boolean; data: Order }>(`/orders/${orderId}/request-shipping`, data);
       return response.data.data;
@@ -303,11 +281,6 @@ export const orderService = {
     use_cod?: boolean; // If true, customer will pay COD
     cod_amount?: number; // COD amount
   }): Promise<Order> {
-    // Use mock data for testing
-    if (shouldUseMockData()) {
-      return mockOrderService.selectCourierForSharedBox(orderId, data);
-    }
-
     try {
       const response = await apiClient.post<{ success: boolean; data: Order }>(`/orders/${orderId}/select-courier`, data);
       return response.data.data;
@@ -337,6 +310,128 @@ export const orderService = {
   async confirmLocalShippingPayment(orderId: string): Promise<Order> {
     try {
       const response = await apiClient.post<{ success: boolean; data: Order }>(`/orders/${orderId}/confirm-local-shipping`);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  // ========== ADMIN API METHODS ==========
+
+  /**
+   * Get all orders (Admin only)
+   * Uses /api/admin/orders endpoint which includes customer info
+   */
+  async getAdminOrders(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    payment_status?: string;
+    storage_status?: string;
+    order_type?: string;
+    search?: string;
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      order_number: string;
+      customer_name: string;
+      customer_email: string;
+      customer_phone?: string;
+      status: string;
+      payment_status: string;
+      storage_status?: string;
+      fulfillment_status?: string;
+      preorder_status?: string | null;
+      total: number;
+      subtotal: number;
+      shipping_fee: number;
+      item_count: number;
+      created_at: string;
+      shipping_address: any;
+      order_items?: any[];
+      payment_history?: any[];
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: any[];
+        pagination: any;
+      }>('/admin/orders', { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get single order details (Admin only)
+   * Uses /api/admin/orders/:id endpoint which includes customer info
+   */
+  async getAdminOrderById(id: string): Promise<{
+    id: string;
+    order_number: string;
+    customer_name: string;
+    customer_email: string;
+    customer_phone?: string;
+    status: string;
+    payment_status: string;
+    storage_status?: string;
+    fulfillment_status?: string;
+    preorder_status?: string | null;
+    total: number;
+    subtotal: number;
+    shipping_fee: number;
+    shipping_address: any;
+    order_items: any[];
+    payment_history?: any[];
+  }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: any;
+      }>(`/admin/orders/${id}`);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Update order status (Admin only)
+   */
+  async updateAdminOrderStatus(id: string, data: {
+    status: string;
+    admin_notes?: string;
+  }): Promise<Order> {
+    try {
+      const response = await apiClient.patch<UpdateOrderStatusResponse>(`/admin/orders/${id}/status`, data);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Update order payment status (Admin only - Payment Verification)
+   */
+  async updateAdminOrderPaymentStatus(id: string, data: {
+    payment_status: 'paid' | 'partial' | 'failed';
+    admin_notes?: string;
+    rejection_reason?: string;
+    downpayment_paid?: number;
+  }): Promise<Order> {
+    try {
+      const response = await apiClient.patch<UpdateOrderStatusResponse>(`/admin/orders/${id}/payment-status`, data);
       return response.data.data;
     } catch (error) {
       throw handleApiError(error);

@@ -60,13 +60,12 @@ function StoreOrdersContent() {
     setLoading(true);
     try {
       if (user?.id) {
-        // Use orderService which automatically uses API or mock data based on environment
         console.log('📦 Fetching orders for user:', user.id);
         
         const ordersResponse = await orderService.getOrders({ user_id: user.id });
         const ordersData = ordersResponse.data;
         
-        // Map API/mock data to Order interface
+        // Map API response to Order interface
         const mappedOrders: Order[] = ordersData.map((order: OrderType) => ({
           id: order.id,
           orderNumber: order.order_number,
@@ -95,7 +94,6 @@ function StoreOrdersContent() {
     
     setLoadingOrderDetails(prev => ({ ...prev, [orderId]: true }));
     try {
-      // Use orderService which automatically uses API or mock data based on environment
       const orderDetail = await orderService.getOrderById(orderId);
       setOrderDetails(prev => ({ ...prev, [orderId]: orderDetail }));
     } catch (error) {

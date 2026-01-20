@@ -34,7 +34,6 @@ export default function OrderDetailsPage() {
     setLoading(true);
     setError(null);
     try {
-      // Use orderService which automatically uses API or mock data based on environment
       const orderData = await orderService.getOrderById(orderId);
       
       // Verify the order belongs to the current user
