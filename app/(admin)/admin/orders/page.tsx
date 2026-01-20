@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
-import { getAllMockOrders } from "@/lib/mockOrdersData";
-import type { Order as OrderType } from "@/services/orderService";
+import { orderService, type Order as OrderType } from "@/services/orderService";
+import { userService } from "@/services/userService";
 
 interface Order {
   id: string;
@@ -24,12 +24,8 @@ interface Order {
   createdAt: Date;
 }
 
-// Mock customer data (in real app, this would come from user service)
-const mockCustomers: Record<string, { name: string; email: string }> = {
-  "user-test-customer-1": { name: "John Doe", email: "john@example.com" },
-  "user-test-customer-2": { name: "Jane Smith", email: "jane@example.com" },
-  "user-test-customer-3": { name: "Mike Johnson", email: "mike@example.com" },
-};
+// Cache for customer data to avoid repeated API calls
+const customerCache: Record<string, { name: string; email: string }> = {};
 
 
 export default function OrdersPage() {
@@ -41,21 +37,44 @@ export default function OrdersPage() {
     loadOrders();
   }, [statusFilter]);
 
+  // Helper function to get customer info (with caching)
+  const getCustomerInfo = async (userId: string): Promise<{ name: string; email: string }> => {
+    if (customerCache[userId]) {
+      return customerCache[userId];
+    }
+
+    try {
+      const user = await userService.getUserById(userId);
+      const customerInfo = {
+        name: user.name || `Customer ${userId.slice(-6)}`,
+        email: user.email || `customer${userId.slice(-6)}@example.com`,
+      };
+      customerCache[userId] = customerInfo;
+      return customerInfo;
+    } catch (error) {
+      console.error(`Error fetching customer ${userId}:`, error);
+      return {
+        name: `Customer ${userId.slice(-6)}`,
+        email: `customer${userId.slice(-6)}@example.com`,
+      };
+    }
+  };
+
   const loadOrders = async () => {
     setLoading(true);
     try {
-      // Use mock data directly - no API calls, just .map on mock data
-      console.log('📦 Using mock data for admin orders (no API calls, direct .map)');
+      console.log('📦 Fetching all orders for admin');
       
-      // Get all orders from all users directly using .map
-      const allOrders: OrderType[] = getAllMockOrders();
+      // Fetch all orders (admin view - no user_id filter)
+      // Note: Backend should handle admin permissions and return all orders
+      const ordersResponse = await orderService.getOrders(
+        statusFilter !== "all" ? { status: statusFilter } : undefined
+      );
+      const allOrders = ordersResponse.data;
       
-      // Map mock orders to admin Order interface using .map
-      const mappedOrders: Order[] = allOrders.map((order: OrderType) => {
-        const customer = mockCustomers[order.user_id] || { 
-          name: `Customer ${order.user_id.slice(-6)}`, 
-          email: `customer${order.user_id.slice(-6)}@example.com` 
-        };
+      // Fetch customer info for each order and map to admin Order interface
+      const mappedOrdersPromises = allOrders.map(async (order: OrderType) => {
+        const customer = await getCustomerInfo(order.user_id);
         
         // Determine fulfillment status from order status
         let fulfillmentStatus: Order["fulfillmentStatus"] = undefined;
@@ -94,6 +113,8 @@ export default function OrdersPage() {
           createdAt: new Date(order.created_at),
         };
       });
+      
+      const mappedOrders = await Promise.all(mappedOrdersPromises);
       
       // Sort by creation date (newest first)
       mappedOrders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

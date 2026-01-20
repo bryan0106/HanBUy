@@ -3,17 +3,20 @@
 import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/currency";
 import type { BankType } from "@/services/api";
+import { paymentService } from "@/services/paymentService";
+import toast from "react-hot-toast";
+import { shouldUseMockData } from "@/utils/env";
 
 interface QRPaymentProps {
   amount: number; // Pre-identified amount (exact amount to pay)
   orderId: string;
-  paymentType?: "full" | "downpayment" | "installment" | "balance";
+  paymentType?: "full" | "downpayment" | "installment" | "balance" | "item_only" | "shipping" | "full_payment";
   downpaymentAmount?: number;
   balance?: number;
   subtotal?: number; // Product subtotal
   isf?: number; // International Service Fee
   lsf?: number; // Local Service Fee
-  onPaymentComplete?: () => void;
+  onPaymentComplete?: (paymentId?: string) => void;
   bankTypes?: BankType[]; // Optional bank types from API
   useWallet?: boolean;
   walletAmount?: number;
@@ -52,35 +55,156 @@ export function QRPayment({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [generatingQR, setGeneratingQR] = useState(false);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>("");
 
-  // Generate QR code with pre-identified amount
-  const generateQR = (bank: string) => {
-    // TODO: Generate actual QR code from backend API with pre-identified amount
-    // The QR code should contain the exact amount so customer can't modify it
-    // Format: Contains merchant info + exact amount encoded
-    const paymentAmount = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance" && amount)
-      ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
-      : amount;
+  // Map frontend payment type to API payment type
+  const getApiPaymentType = (): 'item_only' | 'full_payment' | 'shipping' | 'cod' => {
+    if (paymentType === 'item_only') return 'item_only';
+    if (paymentType === 'full_payment' || paymentType === 'full') return 'full_payment';
+    if (paymentType === 'shipping') return 'shipping';
+    return 'full_payment'; // Default
+  };
+
+  // Normalize order ID: extract UUID from order-<uuid>-<suffix> format
+  const normalizeOrderId = (orderId: string): string => {
+    const trimmed = orderId.trim();
     
-    // Format currency for display (without encoding issues)
-    const amountText = formatCurrency(paymentAmount || 0, "PHP");
+    // If it starts with "order-", extract the UUID part
+    if (trimmed.startsWith('order-')) {
+      // Match UUID pattern after "order-"
+      const uuidMatch = trimmed.match(/^order-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+      if (uuidMatch) {
+        return uuidMatch[1]; // Return just the UUID
+      }
+    }
     
-    // Create SVG with proper encoding - use encodeURIComponent instead of btoa for Unicode support
-    const svgContent = `
-      <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-        <rect width="200" height="200" fill="white"/>
-        <text x="100" y="80" text-anchor="middle" font-size="14" font-weight="bold">QR Code</text>
-        <text x="100" y="100" text-anchor="middle" font-size="11">${bank}</text>
-        <text x="100" y="120" text-anchor="middle" font-size="10" font-weight="bold">Amount:</text>
-        <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="bold">${amountText}</text>
-        ${paymentType === "downpayment" ? `<text x="100" y="160" text-anchor="middle" font-size="8">Downpayment</text>` : ''}
-        ${paymentType === "balance" ? `<text x="100" y="160" text-anchor="middle" font-size="8">Balance Payment</text>` : ''}
-      </svg>
-    `.trim();
+    // If it's already a UUID, return as-is
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(trimmed)) {
+      return trimmed;
+    }
     
-    // Use encodeURIComponent for proper Unicode handling, then create data URI
-    const encodedSvg = encodeURIComponent(svgContent);
-    setQrCode(`data:image/svg+xml;charset=utf-8,${encodedSvg}`);
+    // Otherwise return trimmed (for mock data)
+    return trimmed;
+  };
+
+  // Generate QR code with pre-identified amount from API
+  const generateQR = async (bank: string) => {
+    if (!orderId || amount <= 0 || !bank) {
+      console.warn('⏸️ Skipping QR generation - missing required data:', { orderId: !!orderId, amount, bank });
+      return;
+    }
+    
+    setGeneratingQR(true);
+    try {
+      // Normalize order ID to extract UUID if needed
+      const cleanOrderId = normalizeOrderId(orderId);
+      
+      // Validate UUID format only in real API mode
+      if (!shouldUseMockData()) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(cleanOrderId)) {
+          console.error("Invalid order ID format after normalization:", { original: orderId, normalized: cleanOrderId });
+          throw new Error(
+            `Invalid order ID format: ${orderId}. Expected UUID format.`
+          );
+        }
+      }
+      
+      const paymentAmount = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance" && amount)
+        ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
+        : amount;
+
+      console.log('🔗 Generating QR code for:', { order_id: cleanOrderId, amount: paymentAmount, bank });
+      
+      const qrData = await paymentService.generateQRCode({
+        order_id: cleanOrderId,
+        amount: paymentAmount,
+        payment_method: {
+          type: 'qr_code',
+          bank: bank as 'BPI' | 'BDO' | 'GCASH' | 'GOTYME' | 'MAYA',
+        },
+        payment_type: getApiPaymentType(),
+        use_wallet: useWallet,
+        wallet_amount: walletAmount || 0,
+      });
+
+      console.log('📦 QR Code API Response:', qrData);
+
+      // Validate response has required fields
+      if (!qrData || !qrData.qr_code) {
+        console.error('❌ QR code data missing in response:', qrData);
+        throw new Error('QR code not found in response. Please try again.');
+      }
+
+      if (!qrData.payment_id) {
+        console.error('❌ Payment ID missing in response:', qrData);
+        throw new Error('Payment ID not found in response. Please try again.');
+      }
+
+      setQrCode(qrData.qr_code);
+      setPaymentId(qrData.payment_id);
+      if (qrData.expires_at) {
+        setQrExpiresAt(qrData.expires_at);
+      }
+      
+      // Log QR code type detection
+      if (qrData.qr_code?.startsWith('data:image/svg+xml')) {
+        console.log('✅ TEST MODE: Mock QR code received (SVG data URL)');
+        console.log('📦 Payment ID:', qrData.payment_id);
+        console.log('💰 Amount:', qrData.amount);
+      } else if (qrData.qr_code?.startsWith('http://') || qrData.qr_code?.startsWith('https://')) {
+        console.log('✅ QR code received (HTTPS URL)');
+        console.log('📦 Payment ID:', qrData.payment_id);
+        console.log('💰 Amount:', qrData.amount);
+      } else if (qrData.qr_code?.startsWith('data:image/')) {
+        console.log('✅ QR code received (base64 data URL)');
+        console.log('📦 Payment ID:', qrData.payment_id);
+        console.log('💰 Amount:', qrData.amount);
+      } else {
+        console.log('✅ QR code received (unknown format)');
+      }
+      
+      // Note: QR code can be:
+      // - Base64 data URL: data:image/svg+xml;base64,... (MSW mock)
+      // - HTTPS URL: https://... (live provider)
+      // Both work with <img src={qrCode} />
+    } catch (error: any) {
+      console.error('❌ Error generating QR code:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      });
+      
+      // Show user-friendly error
+      const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to generate QR code';
+      toast.error(errorMessage);
+      
+      // Fallback to mock QR code only if API call failed
+      const paymentAmount = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance" && amount)
+        ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
+        : amount;
+      const amountText = formatCurrency(paymentAmount || 0, "PHP");
+      const svgContent = `
+        <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+          <rect width="200" height="200" fill="white"/>
+          <text x="100" y="80" text-anchor="middle" font-size="14" font-weight="bold">QR Code</text>
+          <text x="100" y="100" text-anchor="middle" font-size="11">${bank}</text>
+          <text x="100" y="120" text-anchor="middle" font-size="10" font-weight="bold">Amount:</text>
+          <text x="100" y="140" text-anchor="middle" font-size="12" font-weight="bold">${amountText}</text>
+          <text x="100" y="160" text-anchor="middle" font-size="9" fill="red">(Fallback - API Error)</text>
+        </svg>
+      `.trim();
+      const encodedSvg = encodeURIComponent(svgContent);
+      setQrCode(`data:image/svg+xml;charset=utf-8,${encodedSvg}`);
+      console.log('⚠️ Using fallback mock QR code due to API error');
+    } finally {
+      setGeneratingQR(false);
+    }
   };
 
   const handleBankSelect = (bank: string) => {
@@ -88,9 +212,37 @@ export function QRPayment({
     generateQR(bank);
   };
 
+  // Countdown timer for QR expiration
   useEffect(() => {
-    generateQR(selectedBank);
-  }, [selectedBank, amount, paymentType, downpaymentAmount]);
+    if (!qrExpiresAt) return;
+    
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const expiry = new Date(qrExpiresAt).getTime();
+      const diff = expiry - now;
+      
+      if (diff <= 0) {
+        clearInterval(timer);
+        setTimeLeft("Expired");
+        toast.error('QR code expired. Please generate a new one.');
+        return;
+      }
+      
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [qrExpiresAt]);
+
+  // Auto-generate QR when bank is selected (but only if we have valid data)
+  useEffect(() => {
+    if (orderId && amount > 0 && selectedBank && !generatingQR) {
+      generateQR(selectedBank);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBank, amount, paymentType, downpaymentAmount, orderId, useWallet, walletAmount]);
 
   // Update selected bank when bank types change
   useEffect(() => {
@@ -167,7 +319,11 @@ export function QRPayment({
       </div>
 
       {/* QR Code Display */}
-      {qrCode && (
+      {generatingQR ? (
+        <div className="mb-6 text-center py-12">
+          <p className="text-muted-foreground">Generating QR code...</p>
+        </div>
+      ) : qrCode ? (
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 inline-block rounded-lg border-4 border-border bg-white p-4">
             <img
@@ -188,7 +344,7 @@ export function QRPayment({
             Scan with {selectedBank} app to pay (Amount is pre-identified)
           </p>
         </div>
-      )}
+      ) : null}
 
       {/* Instructions */}
       <div className="mb-6 rounded-lg bg-grey-50 p-4">
@@ -253,88 +409,77 @@ export function QRPayment({
         
         <button
           onClick={async () => {
-            // If proof file is selected, upload it first
+            if (!paymentId) {
+              toast.error('Please wait for QR code to generate');
+              return;
+            }
+
+            // If proof file is selected, upload it via API
             if (proofFile) {
               setUploading(true);
               try {
-                // Convert file to base64
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                  const base64String = reader.result as string;
-                  
-                  // Get Google Apps Script URL from environment
-                  const scriptUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL;
-                  
-                  if (!scriptUrl) {
-                    console.warn("Google Apps Script URL not configured. Skipping upload.");
-                    setUploadSuccess(true);
+                const paymentAmount = (paymentType === "downpayment" && downpaymentAmount) || (paymentType === "balance" && amount)
+                  ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
+                  : amount;
+
+                // Ensure orderId is a valid UUID in real API mode.
+                // In mock mode, order IDs are not UUIDs, so skip validation.
+                const cleanOrderId = orderId.trim();
+                if (!shouldUseMockData()) {
+                  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                  if (!uuidRegex.test(cleanOrderId)) {
+                    toast.error(`Invalid order ID format. Please refresh and try again.`);
                     setUploading(false);
-                    onPaymentComplete?.();
                     return;
                   }
-
-                  // Prepare data to send
-                  const data = {
-                    orderId: orderId,
-                    orderNumber: `ORD-${orderId.slice(-6)}`, // Generate order number from ID
-                    amount: formatCurrency(amount, "PHP"),
-                    paymentType: paymentType,
-                    customerEmail: customerEmail || "N/A",
-                    customerName: customerName || "N/A",
-                    imageBase64: base64String,
-                    fileName: proofFile.name
-                  };
-
-                  // Send to Google Apps Script
-                  const response = await fetch(scriptUrl, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                    mode: 'no-cors' // Required for Google Apps Script
-                  });
-
-                  // Note: With no-cors, we can't read the response
-                  // But the request will be sent
-                  setUploadSuccess(true);
-                  setUploading(false);
-                  
-                  // Wait a bit to show success message
-                  setTimeout(() => {
-                    onPaymentComplete?.();
-                  }, 1000);
-                };
+                }
                 
-                reader.readAsDataURL(proofFile);
-              } catch (error) {
+                const confirmation = await paymentService.confirmPayment({
+                  order_id: cleanOrderId,
+                  payment_id: paymentId,
+                  amount: paymentAmount,
+                  payment_method: {
+                    type: 'qr_code',
+                    bank: selectedBank as 'BPI' | 'BDO' | 'GCASH' | 'GOTYME' | 'MAYA',
+                  },
+                  payment_proof: proofFile,
+                  use_wallet: useWallet,
+                  wallet_amount: walletAmount || 0,
+                });
+
+                setUploadSuccess(true);
+                toast.success('Payment proof uploaded successfully! Awaiting verification.');
+                
+                if (confirmation.wallet_credit && confirmation.wallet_credit > 0) {
+                  toast.success(`Excess payment of ${formatCurrency(confirmation.wallet_credit, "PHP")} credited to your wallet!`);
+                }
+                
+                onPaymentComplete?.(paymentId);
+              } catch (error: any) {
                 console.error("Error uploading proof:", error);
-                alert("Failed to upload proof of payment. You can still proceed, but please contact support with your proof.");
+                toast.error(error?.message || "Failed to upload proof of payment. Please try again.");
                 setUploading(false);
-                // Still allow payment to proceed
-                onPaymentComplete?.();
               }
             } else {
-              // No proof file - allow payment to proceed but show warning
-              const proceed = window.confirm(
-                "You haven't uploaded proof of payment yet. You can upload it later, but verification may be delayed.\n\n" +
-                "Do you want to proceed without uploading proof now?"
-              );
-              
-              if (proceed) {
-                onPaymentComplete?.();
-              }
+              // No proof file - require it
+              toast.error('Please upload proof of payment before confirming');
             }
           }}
-          disabled={uploading}
+          disabled={uploading || !paymentId || generatingQR}
           className={`w-full rounded-lg px-4 py-3 font-semibold text-white transition-colors ${
-            uploading
+            uploading || !paymentId || generatingQR
               ? 'bg-grey-400 cursor-not-allowed'
               : 'bg-soft-blue-600 hover:bg-soft-blue-700'
           }`}
         >
-          {uploading ? "Uploading Proof..." : uploadSuccess ? "✓ Proof Sent! Processing..." : proofFile ? "Confirm Payment & Upload Proof" : "Confirm Payment (Upload Proof Later)"}
+          {generatingQR ? "Generating QR Code..." : uploading ? "Uploading Proof..." : uploadSuccess ? "✓ Proof Sent! Processing..." : proofFile ? "Confirm Payment & Upload Proof" : "Please Upload Proof of Payment"}
         </button>
+        
+        {qrExpiresAt && timeLeft && (
+          <p className="mt-2 text-xs text-center text-muted-foreground">
+            QR code expires in: <strong>{timeLeft}</strong>
+          </p>
+        )}
         
         {!proofFile && (
           <p className="text-xs text-center text-muted-foreground">

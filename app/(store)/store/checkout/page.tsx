@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
 import { cartService } from "@/services/cartService";
+import { userService } from "@/services";
 import { mockOrderService } from "@/lib/mockOrdersData";
 import { mockProducts } from "@/lib/mockData";
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
@@ -17,7 +18,7 @@ import Link from "next/link";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { isAuthenticated, loading: authLoading, user } = useAuth();
+  const { isAuthenticated, loading: authLoading, user, refetch: refetchUser } = useAuth();
   const { balance: walletBalance, loading: walletLoading } = useWallet(user?.id);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -26,6 +27,8 @@ export default function CheckoutPage() {
   const [walletAmount, setWalletAmount] = useState<number>(0);
   const [paymentOption, setPaymentOption] = useState<"split" | "full">("split"); // "split" = 3-way, "full" = 1-time
   const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
+  const [saveAddressForNextTime, setSaveAddressForNextTime] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
   const [shippingAddress, setShippingAddress] = useState({
     country: "Philippines",
     firstName: "",
@@ -61,6 +64,8 @@ export default function CheckoutPage() {
           region: user.address.region || "",
           phone: user.phone || "",
         });
+        // Auto-check "save address" if user already has a saved address
+        setSaveAddressForNextTime(true);
       }
     }
   }, [isAuthenticated, authLoading, router, user]);
@@ -505,6 +510,20 @@ export default function CheckoutPage() {
               </div>
             </div>
             
+            {/* Address Saved Indicator */}
+            {user?.address && (
+              <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3">
+                <div className="flex items-center gap-2">
+                  <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-sm text-green-800">
+                    Using your saved address. You can edit it above if needed.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Navigation Buttons */}
             <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
               <Link
@@ -516,17 +535,68 @@ export default function CheckoutPage() {
                 </svg>
                 Return to cart
               </Link>
+              {/* Save Address Option */}
+              {!user?.address && (
+                <div className="mb-4 rounded-lg border border-border bg-background p-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveAddressForNextTime}
+                      onChange={(e) => setSaveAddressForNextTime(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Save this address for future orders
+                    </span>
+                  </label>
+                </div>
+              )}
+
               <Button
-                onClick={() => {
+                onClick={async () => {
+                  // Save address to user profile if checkbox is checked
+                  if (saveAddressForNextTime && user?.id && !savingAddress) {
+                    setSavingAddress(true);
+                    try {
+                      const updatedUser = await userService.updateUser(user.id, {
+                        address: {
+                          street: shippingAddress.address + (shippingAddress.apartment ? `, ${shippingAddress.apartment}` : ""),
+                          city: shippingAddress.city,
+                          province: shippingAddress.province || shippingAddress.city,
+                          zipCode: shippingAddress.postalCode,
+                          country: shippingAddress.country,
+                          region: shippingAddress.region,
+                        },
+                        phone: shippingAddress.phone || user.phone,
+                      });
+                      
+                      // Update user in localStorage
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('hanbuy_user', JSON.stringify(updatedUser));
+                      }
+                      
+                      // Refresh user in auth context
+                      await refetchUser();
+                      
+                      toast.success("Address saved for future orders!");
+                    } catch (error: any) {
+                      console.error("Error saving address:", error);
+                      toast.error(error?.message || "Failed to save address, but you can continue");
+                    } finally {
+                      setSavingAddress(false);
+                    }
+                  }
+
                   // Save shipping address to sessionStorage
                   if (typeof window !== 'undefined') {
                     sessionStorage.setItem('shippingAddress', JSON.stringify(shippingAddress));
                   }
                   router.push("/store/shipping");
                 }}
-                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
+                disabled={savingAddress}
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Continue to shipping
+                {savingAddress ? "Saving..." : "Continue to shipping"}
               </Button>
             </div>
           </div>

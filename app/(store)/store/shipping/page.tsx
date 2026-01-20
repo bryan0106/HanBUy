@@ -189,27 +189,39 @@ export default function ShippingPage() {
               return item;
             }
             if (product && product.images && product.images.length > 0) {
+              const updatedProduct: {
+                id: string;
+                name: string;
+                price: number | string;
+                currency: string;
+                images: string[];
+                stock: number;
+                price_conversion_rate?: number;
+                php_price?: number;
+                product_type?: 'onhand' | 'preorder' | 'kr_website';
+              } = item.product ? {
+                id: item.product.id || product.id,
+                name: item.product.name || product.name,
+                price: item.product.price ?? product.price,
+                currency: item.product.currency || product.currency,
+                images: product.images,
+                stock: item.product.stock ?? product.stock,
+                price_conversion_rate: item.product.price_conversion_rate,
+                php_price: item.product.php_price,
+                product_type: item.product.product_type,
+              } : {
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                currency: product.currency,
+                images: product.images,
+                stock: product.stock,
+              };
+              
               return {
                 ...item,
                 image_url: product.images[0],
-                product: item.product ? {
-                  id: item.product.id || product.id,
-                  name: item.product.name || product.name,
-                  price: item.product.price ?? product.price,
-                  currency: item.product.currency || product.currency,
-                  images: product.images,
-                  stock: item.product.stock ?? product.stock,
-                  price_conversion_rate: item.product.price_conversion_rate,
-                  php_price: item.product.php_price,
-                  product_type: item.product.product_type,
-                } : {
-                  id: product.id,
-                  name: product.name,
-                  price: product.price,
-                  currency: product.currency,
-                  images: product.images,
-                  stock: product.stock,
-                },
+                product: updatedProduct,
               };
             }
           } catch (error) {

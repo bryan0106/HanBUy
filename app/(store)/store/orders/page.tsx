@@ -6,8 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { initializeMockOrders, mockOrderService } from "@/lib/mockOrdersData";
-import type { Order as OrderType } from "@/services/orderService";
+import { orderService, type Order as OrderType } from "@/services/orderService";
 
 interface Order {
   id: string;
@@ -56,18 +55,14 @@ function StoreOrdersContent() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Use mock data directly - no API calls
       if (user?.id) {
-        console.log('📦 Using mock data for orders (no API calls)');
+        // Use orderService which automatically uses API or mock data based on environment
+        console.log('📦 Fetching orders for user:', user.id);
         
-        // Initialize mock orders for user
-        initializeMockOrders(user.id);
-        
-        // Get orders from mock service
-        const ordersResponse = await mockOrderService.getOrders({ user_id: user.id });
+        const ordersResponse = await orderService.getOrders({ user_id: user.id });
         const ordersData = ordersResponse.data;
         
-        // Map mock data to Order interface
+        // Map API/mock data to Order interface
         const mappedOrders: Order[] = ordersData.map((order: OrderType) => ({
           id: order.id,
           orderNumber: order.order_number,
@@ -84,7 +79,7 @@ function StoreOrdersContent() {
         setOrders(mappedOrders);
       }
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("Error loading orders:", error);
       setOrders([]);
     } finally {
       setLoading(false);
@@ -96,8 +91,8 @@ function StoreOrdersContent() {
     
     setLoadingOrderDetails(prev => ({ ...prev, [orderId]: true }));
     try {
-      // Use mock data directly - no API calls
-      const orderDetail = await mockOrderService.getOrderById(orderId);
+      // Use orderService which automatically uses API or mock data based on environment
+      const orderDetail = await orderService.getOrderById(orderId);
       setOrderDetails(prev => ({ ...prev, [orderId]: orderDetail }));
     } catch (error) {
       console.error(`Error loading order ${orderId}:`, error);

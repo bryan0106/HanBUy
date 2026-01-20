@@ -53,7 +53,9 @@ export const utilityService = {
       const response = await apiClient.get<GetBankTypesResponse>('/bank-type');
       return response.data.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Return default banks if API fails
+      console.warn("Failed to fetch bank types from API, using defaults:", error);
+      return getDefaultBankTypes();
     }
   },
 
@@ -95,6 +97,39 @@ export const utilityService = {
     }
   },
 };
+
+/**
+ * Default bank types for payment
+ */
+function getDefaultBankTypes(): BankType[] {
+  return [
+    {
+      code: "GCASH",
+      name: "GCash",
+      color: "bg-blue-500",
+    },
+    {
+      code: "MAYA",
+      name: "Maya",
+      color: "bg-green-600",
+    },
+    {
+      code: "BPI",
+      name: "BPI",
+      color: "bg-red-600",
+    },
+    {
+      code: "BDO",
+      name: "BDO",
+      color: "bg-blue-600",
+    },
+    {
+      code: "GOTYME",
+      name: "GoTyme",
+      color: "bg-purple-600",
+    },
+  ];
+}
 
 /**
  * Default couriers for local delivery

@@ -124,13 +124,19 @@ export interface CreateOrderRequest {
   balance?: number | null;
   qr_code?: string;
   box_type_preference: 'solo' | 'shared';
+  box_size?: 'small' | 'medium' | 'large';
+  shared_box_id?: string | null;
   shipping_address: {
     street: string;
     city: string;
     province: string;
     zipCode: string;
     country: string;
+    region?: string;
   };
+  storage_status?: 'pending' | 'shipping_requested';
+  shipping_payment_status?: 'paid';
+  shipping_requested_at?: string;
   order_items: Array<{
     product_id: string;
     product_name: string;
@@ -165,18 +171,20 @@ export const orderService = {
    * Get orders with optional filters
    */
   async getOrders(params?: GetOrdersParams): Promise<GetOrdersResponse> {
-    // Use mock data for testing on localhost
-    if (shouldUseMockData()) {
-      console.log('📦 Using mock data for orders (localhost)');
-      return mockOrderService.getOrders(params);
-    }
-
     try {
       console.log('🔗 Fetching orders from API:', '/orders', params);
       const response = await apiClient.get<GetOrdersResponse>('/orders', { params });
+      console.log('✅ Orders fetched successfully from API');
       return response.data;
-    } catch (error) {
-      console.error('❌ Error fetching orders:', error);
+    } catch (error: any) {
+      console.error('❌ Error fetching orders from API:', error);
+      
+      // Fallback to mock data only if explicitly enabled AND API fails
+      if (shouldUseMockData() && process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Falling back to mock data (API unavailable)');
+        return mockOrderService.getOrders(params);
+      }
+      
       throw handleApiError(error);
     }
   },
@@ -185,15 +193,20 @@ export const orderService = {
    * Get single order by ID
    */
   async getOrderById(id: string): Promise<Order> {
-    // Use mock data for testing
-    if (shouldUseMockData()) {
-      return mockOrderService.getOrderById(id);
-    }
-
     try {
+      console.log('🔗 Fetching order from API:', `/orders/${id}`);
       const response = await apiClient.get<GetOrderResponse>(`/orders/${id}`);
+      console.log('✅ Order fetched successfully from API');
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Error fetching order from API:', error);
+      
+      // Fallback to mock data only if explicitly enabled AND API fails
+      if (shouldUseMockData() && process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Falling back to mock data (API unavailable)');
+        return mockOrderService.getOrderById(id);
+      }
+      
       throw handleApiError(error);
     }
   },
@@ -208,9 +221,16 @@ export const orderService = {
     }
 
     try {
+      console.log('🔗 Creating order via API:', '/orders', data);
       const response = await apiClient.post<CreateOrderResponse>('/orders', data);
+      console.log('✅ Order created successfully:', response.data);
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Error creating order:', error);
+      console.error('❌ Request data:', data);
+      if (error?.response?.data) {
+        console.error('❌ API Error Response:', error.response.data);
+      }
       throw handleApiError(error);
     }
   },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,7 +12,10 @@ import Link from "next/link";
 import { calculateShippingFee } from "@/lib/shipping";
 import { QRPayment } from "@/components/payment/QRPayment";
 import { utilityService, type BankType } from "@/services/utilityService";
-import { mockOrderService } from "@/lib/mockOrdersData";
+import { orderService } from "@/services/orderService";
+import { mockPreorderProducts } from "@/lib/mockPreorderData";
+import toast from "react-hot-toast";
+import { shouldUseMockData } from "@/utils/env";
 
 export default function CheckoutPaymentPage() {
   const router = useRouter();
@@ -28,6 +31,9 @@ export default function CheckoutPaymentPage() {
   const [bankTypes, setBankTypes] = useState<BankType[]>([]);
   const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [walletAmount, setWalletAmount] = useState<number>(0);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const [creatingOrder, setCreatingOrder] = useState(false);
+  const [orderCreateError, setOrderCreateError] = useState<string | undefined>(undefined);
   const [shippingAddress, setShippingAddress] = useState({
     country: "Philippines",
     firstName: "",
@@ -120,15 +126,12 @@ export default function CheckoutPaymentPage() {
     try {
       const banks = await utilityService.getBankTypes();
       setBankTypes(banks);
+      console.log("✅ Bank types loaded:", banks);
     } catch (error) {
-      console.warn("Failed to fetch bank types, using defaults:", error);
-      setBankTypes([
-        { code: "BPI", name: "BPI" },
-        { code: "BDO", name: "BDO" },
-        { code: "GCASH", name: "GCash" },
-        { code: "GOTYME", name: "GoTyme" },
-        { code: "MAYA", name: "Maya" },
-      ]);
+      console.warn("Failed to fetch bank types, utilityService will use defaults:", error);
+      // utilityService.getBankTypes() now returns defaults, so set empty array
+      // QRPayment component will use its DEFAULT_BANKS
+      setBankTypes([]);
     }
   };
 
@@ -221,67 +224,220 @@ export default function CheckoutPaymentPage() {
   const actualWalletAmount = useWalletBalance ? Math.min(walletAmount, maxWalletUsage) : 0;
   const remainingAmount = Math.max(0, totals.total - actualWalletAmount);
 
-  const handlePaymentComplete = async () => {
-    setProcessing(true);
-    try {
-      // Create order
-      const orderNumber = `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-      
-      const orderItems = cartItems.map(item => ({
-        product_id: item.product_id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        price: item.price || 0,
-        product_type: item.product_type,
-      }));
+  const orderCreateKey = useMemo(() => {
+    // Only create once per cart+selection combination
+    const cartKey = cartItems
+      .map((i) => `${i.product_id}:${i.quantity}:${i.product_type || ""}`)
+      .sort()
+      .join("|");
+    return [
+      user?.id || "",
+      cartKey,
+      paymentOption,
+      boxTypePreference,
+      boxTypePreference === "solo" ? boxSize : "",
+      boxTypePreference === "shared" ? (selectedSharedBoxId || "") : "",
+      // totals included to reflect shipping toggle
+      String(totals.subtotalPHP),
+      String(totals.isf),
+      String(totals.lsf),
+      String(totals.shippingFee),
+      String(totals.total),
+    ].join("::");
+  }, [
+    user?.id,
+    cartItems,
+    paymentOption,
+    boxTypePreference,
+    boxSize,
+    selectedSharedBoxId,
+    totals.subtotalPHP,
+    totals.isf,
+    totals.lsf,
+    totals.shippingFee,
+    totals.total,
+  ]);
 
-      const shippingAddress = {
-        street: "",
-        city: "",
-        province: "",
-        zipCode: "",
-        country: "Philippines",
-        region: "",
-        phone: "",
-      };
+  const lastCreatedKeyRef = useRef<string | null>(null);
 
-      if (typeof window !== 'undefined') {
-        const savedAddress = sessionStorage.getItem('shippingAddress');
-        if (savedAddress) {
-          try {
-            Object.assign(shippingAddress, JSON.parse(savedAddress));
-          } catch (e) {
-            console.error("Error parsing shipping address:", e);
+  // Create order once cart + selections are ready
+  useEffect(() => {
+    const createOrder = async () => {
+      if (!user?.id) return;
+      if (cartItems.length === 0) return;
+      if (creatingOrder) return;
+      if (createdOrderId) return;
+      if (lastCreatedKeyRef.current === orderCreateKey) return;
+
+      lastCreatedKeyRef.current = orderCreateKey;
+      setOrderCreateError(undefined);
+      setCreatingOrder(true);
+      let orderData: unknown = undefined;
+      try {
+        const orderNumber = `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+        
+        // Prepare order items with preorder release dates
+        const orderItems = await Promise.all(
+          cartItems.map(async (item) => {
+            let preorderReleaseDate: string | undefined = undefined;
+            
+            if (item.product_type === 'preorder') {
+              try {
+                const product = mockPreorderProducts.find(p => p.id === item.product_id);
+                if (product && product.release_date) {
+                  preorderReleaseDate = new Date(product.release_date).toISOString();
+                }
+              } catch (error) {
+                console.warn('Could not fetch product details for preorder:', error);
+              }
+            }
+
+            const itemPricePHP = item.product?.price 
+              ? (parseFloat(String(item.product.price)) * (item.product?.price_conversion_rate || 0.042))
+              : ((item.price || 0) * 0.042);
+
+            return {
+              product_id: item.product_id,
+              product_name: item.product_name || item.product?.name || "Unknown Product",
+              product_type: item.product_type || "onhand",
+              quantity: item.quantity,
+              unit_price: itemPricePHP,
+              total: itemPricePHP * item.quantity,
+              image_url: item.image_url || item.product?.images?.[0],
+              preorder_release_date: preorderReleaseDate,
+            };
+          })
+        );
+
+        const shippingAddressObj = {
+          street: "",
+          city: "",
+          province: "",
+          zipCode: "",
+          country: "Philippines",
+          region: "",
+        };
+
+        if (typeof window !== 'undefined') {
+          const savedAddress = sessionStorage.getItem('shippingAddress');
+          if (savedAddress) {
+            try {
+              const parsed = JSON.parse(savedAddress);
+              Object.assign(shippingAddressObj, {
+                street: parsed.address || "",
+                city: parsed.city || "",
+                province: parsed.province || "",
+                zipCode: parsed.postalCode || "",
+                country: parsed.country || "Philippines",
+                region: parsed.region || "",
+              });
+            } catch (e) {
+              console.error("Error parsing shipping address:", e);
+            }
           }
         }
+
+        const hasPreorder = orderItems.some(item => item.product_type === 'preorder');
+
+        orderData = {
+          user_id: user.id,
+          order_number: orderNumber,
+          subtotal: totals.subtotalPHP,
+          isf: paymentOption === "full" ? totals.isf : 0,
+          lsf: paymentOption === "full" ? totals.lsf : 0,
+          shipping_fee: paymentOption === "full" ? totals.shippingFee : 0,
+          solo_shipping_fee: totals.soloShippingFee,
+          shared_shipping_fee: totals.sharedShippingFee,
+          total: paymentOption === "full" ? totals.total : totals.subtotalPHP,
+          currency: "PHP" as const,
+          status: "pending",
+          payment_status: "pending",
+          payment_type: paymentOption === "full" ? ("full_payment" as const) : ("item_only" as const),
+          box_type_preference: boxTypePreference,
+          box_size: boxTypePreference === "solo" ? boxSize : undefined,
+          shared_box_id: boxTypePreference === "shared" ? selectedSharedBoxId || undefined : undefined,
+          shipping_address: shippingAddressObj,
+          storage_status: paymentOption === "full" ? ("shipping_requested" as const) : ("pending" as const),
+          shipping_payment_status: paymentOption === "full" ? ("paid" as const) : undefined,
+          shipping_requested_at: paymentOption === "full" ? new Date().toISOString() : undefined,
+          order_items: orderItems,
+          customer_message: typeof window !== 'undefined' ? (sessionStorage.getItem('order_message') || undefined) : undefined,
+        };
+
+        const createdOrder = await orderService.createOrder(orderData as any);
+        
+        // Validate and extract order id from order response
+        // Normalize order ID: extract UUID from order-<uuid>-<suffix> format if needed
+        if (!createdOrder.id) {
+          throw new Error("Order created but missing order ID");
+        }
+        
+        let orderId = createdOrder.id.trim();
+        
+        // Normalize: extract UUID from order-<uuid>-<timestamp> format
+        if (orderId.startsWith('order-')) {
+          const uuidMatch = orderId.match(/^order-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+          if (uuidMatch) {
+            orderId = uuidMatch[1]; // Extract just the UUID
+            console.log('📝 Normalized order ID:', { original: createdOrder.id, normalized: orderId });
+          }
+        }
+        
+        // Validate UUID format only in real API mode
+        if (!shouldUseMockData()) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!uuidRegex.test(orderId)) {
+            console.error("Invalid order ID format after normalization:", { original: createdOrder.id, normalized: orderId });
+            console.error("Full order response:", createdOrder);
+            throw new Error(`Invalid order ID format: ${createdOrder.id}. Expected UUID format.`);
+          }
+        }
+        
+        setCreatedOrderId(orderId);
+        console.log("✅ Order created successfully with ID:", orderId);
+        toast.success("Order created successfully!");
+      } catch (error: any) {
+        console.error("Error creating order:", error);
+        console.error("Order data that failed:", orderData);
+        
+        // Extract detailed error message
+        let errorMessage = "Failed to create order. Please try again.";
+        
+        if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error?.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        
+        // Add status code if available
+        if (error?.response?.status) {
+          console.error(`API Error Status: ${error.response.status}`);
+          if (error.response.status === 400) {
+            errorMessage += " (Validation error - check your order data)";
+          } else if (error.response.status === 401) {
+            errorMessage += " (Authentication error - please login again)";
+          } else if (error.response.status === 500) {
+            errorMessage += " (Server error - please try again later)";
+          }
+        }
+        
+        setOrderCreateError(errorMessage);
+        toast.error(errorMessage);
+      } finally {
+        setCreatingOrder(false);
       }
+    };
 
-      const orderData = {
-        user_id: user?.id || "",
-        order_number: orderNumber,
-        items: orderItems,
-        subtotal: totals.subtotalPHP,
-        isf: totals.isf,
-        lsf: totals.lsf,
-        shipping_fee: totals.shippingFee,
-        solo_shipping_fee: totals.soloShippingFee,
-        shared_shipping_fee: totals.sharedShippingFee,
-        total: totals.total,
-        currency: "PHP" as const,
-        status: "pending",
-        payment_status: "pending",
-        payment_type: paymentOption === "full" ? ("full_payment" as const) : ("item_only" as const),
-        box_type_preference: boxTypePreference,
-        box_size: boxTypePreference === "solo" ? boxSize : undefined,
-        shared_box_id: boxTypePreference === "shared" ? selectedSharedBoxId : undefined,
-        shipping_address: shippingAddress,
-        customer_message: typeof window !== 'undefined' ? (sessionStorage.getItem('order_message') || undefined) : undefined,
-      };
+    createOrder();
+  }, [user?.id, cartItems.length, creatingOrder, createdOrderId, orderCreateKey]);
 
-      const createdOrder = await mockOrderService.createOrder(orderData);
-      
-      // Clear cart
-      await cartService.clearCart();
+  const handlePaymentComplete = async (paymentId?: string) => {
+    setProcessing(true);
+    try {
+      // Clear cart only after payment is confirmed
+      // Note: Cart will be cleared by backend after payment verification
       
       // Clear sessionStorage
       if (typeof window !== 'undefined') {
@@ -295,11 +451,11 @@ export default function CheckoutPaymentPage() {
       // Refresh wallet
       await refetchWallet();
 
-      alert("Order created successfully! Your payment is being processed.");
+      toast.success("Payment proof uploaded! Awaiting admin verification.");
       router.push("/store/orders");
     } catch (error) {
-      console.error("Error creating order:", error);
-      alert("Error creating order. Please try again.");
+      console.error("Error completing payment:", error);
+      toast.error("Error processing payment. Please try again.");
     } finally {
       setProcessing(false);
     }
@@ -518,20 +674,65 @@ export default function CheckoutPaymentPage() {
                 </p>
               )}
             </div>
-            <QRPayment
-              amount={remainingAmount}
-              orderId={`checkout-${Date.now()}`}
-              paymentType={paymentOption === "full" ? "full" : "downpayment"}
-              subtotal={totals.subtotalPHP}
-              isf={totals.isf}
-              lsf={totals.lsf}
-              onPaymentComplete={handlePaymentComplete}
-              bankTypes={bankTypes.length > 0 ? bankTypes : undefined}
-              useWallet={useWalletBalance}
-              walletAmount={actualWalletAmount}
-              customerEmail={user?.email || ""}
-              customerName={user?.name || ""}
-            />
+            {creatingOrder ? (
+              <div className="rounded-lg border border-border bg-card p-12 text-center">
+                <p className="text-muted-foreground">Creating order...</p>
+              </div>
+            ) : createdOrderId ? (
+              <QRPayment
+                amount={remainingAmount}
+                orderId={createdOrderId}
+                paymentType={paymentOption === "full" ? "full_payment" : "item_only"}
+                subtotal={totals.subtotalPHP}
+                isf={totals.isf}
+                lsf={totals.lsf}
+                onPaymentComplete={handlePaymentComplete}
+                bankTypes={bankTypes.length > 0 ? bankTypes : undefined}
+                useWallet={useWalletBalance}
+                walletAmount={actualWalletAmount}
+                customerEmail={user?.email || ""}
+                customerName={user?.name || ""}
+              />
+            ) : (
+              <div className="rounded-lg border border-border bg-card p-6 text-center">
+                <div className="mb-4">
+                  <svg className="mx-auto h-12 w-12 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="mb-2 text-lg font-semibold text-error">Failed to Create Order</h3>
+                <p className="mb-4 text-sm text-muted-foreground whitespace-pre-line">
+                  {orderCreateError || "Failed to create order. Please try again."}
+                </p>
+                <div className="space-y-2">
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      // allow retry
+                      lastCreatedKeyRef.current = null;
+                      setCreatedOrderId(null);
+                      setOrderCreateError(undefined);
+                    }}
+                  >
+                    Retry Create Order
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      router.push("/store/cart");
+                    }}
+                  >
+                    Return to Cart
+                  </Button>
+                </div>
+                {process.env.NODE_ENV === 'development' && (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Check browser console for detailed error information
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
