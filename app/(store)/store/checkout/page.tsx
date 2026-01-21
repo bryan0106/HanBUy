@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
 import { cartService } from "@/services/cartService";
 import { userService } from "@/services";
+import { addressService, type ShippingAddress } from "@/services/addressService";
 import { mockOrderService } from "@/lib/mockOrdersData";
 import { mockProducts } from "@/lib/mockData";
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
@@ -29,6 +30,9 @@ export default function CheckoutPage() {
   const [boxTypePreference, setBoxTypePreference] = useState<"solo" | "shared">("solo");
   const [saveAddressForNextTime, setSaveAddressForNextTime] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<ShippingAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | "new">("new");
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [shippingAddress, setShippingAddress] = useState({
     country: "Philippines",
     firstName: "",
@@ -50,7 +54,8 @@ export default function CheckoutPage() {
     }
     if (!authLoading && isAuthenticated && user) {
       loadCart();
-      // Load saved address from user if available
+      loadSavedAddresses();
+      // Load saved address from user if available (legacy support)
       if (user.address) {
         setShippingAddress({
           country: user.address.country || "Philippines",
@@ -69,6 +74,40 @@ export default function CheckoutPage() {
       }
     }
   }, [isAuthenticated, authLoading, router, user]);
+
+  const loadSavedAddresses = async () => {
+    if (!user?.id) return;
+
+    setLoadingAddresses(true);
+    try {
+      const addresses = await addressService.getAddresses();
+      setSavedAddresses(addresses);
+      
+      // Auto-select default address if available
+      const defaultAddress = addresses.find(addr => addr.is_default);
+      if (defaultAddress) {
+        setSelectedAddressId(defaultAddress.id);
+        setShippingAddress({
+          country: defaultAddress.country || "Philippines",
+          firstName: defaultAddress.first_name || user.name?.split(' ')[0] || "",
+          lastName: defaultAddress.last_name || user.name?.split(' ').slice(1).join(' ') || "",
+          address: defaultAddress.address_line_1 || "",
+          apartment: defaultAddress.address_line_2 || "",
+          postalCode: defaultAddress.postal_code || "",
+          city: defaultAddress.city || "",
+          province: defaultAddress.province || "",
+          region: defaultAddress.region || "",
+          phone: defaultAddress.phone || user.phone || "",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error loading saved addresses:", error);
+      // Don't show error toast - user can still add new address
+      setSavedAddresses([]);
+    } finally {
+      setLoadingAddresses(false);
+    }
+  };
 
   const loadCart = async () => {
     if (!user?.id) return;
@@ -382,6 +421,85 @@ export default function CheckoutPage() {
           {/* Shipping Address */}
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="mb-4 text-lg font-semibold">Shipping address</h2>
+            
+            {/* Saved Addresses Selection */}
+            {savedAddresses.length > 0 && (
+              <div className="mb-4">
+                <label className="mb-2 block text-sm font-medium">Select a saved address or add new</label>
+                <div className="space-y-2">
+                  {savedAddresses.map((addr) => (
+                    <label
+                      key={addr.id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        selectedAddressId === addr.id
+                          ? "border-soft-blue-600 bg-soft-blue-50"
+                          : "border-border bg-background hover:bg-grey-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="address"
+                        value={addr.id}
+                        checked={selectedAddressId === addr.id}
+                        onChange={(e) => {
+                          setSelectedAddressId(e.target.value);
+                          setShippingAddress({
+                            country: addr.country || "Philippines",
+                            firstName: addr.first_name || user?.name?.split(' ')[0] || "",
+                            lastName: addr.last_name || user?.name?.split(' ').slice(1).join(' ') || "",
+                            address: addr.address_line_1 || "",
+                            apartment: addr.address_line_2 || "",
+                            postalCode: addr.postal_code || "",
+                            city: addr.city || "",
+                            province: addr.province || "",
+                            region: addr.region || "",
+                            phone: addr.phone || user?.phone || "",
+                          });
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        {addr.label && (
+                          <p className="font-semibold text-foreground">{addr.label}</p>
+                        )}
+                        <p className="text-sm text-muted-foreground">{addr.address_line_1}</p>
+                        {addr.address_line_2 && (
+                          <p className="text-sm text-muted-foreground">{addr.address_line_2}</p>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                          {addr.city}, {addr.province} {addr.postal_code}
+                        </p>
+                        {addr.is_default && (
+                          <span className="mt-1 inline-block rounded-full bg-soft-blue-600 px-2 py-0.5 text-xs font-medium text-white">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                  <label
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                      selectedAddressId === "new"
+                        ? "border-soft-blue-600 bg-soft-blue-50"
+                        : "border-border bg-background hover:bg-grey-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="address"
+                      value="new"
+                      checked={selectedAddressId === "new"}
+                      onChange={(e) => setSelectedAddressId(e.target.value)}
+                      className="mt-1"
+                    />
+                    <span className="font-medium text-foreground">+ Add new address</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Address Form - Show if no saved addresses or "new" selected */}
+            {(selectedAddressId === "new" || savedAddresses.length === 0) && (
             <div className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-medium">Country/Region</label>
@@ -518,6 +636,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
+            )}
             
             {/* Address Saved Indicator */}
             {user?.address && (
@@ -544,8 +663,8 @@ export default function CheckoutPage() {
                 </svg>
                 Return to cart
               </Link>
-              {/* Save Address Option */}
-              {!user?.address && (
+              {/* Save Address Option - Show when adding new address */}
+              {selectedAddressId === "new" && (
                 <div className="mb-4 rounded-lg border border-border bg-background p-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -555,7 +674,7 @@ export default function CheckoutPage() {
                       className="rounded border-border"
                     />
                     <span className="text-sm text-muted-foreground">
-                      Save this address for future orders
+                      Save to my shipping addresses
                     </span>
                   </label>
                 </div>
@@ -563,31 +682,36 @@ export default function CheckoutPage() {
 
               <Button
                 onClick={async () => {
-                  // Save address to user profile if checkbox is checked
-                  if (saveAddressForNextTime && user?.id && !savingAddress) {
+                  // Save address to shipping addresses if checkbox is checked
+                  if (saveAddressForNextTime && user?.id && !savingAddress && selectedAddressId === "new") {
                     setSavingAddress(true);
                     try {
-                      const updatedUser = await userService.updateUser(user.id, {
-                        address: {
-                          street: shippingAddress.address + (shippingAddress.apartment ? `, ${shippingAddress.apartment}` : ""),
-                          city: shippingAddress.city,
-                          province: shippingAddress.province || shippingAddress.city,
-                          zipCode: shippingAddress.postalCode,
-                          country: shippingAddress.country,
-                          region: shippingAddress.region,
-                        },
-                        phone: shippingAddress.phone || user.phone,
+                      // Validate required fields
+                      if (!shippingAddress.address || !shippingAddress.city || !shippingAddress.province || !shippingAddress.postalCode) {
+                        toast.error("Please fill in all required address fields");
+                        setSavingAddress(false);
+                        return;
+                      }
+
+                      await addressService.createAddress({
+                        first_name: shippingAddress.firstName || user.name?.split(' ')[0] || "",
+                        last_name: shippingAddress.lastName || user.name?.split(' ').slice(1).join(' ') || "",
+                        phone: shippingAddress.phone || user.phone || "",
+                        country: shippingAddress.country || "Philippines",
+                        address_line_1: shippingAddress.address,
+                        address_line_2: shippingAddress.apartment || undefined,
+                        city: shippingAddress.city,
+                        province: shippingAddress.province,
+                        region: shippingAddress.region || undefined,
+                        postal_code: shippingAddress.postalCode,
+                        label: undefined, // Can add label input later if needed
+                        is_default: savedAddresses.length === 0, // Set as default if it's the first address
                       });
                       
-                      // Update user in localStorage
-                      if (typeof window !== 'undefined') {
-                        localStorage.setItem('hanbuy_user', JSON.stringify(updatedUser));
-                      }
+                      toast.success("Address saved to your shipping addresses!");
                       
-                      // Refresh user in auth context
-                      await refetchUser();
-                      
-                      toast.success("Address saved for future orders!");
+                      // Reload addresses to include the new one
+                      loadSavedAddresses();
                     } catch (error: any) {
                       console.error("Error saving address:", error);
                       toast.error(error?.message || "Failed to save address, but you can continue");

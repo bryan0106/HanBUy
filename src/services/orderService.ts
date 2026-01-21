@@ -245,6 +245,73 @@ export const orderService = {
   },
 
   /**
+   * Cancel order (Customer)
+   * Cancels orders with status pending or confirmed
+   * Automatic refund processing for paid orders
+   */
+  async cancelOrder(id: string, reason: string): Promise<{ id: string; status: string; refund_processed: boolean }> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        data: { id: string; status: string; refund_processed: boolean };
+        message: string;
+      }>(`/orders/${id}/cancel`, {
+        reason,
+      });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Send message about order (Customer)
+   */
+  async sendMessage(orderId: string, message: string): Promise<{ id: string; message: string; created_at: string }> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        data: { id: string; message: string; created_at: string };
+        message: string;
+      }>(`/orders/${orderId}/messages`, {
+        message,
+      });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get all messages for order (Customer)
+   */
+  async getMessages(orderId: string): Promise<Array<{
+    id: string;
+    message: string;
+    user_name: string;
+    user_email: string;
+    user_role: string;
+    created_at: string;
+  }>> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        data: Array<{
+          id: string;
+          message: string;
+          user_name: string;
+          user_email: string;
+          user_role: string;
+          created_at: string;
+        }>;
+      }>(`/orders/${orderId}/messages`);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
    * Request shipping for stored items
    * Customer requests shipping and pays shipping fee
    * For solo boxes: courier is selected here (direct delivery)

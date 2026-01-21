@@ -2,9 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/currency";
-import type { BankType } from "@/services/api";
 import { paymentService } from "@/services/paymentService";
 import toast from "react-hot-toast";
+
+type BankOption = {
+  code: string;
+  name: string;
+  color?: string;
+};
 
 interface QRPaymentProps {
   amount: number; // Pre-identified amount (exact amount to pay)
@@ -16,14 +21,14 @@ interface QRPaymentProps {
   isf?: number; // International Service Fee
   lsf?: number; // Local Service Fee
   onPaymentComplete?: (paymentId?: string) => void;
-  bankTypes?: BankType[]; // Optional bank types from API
+  bankTypes?: BankOption[]; // Optional bank types from API (UI-friendly shape)
   useWallet?: boolean;
   walletAmount?: number;
   customerEmail?: string;
   customerName?: string;
 }
 
-const DEFAULT_BANKS: BankType[] = [
+const DEFAULT_BANKS: BankOption[] = [
   { code: "BPI", name: "BPI", color: "bg-red-600" },
   { code: "BDO", name: "BDO", color: "bg-blue-600" },
   { code: "GCASH", name: "GCash", color: "bg-blue-500" },
@@ -233,9 +238,19 @@ export function QRPayment({
     }
   }, [banks, selectedBank]);
 
-  const paymentAmount: number = ((paymentType === "downpayment" || paymentType === "installment") && downpaymentAmount) || (paymentType === "balance")
-    ? (paymentType === "balance" ? amount : (downpaymentAmount || 0))
-    : amount;
+  // Round amount to 2 decimal places to avoid floating point precision issues
+  const paymentAmount: number = (() => {
+    let amt: number;
+    if ((paymentType === "downpayment" || paymentType === "installment") && downpaymentAmount) {
+      amt = downpaymentAmount || 0;
+    } else if (paymentType === "balance") {
+      amt = amount;
+    } else {
+      amt = amount;
+    }
+    // Round to 2 decimal places
+    return Math.round((amt + Number.EPSILON) * 100) / 100;
+  })();
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">

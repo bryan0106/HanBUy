@@ -387,6 +387,52 @@ export default function OrderDetailsPage() {
                 <p className="text-sm font-medium capitalize">
                   {order.box_type_preference} Box
                 </p>
+                {order.box_type_preference === 'solo' && (
+                  <div className="mt-3 space-y-2">
+                    {order.payment_status === 'paid' && !order.box_id ? (
+                      <div className="rounded-lg bg-warning/10 p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-warning">⏳</span>
+                          <div>
+                            <p className="text-xs font-semibold text-warning">Waiting for Approval</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Your solo box request is pending admin approval. Once approved, items will be shipped.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : order.box_id ? (
+                      <div className="rounded-lg bg-success/10 p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-success">✓</span>
+                          <div>
+                            <p className="text-xs font-semibold text-success">Approved - Ready to Ship</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Your solo box has been approved. Items are ready to be shipped in your dedicated box.
+                            </p>
+                            {order.box_id && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Box ID: <span className="font-medium">{order.box_id}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : order.payment_status !== 'paid' ? (
+                      <div className="rounded-lg bg-info/10 p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-info">ℹ️</span>
+                          <div>
+                            <p className="text-xs font-semibold text-info">Payment Required</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Complete payment to proceed with solo box approval.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </div>
             </div>
           </div>

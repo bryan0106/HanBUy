@@ -1,6 +1,6 @@
-// Authentication utilities - Now uses backend API
+// Authentication utilities - Uses backend API via modular services
 
-import { authService as apiAuthService, type LoginResponse } from "@/services/api";
+import { authService as apiAuthService } from "@/services/authService";
 
 export interface User {
   id: string;
@@ -62,16 +62,36 @@ export const authService = {
   login: async (email: string, password: string): Promise<User> => {
     try {
       // Call backend API
-      const response: LoginResponse = await apiAuthService.login(email, password);
-      
+      const response = await apiAuthService.login(email, password);
+
+      // Map backend user shape to frontend auth user shape
+      const user: User = {
+        id: response.user.id,
+        email: response.user.email,
+        name: response.user.name,
+        role: response.user.role,
+        clientLevel: response.user.client_level,
+        approvalStatus: response.user.approval_status,
+        installmentApproved: response.user.installment_approved,
+        isAuthenticated: true,
+        phone: response.user.phone,
+        address: response.user.address
+          ? {
+              street: response.user.address.street || undefined,
+              city: response.user.address.city || undefined,
+              province: response.user.address.province || undefined,
+              zipCode: response.user.address.zipCode || undefined,
+              country: response.user.address.country || undefined,
+              region: response.user.address.region || undefined,
+            }
+          : undefined,
+      };
+
       // Store user in localStorage
-      const user = response.user;
       currentUser = user;
       
       // Store token if provided
-      if (response.token) {
-        localStorage.setItem("hanbuy_token", response.token);
-      }
+      localStorage.setItem("hanbuy_token", response.token);
       
       // Store user data
       if (typeof window !== "undefined") {

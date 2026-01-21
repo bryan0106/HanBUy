@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { invoiceService } from "@/services/api";
+import { invoiceService } from "@/services/invoiceService";
 import { useCart } from "@/hooks/useCart";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { AccountDropdown } from "./AccountDropdown";
@@ -67,6 +67,23 @@ export function StoreLayout({ children }: StoreLayoutProps) {
     };
   }, [user?.id, refetch]);
 
+  // Check if user has invoices (drives nav badge visibility)
+  useEffect(() => {
+    const loadInvoices = async () => {
+      try {
+        if (!user?.id) {
+          setHasInvoices(false);
+          return;
+        }
+        const response = await invoiceService.getInvoices({ page: 1, limit: 1 });
+        setHasInvoices((response.data?.length || 0) > 0);
+      } catch {
+        setHasInvoices(false);
+      }
+    };
+    loadInvoices();
+  }, [user?.id]);
+
   const navItems = [
     { label: "Home", href: "/store" },
     { label: "Onhand Items", href: "/store/products/onhand" },
@@ -88,8 +105,8 @@ export function StoreLayout({ children }: StoreLayoutProps) {
     const checkInvoices = async () => {
       if (isAuthenticated && user?.id) {
         try {
-          const invoices = await invoiceService.getUserInvoices(user.id);
-          setHasInvoices(invoices.length > 0);
+          const response = await invoiceService.getInvoices({ page: 1, limit: 1 });
+          setHasInvoices((response.data?.length || 0) > 0);
         } catch (error) {
           console.error("Error checking invoices:", error);
           setHasInvoices(false);

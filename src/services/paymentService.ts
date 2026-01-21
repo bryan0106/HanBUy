@@ -168,18 +168,23 @@ export const paymentService = {
    */
   async confirmPayment(data: ConfirmPaymentRequest): Promise<ConfirmPaymentResponse['data']> {
     try {
+      // Round amount to 2 decimal places to match database DECIMAL(10,2) type
+      const roundedAmount = Math.round((data.amount + Number.EPSILON) * 100) / 100;
+      const roundedWalletAmount = data.wallet_amount ? Math.round((data.wallet_amount + Number.EPSILON) * 100) / 100 : undefined;
+      
       const formData = new FormData();
       formData.append('order_id', data.order_id);
       formData.append('payment_id', data.payment_id);
-      formData.append('amount', data.amount.toString());
+      // Send as number (not string) - backend should handle numeric type
+      formData.append('amount', roundedAmount.toFixed(2));
       formData.append('payment_method', JSON.stringify(data.payment_method));
       formData.append('payment_proof', data.payment_proof);
       
       if (data.use_wallet !== undefined) {
         formData.append('use_wallet', data.use_wallet.toString());
       }
-      if (data.wallet_amount !== undefined) {
-        formData.append('wallet_amount', data.wallet_amount.toString());
+      if (roundedWalletAmount !== undefined) {
+        formData.append('wallet_amount', roundedWalletAmount.toFixed(2));
       }
 
       const response = await apiClient.post<ConfirmPaymentResponse>(

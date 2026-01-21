@@ -9,6 +9,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { orderService, type Order as OrderType } from "@/services/orderService";
 import { productService } from "@/services/productService";
 import toast from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 interface Order {
   id: string;
@@ -21,6 +23,16 @@ interface Order {
   createdAt: Date;
   boxId?: string;
   phCourierTrackingNumber?: string;
+  orderItems?: Array<{
+    id: string;
+    product_id: string;
+    product_name: string;
+    product_type?: 'onhand' | 'preorder' | 'pasabuy';
+    quantity: number;
+    unit_price: number;
+    total: number;
+    image_url?: string;
+  }>;
 }
 
 function StoreOrdersContent() {
@@ -36,12 +48,42 @@ function StoreOrdersContent() {
   const [loadingOrderDetails, setLoadingOrderDetails] = useState<Record<string, boolean>>({});
   const [pasabuyRequests, setPasabuyRequests] = useState<any[]>([]);
   const [loadingPasabuy, setLoadingPasabuy] = useState(false);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [pageLimit] = useState(10); // Default limit per page
+  
+  // Contact modal state
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  
+  // Cancel order modal state
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
-  // Update active tab when URL changes
+  // Update active tab and page when URL changes
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab && ["orders", "receive", "rate", "payments", "pasabuy"].includes(tab)) {
       setActiveTab(tab as "orders" | "receive" | "rate" | "payments" | "pasabuy");
+    }
+    
+    // Read page from URL query params
+    const pageParam = searchParams.get("page");
+    if (pageParam) {
+      const page = parseInt(pageParam, 10);
+      if (!isNaN(page) && page >= 1) {
+        setCurrentPage(page);
+      }
+    } else {
+      setCurrentPage(1);
     }
   }, [searchParams]);
 
@@ -53,31 +95,123 @@ function StoreOrdersContent() {
     if (!authLoading && isAuthenticated) {
       loadData();
     }
-  }, [isAuthenticated, authLoading, router, user]);
+  }, [isAuthenticated, authLoading, router, user, currentPage]);
 
 
   const loadData = async () => {
     setLoading(true);
     try {
       if (user?.id) {
-        console.log('📦 Fetching orders for user:', user.id);
+        console.log('📦 Fetching orders for user:', user.id, 'page:', currentPage, 'limit:', pageLimit);
         
-        const ordersResponse = await orderService.getOrders({ user_id: user.id });
+        const ordersResponse = await orderService.getOrders({ 
+          user_id: user.id,
+          page: currentPage,
+          limit: pageLimit
+        });
         const ordersData = ordersResponse.data;
         
+        // Update pagination metadata
+        if (ordersResponse.pagination) {
+          setTotalPages(ordersResponse.pagination.totalPages || 1);
+          setTotalOrders(ordersResponse.pagination.total || 0);
+          setCurrentPage(ordersResponse.pagination.page || currentPage);
+        }
+        
         // Map API response to Order interface
-        const mappedOrders: Order[] = ordersData.map((order: OrderType) => ({
-          id: order.id,
-          orderNumber: order.order_number,
-          items: order.order_items?.length || 0,
-          total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
-          currency: order.currency as "PHP" | "KRW",
-          status: order.status,
-          paymentStatus: order.payment_status,
-          createdAt: new Date(order.created_at),
-          boxId: order.box_id,
-          phCourierTrackingNumber: order.ph_courier_tracking_number,
-        }));
+        const mappedOrders: Order[] = ordersData.map((order: OrderType) => {
+          // Debug: Log order items to see what fields are available
+          if (order.order_items && order.order_items.length > 0) {
+            console.log('📦 Order items from API:', order.order_items.map((item: any) => ({
+              product_name: item.product_name,
+              product_type: item.product_type,
+              product: item.product,
+            })));
+          }
+          
+          return {
+            id: order.id,
+            orderNumber: order.order_number,
+            items: order.order_items?.length || 0,
+            total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
+            currency: order.currency as "PHP" | "KRW",
+            status: order.status,
+            paymentStatus: order.payment_status,
+            createdAt: new Date(order.created_at),
+            boxId: order.box_id,
+            phCourierTrackingNumber: order.ph_courier_tracking_number,
+            orderItems: order.order_items?.map((item: any) => {
+              // Determine product type using multiple strategies:
+              // 1. Check if order has preorder_status (order-level preorder indicator)
+              // 2. Check if item has preorder_release_date (item-level preorder indicator)
+              // 3. Check product_type field from API response (including 'kr_website' as preorder)
+              // 4. Check nested product object for product_type
+              
+              let productType: 'onhand' | 'preorder' | 'pasabuy' = 'onhand';
+              
+              // Strategy 1: Order has preorder_status → all items are preorder
+              if (order.preorder_status) {
+                productType = 'preorder';
+              }
+              // Strategy 2: Item has preorder_release_date → it's a preorder item
+              else if (item.preorder_release_date || item.preorderReleaseDate || item.preorder_releaseDate) {
+                productType = 'preorder';
+              }
+              // Strategy 3: Check explicit product_type field
+              else {
+                const rawProductType = item.product_type 
+                  || item.productType 
+                  || item.product?.product_type 
+                  || item.product?.productType 
+                  || item.product?.type;
+                
+                if (rawProductType) {
+                  const normalizedType = String(rawProductType).toLowerCase().trim();
+                  
+                  // 'kr_website' items are preorders (need to be purchased from Korean websites)
+                  if (normalizedType === 'preorder' || normalizedType === 'pre-order' || normalizedType === 'kr_website' || normalizedType === 'kr-website') {
+                    productType = 'preorder';
+                  } else if (normalizedType === 'pasabuy' || normalizedType === 'pasabuy-request' || normalizedType === 'pasabuy_request') {
+                    productType = 'pasabuy';
+                  } else if (normalizedType === 'onhand' || normalizedType === 'on_hand') {
+                    productType = 'onhand';
+                  } else {
+                    // If product type is unknown but not explicitly 'onhand', check if it's a preorder
+                    // by looking for preorder indicators
+                    if (item.preorder_release_date || item.preorderReleaseDate || item.preorder_releaseDate) {
+                      productType = 'preorder';
+                    }
+                  }
+                } else {
+                  // No product_type field, check if it has preorder_release_date
+                  if (item.preorder_release_date || item.preorderReleaseDate || item.preorder_releaseDate) {
+                    productType = 'preorder';
+                  }
+                }
+              }
+              
+              console.log('🏷️ Product type mapping:', {
+                product_name: item.product_name,
+                order_preorder_status: order.preorder_status,
+                item_preorder_release_date: item.preorder_release_date || item.preorderReleaseDate || item.preorder_releaseDate,
+                item_product_type: item.product_type || item.productType || item.product?.product_type,
+                full_item: item,
+                mapped: productType,
+              });
+              
+              return {
+                id: item.id,
+                product_id: item.product_id,
+                product_name: item.product_name,
+                product_type: productType,
+                quantity: item.quantity,
+                unit_price: item.unit_price || item.price || 0,
+                total: item.total || (item.unit_price || item.price || 0) * item.quantity,
+                image_url: item.image_url,
+              };
+            }),
+          };
+        });
         
         setOrders(mappedOrders);
       }
@@ -100,6 +234,78 @@ function StoreOrdersContent() {
       console.error(`Error loading order ${orderId}:`, error);
     } finally {
       setLoadingOrderDetails(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleOpenCancelModal = (order: Order, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOrderToCancel(order);
+    setCancelReason("");
+    setCancelModalOpen(true);
+  };
+
+  const handleCloseCancelModal = () => {
+    setCancelModalOpen(false);
+    setOrderToCancel(null);
+    setCancelReason("");
+  };
+
+  const handleCancelOrder = async () => {
+    if (!orderToCancel || !cancelReason.trim()) {
+      toast.error('Please provide a reason for cancellation');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const result = await orderService.cancelOrder(orderToCancel.id, cancelReason.trim());
+      if (result.refund_processed) {
+        toast.success('Order cancelled and refund processed successfully');
+      } else {
+        toast.success('Order cancelled successfully');
+      }
+      handleCloseCancelModal();
+      // Reload orders
+      loadData();
+    } catch (error: any) {
+      console.error('Error cancelling order:', error);
+      toast.error(error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to cancel order');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleOpenContactModal = (order: Order, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedOrder(order);
+    setMessage("");
+    setContactModalOpen(true);
+  };
+
+  const handleCloseContactModal = () => {
+    setContactModalOpen(false);
+    setSelectedOrder(null);
+    setMessage("");
+  };
+
+  const handleSendMessage = async () => {
+    if (!selectedOrder || !message.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+
+    setSending(true);
+    try {
+      await orderService.sendMessage(selectedOrder.id, message.trim());
+      toast.success('Message sent successfully! We will get back to you soon.');
+      handleCloseContactModal();
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      toast.error(error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to send message');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -177,7 +383,7 @@ function StoreOrdersContent() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Orders ({orders.length})
+            Orders ({totalOrders > 0 ? totalOrders : orders.length})
           </button>
           <button
             onClick={() => {
@@ -256,43 +462,225 @@ function StoreOrdersContent() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
-              {orders.map((order) => (
-                <Link
+            <>
+              <div className="space-y-4">
+                {orders.map((order) => (
+                <div
                   key={order.id}
-                  href={`/store/orders/${order.id}`}
-                  className="block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-lg"
+                  className="rounded-lg border border-border bg-card transition-shadow hover:shadow-lg"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="mb-2 flex items-center justify-between">
-                        <h3 className="font-semibold text-foreground">
-                          {order.orderNumber}
-                        </h3>
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs font-medium ${
-                            statusColors[order.status] || "bg-grey-100 text-grey-700"
-                          }`}
-                        >
-                          {order.status.replace(/_/g, " ").toUpperCase()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {order.items} item{order.items > 1 ? "s" : ""} • {formatDate(order.createdAt)}
-                      </p>
-                      <p className="mt-2 text-lg font-bold">
-                        {formatCurrency(order.total, order.currency)}
-                      </p>
-                      {order.phCourierTrackingNumber && (
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Tracking: {order.phCourierTrackingNumber}
+                  {/* Accordion Header - Order Info */}
+                  <button
+                    onClick={() => {
+                      const newExpanded = new Set(expandedOrders);
+                      if (newExpanded.has(order.id)) {
+                        newExpanded.delete(order.id);
+                      } else {
+                        newExpanded.add(order.id);
+                      }
+                      setExpandedOrders(newExpanded);
+                    }}
+                    className="w-full p-4 text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="mb-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg font-semibold text-foreground">
+                              {order.orderNumber}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {expandedOrders.has(order.id) ? '▼' : '▶'}
+                            </span>
+                          </div>
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-medium ${
+                              statusColors[order.status] || "bg-grey-100 text-grey-700"
+                            }`}
+                          >
+                            {order.status.replace(/_/g, " ").toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {order.items} item{order.items > 1 ? "s" : ""} • {formatDate(order.createdAt)}
                         </p>
-                      )}
+                        {order.phCourierTrackingNumber && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Tracking: {order.phCourierTrackingNumber}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Link>
+                  </button>
+                  
+                  {/* Accordion Content - Item List and Actions */}
+                  {expandedOrders.has(order.id) && (
+                    <div className="border-t border-border p-4">
+                      {/* Item List */}
+                      <div>
+                        <h4 className="mb-3 text-sm font-semibold text-foreground">Order Items:</h4>
+                        {order.orderItems && order.orderItems.length > 0 ? (
+                          <div className="space-y-2">
+                            {order.orderItems.map((item) => (
+                              <div key={item.id} className="flex items-center gap-3 rounded border border-border bg-background p-2">
+                                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded">
+                                  {item.image_url ? (
+                                    <Image
+                                      src={item.image_url}
+                                      alt={item.product_name}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
+                                      <span className="text-xs">No Image</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate text-sm font-medium text-foreground">
+                                    {item.product_name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Qty: {item.quantity} × {formatCurrency(item.unit_price, order.currency)}
+                                  </p>
+                                  {(item.product_type === 'preorder' || item.product_type === 'pasabuy') && (
+                                    <span
+                                      className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                                        item.product_type === 'preorder'
+                                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                          : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                                      }`}
+                                    >
+                                      {item.product_type === 'preorder' ? 'Preorder' : 'Pasabuy'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No items available</p>
+                        )}
+                      </div>
+                      
+                      {/* Total Price */}
+                      <div className="mt-4 border-t border-border pt-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-foreground">Total:</span>
+                          <span className="text-lg font-bold text-foreground">
+                            {formatCurrency(order.total, order.currency)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="mt-4 flex gap-2">
+                        <Button
+                          onClick={(e) => handleOpenCancelModal(order, e)}
+                          variant="outline"
+                          size="sm"
+                          disabled={order.status === 'cancelled' || order.status === 'delivered'}
+                          className="flex-1"
+                        >
+                          Cancel Order
+                        </Button>
+                        <Button
+                          onClick={(e) => handleOpenContactModal(order, e)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          Contact
+                        </Button>
+                        <Link href={`/store/orders/${order.id}`} onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                          >
+                            View Details
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
-            </div>
+              </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {orders.length > 0 ? ((currentPage - 1) * pageLimit + 1) : 0} to {Math.min(currentPage * pageLimit, totalOrders)} of {totalOrders} orders
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => {
+                        const newPage = currentPage - 1;
+                        if (newPage >= 1) {
+                          setCurrentPage(newPage);
+                          router.push(`/store/orders?tab=orders&page=${newPage}`);
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === 1 || loading}
+                    >
+                      Previous
+                    </Button>
+                    
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum: number;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            onClick={() => {
+                              setCurrentPage(pageNum);
+                              router.push(`/store/orders?tab=orders&page=${pageNum}`);
+                            }}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            disabled={loading}
+                            className={currentPage === pageNum ? "bg-soft-blue-600 text-white hover:bg-soft-blue-700" : ""}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      onClick={() => {
+                        const newPage = currentPage + 1;
+                        if (newPage <= totalPages) {
+                          setCurrentPage(newPage);
+                          router.push(`/store/orders?tab=orders&page=${newPage}`);
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === totalPages || loading}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -897,6 +1285,123 @@ function StoreOrdersContent() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Contact Modal */}
+      {contactModalOpen && selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={handleCloseContactModal}>
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">Contact Us</h2>
+              <button
+                onClick={handleCloseContactModal}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground">
+                Send a message about order <span className="font-semibold text-foreground">{selectedOrder.orderNumber}</span>
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="message" className="mb-2 block text-sm font-medium text-foreground">
+                Message
+              </label>
+              <textarea
+                id="message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Enter your message or question about this order..."
+                rows={6}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-soft-blue-500 focus:outline-none focus:ring-1 focus:ring-soft-blue-500"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCloseContactModal}
+                variant="outline"
+                className="flex-1"
+                disabled={sending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSendMessage}
+                className="flex-1 bg-soft-blue-600 text-white hover:bg-soft-blue-700"
+                disabled={sending || !message.trim()}
+              >
+                {sending ? 'Sending...' : 'Send Message'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order Modal */}
+      {cancelModalOpen && orderToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={handleCloseCancelModal}>
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">Cancel Order</h2>
+              <button
+                onClick={handleCloseCancelModal}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Close"
+                disabled={cancelling}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to cancel order <span className="font-semibold text-foreground">{orderToCancel.orderNumber}</span>?
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                If you've already paid, a refund will be processed automatically.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="cancelReason" className="mb-2 block text-sm font-medium text-foreground">
+                Reason for Cancellation <span className="text-error">*</span>
+              </label>
+              <textarea
+                id="cancelReason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Please provide a reason for cancellation..."
+                rows={4}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-soft-blue-500 focus:outline-none focus:ring-1 focus:ring-soft-blue-500"
+                disabled={cancelling}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCloseCancelModal}
+                variant="outline"
+                className="flex-1"
+                disabled={cancelling}
+              >
+                Keep Order
+              </Button>
+              <Button
+                onClick={handleCancelOrder}
+                className="flex-1 bg-error text-white hover:bg-error/90"
+                disabled={cancelling || !cancelReason.trim()}
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Order'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

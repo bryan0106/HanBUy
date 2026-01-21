@@ -133,7 +133,7 @@ export const mockWalletService = {
     type: 'credit' | 'debit';
     amount: number;
     description: string;
-    reference_type?: 'order' | 'payment' | 'refund' | 'adjustment';
+    reference_type?: 'order' | 'payment' | 'refund' | 'adjustment' | 'load_money' | 'shipping_payment';
     reference_id?: string;
   }): Promise<WalletTransaction> => {
     return new Promise((resolve, reject) => {

@@ -28,6 +28,7 @@ export * from './shippingService';
 export * from './documentService';
 export * from './notificationService';
 export * from './likedService';
+export * from './addressService';
 // Export utilityService but exclude BankType and GetBankTypesResponse to avoid conflict with paymentService
 export {
   utilityService,

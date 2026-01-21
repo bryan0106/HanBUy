@@ -2,7 +2,17 @@ import apiClient from '@/lib/apiClient';
 import { handleApiError } from '@/utils/errorHandler';
 import { shouldUseMockData } from '@/utils/env';
 import { mockWalletService } from '@/lib/mockWalletData';
-import type { Wallet, WalletTransaction, GetWalletResponse, GetWalletTransactionsResponse, WalletTransactionRequest } from '@/types/wallet';
+import type { 
+  Wallet, 
+  WalletTransaction, 
+  GetWalletResponse, 
+  GetWalletTransactionsResponse, 
+  WalletTransactionRequest,
+  LoadMoneyRequest,
+  LoadMoneyResponse,
+  LoadMoneyDirectRequest,
+  LoadMoneyDirectResponse
+} from '@/types/wallet';
 
 export const walletService = {
   /**
@@ -60,6 +70,31 @@ export const walletService = {
         user_id: userId,
         ...transaction,
       });
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Load money into wallet via QR code (generate QR code for payment)
+   */
+  async loadMoney(request: LoadMoneyRequest): Promise<LoadMoneyResponse['data']> {
+    try {
+      const response = await apiClient.post<LoadMoneyResponse>('/wallet/load-money', request);
+      return response.data.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Load money directly (after payment has been made)
+   * Use this when customer has already paid and wants to credit wallet with proof of payment
+   */
+  async loadMoneyDirect(request: LoadMoneyDirectRequest): Promise<LoadMoneyDirectResponse['data']> {
+    try {
+      const response = await apiClient.post<LoadMoneyDirectResponse>('/wallet/load-money/direct', request);
       return response.data.data;
     } catch (error) {
       throw handleApiError(error);

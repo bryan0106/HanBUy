@@ -15,6 +15,7 @@ import { paymentService } from "@/services/paymentService";
 import type { BankType as PaymentBankType } from "@/services/paymentService";
 import type { BankType } from "@/services/api";
 import { orderService } from "@/services/orderService";
+import { addressService } from "@/services/addressService";
 import { mockPreorderProducts } from "@/lib/mockPreorderData";
 import toast from "react-hot-toast";
 
@@ -47,6 +48,7 @@ export default function CheckoutPaymentPage() {
     region: "",
     phone: "",
   });
+  const [addressLoading, setAddressLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -61,7 +63,41 @@ export default function CheckoutPaymentPage() {
     }
   }, [isAuthenticated, authLoading, router, user]);
 
-  const loadShippingAddress = () => {
+  const loadShippingAddress = async () => {
+    setAddressLoading(true);
+    // First, try to load from saved addresses (default address)
+    try {
+      const savedAddresses = await addressService.getAddresses();
+      console.log("✅ Saved addresses loaded:", savedAddresses);
+      const defaultAddress = savedAddresses.find(addr => addr.is_default) || savedAddresses[0];
+      
+      if (defaultAddress) {
+        console.log("✅ Using default address:", defaultAddress);
+        const addressData = {
+          country: defaultAddress.country || "Philippines",
+          firstName: defaultAddress.first_name || user?.name?.split(' ')[0] || "",
+          lastName: defaultAddress.last_name || user?.name?.split(' ').slice(1).join(' ') || "",
+          address: defaultAddress.address_line_1 || "",
+          apartment: defaultAddress.address_line_2 || "",
+          postalCode: defaultAddress.postal_code || "",
+          city: defaultAddress.city || "",
+          province: defaultAddress.province || "",
+          region: defaultAddress.region || "",
+          phone: defaultAddress.phone || user?.phone || "",
+        };
+        console.log("✅ Setting shipping address:", addressData);
+        setShippingAddress(addressData);
+        setAddressLoading(false);
+        return; // Use saved address, don't check other sources
+      } else {
+        console.warn("⚠️ No saved addresses found");
+      }
+    } catch (error) {
+      console.error("❌ Error loading saved addresses:", error);
+      // Continue to try other sources
+    }
+
+    // Fallback: Try user's address
     if (user?.address) {
       setShippingAddress(prev => ({
         ...prev,
@@ -76,6 +112,7 @@ export default function CheckoutPaymentPage() {
         phone: user.phone || "",
       }));
     }
+    
     // Also try to load from sessionStorage if available
     if (typeof window !== 'undefined') {
       const savedAddress = sessionStorage.getItem('shippingAddress');
@@ -88,6 +125,7 @@ export default function CheckoutPaymentPage() {
         }
       }
     }
+    setAddressLoading(false);
   };
 
   const formatAddress = () => {
@@ -229,7 +267,9 @@ export default function CheckoutPaymentPage() {
     };
   }, [cartItems, boxTypePreference, paymentOption]);
 
-  const maxWalletUsage = Math.min(walletBalance, totals.total);
+  // Default to 0 if wallet balance is not available (e.g., wallet request failed)
+  const safeWalletBalance = walletBalance || 0;
+  const maxWalletUsage = Math.min(safeWalletBalance, totals.total);
   const actualWalletAmount = useWalletBalance ? Math.min(walletAmount, maxWalletUsage) : 0;
   const remainingAmount = Math.max(0, totals.total - actualWalletAmount);
 
@@ -277,6 +317,27 @@ export default function CheckoutPaymentPage() {
       if (creatingOrder) return;
       if (createdOrderId) return;
       if (lastCreatedKeyRef.current === orderCreateKey) return;
+      if (addressLoading) {
+        console.log("⏳ Waiting for address to load...");
+        return; // Wait for address to load before validating
+      }
+
+      // Validate shipping address before creating order
+      console.log("🔍 Validating shipping address:", shippingAddress);
+      if (!shippingAddress.address || !shippingAddress.city || !shippingAddress.province || !shippingAddress.postalCode) {
+        const missingFields = [];
+        if (!shippingAddress.address) missingFields.push("Address");
+        if (!shippingAddress.city) missingFields.push("City");
+        if (!shippingAddress.province) missingFields.push("Province");
+        if (!shippingAddress.postalCode) missingFields.push("Postal Code");
+        
+        console.error("❌ Missing address fields:", missingFields);
+        console.error("❌ Current shippingAddress state:", shippingAddress);
+        setOrderCreateError(`Complete shipping address is required. Missing: ${missingFields.join(", ")}. Please go back to checkout and fill in all address fields.`);
+        setCreatingOrder(false);
+        return;
+      }
+      console.log("✅ Address validation passed");
 
       lastCreatedKeyRef.current = orderCreateKey;
       setOrderCreateError(undefined);
@@ -318,32 +379,25 @@ export default function CheckoutPaymentPage() {
           })
         );
 
+        // Build shipping address from current form state
         const shippingAddressObj = {
-          street: "",
-          city: "",
-          province: "",
-          zipCode: "",
-          country: "Philippines",
-          region: "",
+          street: shippingAddress.address || "",
+          city: shippingAddress.city || "",
+          province: shippingAddress.province || "",
+          zipCode: shippingAddress.postalCode || "",
+          country: shippingAddress.country || "Philippines",
+          region: shippingAddress.region || "",
         };
 
-        if (typeof window !== 'undefined') {
-          const savedAddress = sessionStorage.getItem('shippingAddress');
-          if (savedAddress) {
-            try {
-              const parsed = JSON.parse(savedAddress);
-              Object.assign(shippingAddressObj, {
-                street: parsed.address || "",
-                city: parsed.city || "",
-                province: parsed.province || "",
-                zipCode: parsed.postalCode || "",
-                country: parsed.country || "Philippines",
-                region: parsed.region || "",
-              });
-            } catch (e) {
-              console.error("Error parsing shipping address:", e);
-            }
-          }
+        // Validate shipping address
+        if (!shippingAddressObj.street || !shippingAddressObj.city || !shippingAddressObj.province || !shippingAddressObj.zipCode) {
+          const missingFields = [];
+          if (!shippingAddressObj.street) missingFields.push("Address");
+          if (!shippingAddressObj.city) missingFields.push("City");
+          if (!shippingAddressObj.province) missingFields.push("Province");
+          if (!shippingAddressObj.zipCode) missingFields.push("Postal Code");
+          
+          throw new Error(`Complete shipping address is required. Missing: ${missingFields.join(", ")}. Please go back and fill in all address fields.`);
         }
 
         const hasPreorder = orderItems.some(item => item.product_type === 'preorder');
@@ -448,7 +502,7 @@ export default function CheckoutPaymentPage() {
     };
 
     createOrder();
-  }, [user?.id, cartItems.length, creatingOrder, createdOrderId, orderCreateKey]);
+  }, [user?.id, cartItems.length, creatingOrder, createdOrderId, orderCreateKey, shippingAddress, addressLoading]);
 
   const handlePaymentComplete = async (paymentId?: string) => {
     setProcessing(true);
@@ -478,7 +532,8 @@ export default function CheckoutPaymentPage() {
     }
   };
 
-  if (authLoading || loading || walletLoading) {
+  // Don't block on wallet loading - allow order creation to proceed even if wallet fails
+  if (authLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <p className="text-muted-foreground">Loading payment...</p>
@@ -527,12 +582,21 @@ export default function CheckoutPaymentPage() {
           <div className="rounded-lg border border-border bg-card p-6 space-y-4">
             {/* Ship to */}
             <div className="flex items-start justify-between pb-4 border-b border-border">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-muted-foreground mb-1">Ship to</p>
-                <p className="text-sm text-foreground">{formatAddress()}</p>
+                {(!shippingAddress.address || !shippingAddress.city || !shippingAddress.province || !shippingAddress.postalCode) ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-error font-medium">⚠️ Incomplete shipping address</p>
+                    <p className="text-xs text-muted-foreground">
+                      Please go back to checkout and fill in all address fields.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground">{formatAddress()}</p>
+                )}
               </div>
-              <Link href="/store/checkout" className="text-sm text-[#FF85A2] hover:underline">
-                Change
+              <Link href="/store/checkout" className="text-sm text-[#FF85A2] hover:underline ml-4 shrink-0">
+                {(!shippingAddress.address || !shippingAddress.city || !shippingAddress.province || !shippingAddress.postalCode) ? "Add Address" : "Change"}
               </Link>
             </div>
             
@@ -630,13 +694,13 @@ export default function CheckoutPaymentPage() {
           </div>
 
           {/* Wallet Balance */}
-          {walletBalance > 0 && (
+          {(safeWalletBalance > 0 || !walletLoading) && (
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-lg font-semibold">Wallet Balance</h2>
                   <p className="text-2xl font-bold text-green-600">
-                    {formatCurrency(walletBalance, "PHP")}
+                    {formatCurrency(safeWalletBalance, "PHP")}
                   </p>
                 </div>
               </div>
@@ -647,7 +711,7 @@ export default function CheckoutPaymentPage() {
                   onChange={(e) => {
                     setUseWalletBalance(e.target.checked);
                     if (e.target.checked) {
-                      setWalletAmount(Math.min(walletBalance, totals.total));
+                      setWalletAmount(Math.min(safeWalletBalance, totals.total));
                     } else {
                       setWalletAmount(0);
                     }
