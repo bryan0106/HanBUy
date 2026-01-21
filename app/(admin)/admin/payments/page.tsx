@@ -30,6 +30,7 @@ interface Payment {
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [counts, setCounts] = useState({ total: 0, pending: 0, verified: 0, failed: 0 });
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -46,14 +47,14 @@ export default function PaymentsPage() {
   const loadPayments = async () => {
     setLoading(true);
     try {
-      // Use admin payments API endpoint
+      // 1. Fetch filtered payments for the list
+      // Note: We map 'failed' filter to 'rejected' status for the API call
       const paymentsResponse = await paymentService.getAdminPayments({
-        status: statusFilter === "all" ? undefined : statusFilter === "pending" ? "pending" : statusFilter,
+        status: statusFilter === "all" ? undefined : statusFilter === "pending" ? "pending" : statusFilter === "failed" ? "rejected" : statusFilter,
       });
       
       const adminPayments = paymentsResponse.data;
       
-      // Map admin API response to Payment interface
       const paymentRecords: Payment[] = adminPayments.map((payment: any) => ({
         id: payment.id,
         order_id: payment.order_id,
@@ -62,7 +63,7 @@ export default function PaymentsPage() {
         currency: 'PHP',
         payment_type: payment.payment_method?.type || 'full_payment',
         payment_method: payment.payment_method,
-        status: payment.status === 'verified' ? 'verified' : payment.status === 'rejected' ? 'failed' : 'pending',
+        status: payment.status === 'verified' ? 'verified' : (payment.status === 'rejected' || payment.status === 'failed') ? 'failed' : 'pending',
         verified: payment.status === 'verified',
         verified_at: payment.verified_at,
         verified_by: payment.verified_by,
@@ -75,6 +76,16 @@ export default function PaymentsPage() {
       }));
 
       setPayments(paymentRecords);
+
+      // 2. Fetch all payments to get accurate counts for the filters
+      const allResponse = await paymentService.getAdminPayments({ limit: 1000 });
+      const allData = allResponse.data;
+      setCounts({
+        total: allData.length,
+        pending: allData.filter((p: any) => p.status !== 'verified' && p.status !== 'rejected' && p.status !== 'failed').length,
+        verified: allData.filter((p: any) => p.status === 'verified').length,
+        failed: allData.filter((p: any) => p.status === 'rejected' || p.status === 'failed').length,
+      });
     } catch (error: any) {
       console.error("Error loading payments:", error);
       toast.error(error.message || "Failed to load payments");
@@ -100,7 +111,16 @@ export default function PaymentsPage() {
       setSelectedPayment(null);
       setAdminNotes("");
       setRejectionReason("");
-      await loadPayments();
+      
+      // Switch to the target tab so the user sees the updated payment
+      const targetFilter = verificationStatus === 'verified' ? 'verified' : 'failed';
+      if (statusFilter === targetFilter) {
+        // If already on the target tab, we need to manually reload since the useEffect won't trigger
+        await loadPayments();
+      } else {
+        // This will trigger the useEffect to reload the payments
+        setStatusFilter(targetFilter);
+      }
     } catch (error: any) {
       console.error("Error verifying payment:", error);
       toast.error(error.message || "Failed to verify payment");
@@ -117,13 +137,6 @@ export default function PaymentsPage() {
     refunded: "bg-grey-100 text-grey-700",
   };
 
-  const stats = {
-    total: payments.length,
-    pending: payments.filter(p => !p.verified && p.status !== 'failed').length,
-    verified: payments.filter(p => p.verified).length,
-    failed: payments.filter(p => p.status === 'failed').length,
-  };
-
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
       {/* Header */}
@@ -136,19 +149,19 @@ export default function PaymentsPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Total Payments</p>
-          <p className="text-2xl font-bold">{stats.total}</p>
+          <p className="text-2xl font-bold">{counts.total}</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Pending</p>
-          <p className="text-2xl font-bold text-warning">{stats.pending}</p>
+          <p className="text-2xl font-bold text-warning">{counts.pending}</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Verified</p>
-          <p className="text-2xl font-bold text-success">{stats.verified}</p>
+          <p className="text-2xl font-bold text-success">{counts.verified}</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Failed</p>
-          <p className="text-2xl font-bold text-error">{stats.failed}</p>
+          <p className="text-2xl font-bold text-error">{counts.failed}</p>
         </div>
       </div>
 
@@ -172,7 +185,7 @@ export default function PaymentsPage() {
               : "bg-card text-muted-foreground hover:bg-muted"
           }`}
         >
-          Pending ({stats.pending})
+          Pending ({counts.pending})
         </button>
         <button
           onClick={() => setStatusFilter("verified")}
@@ -182,7 +195,7 @@ export default function PaymentsPage() {
               : "bg-card text-muted-foreground hover:bg-muted"
           }`}
         >
-          Verified ({stats.verified})
+          Verified ({counts.verified})
         </button>
         <button
           onClick={() => setStatusFilter("failed")}
@@ -192,7 +205,7 @@ export default function PaymentsPage() {
               : "bg-card text-muted-foreground hover:bg-muted"
           }`}
         >
-          Failed ({stats.failed})
+          Failed ({counts.failed})
         </button>
       </div>
 

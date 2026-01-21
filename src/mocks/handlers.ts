@@ -909,7 +909,8 @@ export const handlers = [
     console.log('🎭 MSW: Fetching admin payment by ID', { paymentId });
 
     // Extract order ID from payment ID (format: orderId-main or orderId-timestamp)
-    const orderId = paymentId.includes('-main') ? paymentId.replace('-main', '') : paymentId.split('-').slice(0, -1).join('-');
+    // Robust extraction: if it ends with -main, remove it. Otherwise, assume it's the order ID or a direct payment ID.
+    const orderId = paymentId.endsWith('-main') ? paymentId.replace('-main', '') : paymentId;
 
     // Search through all users' orders
     for (const [userId, orders] of ordersStore.entries()) {
@@ -958,7 +959,8 @@ export const handlers = [
     console.log('🎭 MSW: Updating admin payment status', { paymentId, status: body.status });
 
     // Extract order ID from payment ID
-    const orderId = paymentId.includes('-main') ? paymentId.replace('-main', '') : paymentId.split('-').slice(0, -1).join('-');
+    // Robust extraction: if it ends with -main, remove it. Otherwise, assume it's the order ID or a direct payment ID.
+    const orderId = paymentId.endsWith('-main') ? paymentId.replace('-main', '') : paymentId;
 
     // Search through all users' orders
     for (const [userId, orders] of ordersStore.entries()) {

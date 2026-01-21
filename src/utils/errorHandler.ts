@@ -36,7 +36,8 @@ export function handleApiError(error: unknown): ApiError {
     // Handle API response errors
     if (data) {
       // Standard API error format: { success: false, error: "...", message: "..." }
-      const errorMessage = data.error || data.message || error.message || 'An error occurred';
+      // Prefer message over error for detailed feedback (e.g. "Cannot change status from...")
+      const errorMessage = data.message || data.error || error.message || 'An error occurred';
       
       return {
         message: errorMessage,
@@ -50,7 +51,7 @@ export function handleApiError(error: unknown): ApiError {
     switch (status) {
       case 400:
         return {
-          message: data?.error || data?.message || 'Invalid request. Please check your input.',
+          message: data?.message || data?.error || 'Invalid request. Please check your input.',
           status: 400,
         };
       case 401:
@@ -60,17 +61,17 @@ export function handleApiError(error: unknown): ApiError {
         };
       case 403:
         return {
-          message: data?.error || data?.message || 'Access denied. You do not have permission.',
+          message: data?.message || data?.error || 'Access denied. You do not have permission.',
           status: 403,
         };
       case 404:
         return {
-          message: data?.error || data?.message || 'Resource not found.',
+          message: data?.message || data?.error || 'Resource not found.',
           status: 404,
         };
       case 422:
         return {
-          message: data?.error || data?.message || 'Validation error. Please check your input.',
+          message: data?.message || data?.error || 'Validation error. Please check your input.',
           status: 422,
           details: data?.details || data?.validation,
         };

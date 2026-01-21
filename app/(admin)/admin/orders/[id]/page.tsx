@@ -190,13 +190,15 @@ export default function AdminOrderDetailPage() {
           </h1>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => setShowPaymentModal(true)}
-            className="bg-green-600 hover:bg-green-700"
-            disabled={updating}
-          >
-            Verify Payment
-          </Button>
+          {order.payment_status !== "paid" && (
+            <Button
+              onClick={() => setShowPaymentModal(true)}
+              className="bg-green-600 hover:bg-green-700"
+              disabled={updating}
+            >
+              Verify Payment
+            </Button>
+          )}
           <Button
             onClick={() => setShowStatusModal(true)}
             disabled={updating}
@@ -432,13 +434,15 @@ export default function AdminOrderDetailPage() {
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="mb-4 text-lg font-semibold">Quick Actions</h2>
             <div className="space-y-2">
-              <Button
-                onClick={() => setShowPaymentModal(true)}
-                className="w-full bg-green-600 hover:bg-green-700"
-                disabled={updating}
-              >
-                Verify Payment
-              </Button>
+              {order.payment_status !== "paid" && (
+                <Button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  disabled={updating}
+                >
+                  Verify Payment
+                </Button>
+              )}
               <Button
                 onClick={() => setShowStatusModal(true)}
                 className="w-full"

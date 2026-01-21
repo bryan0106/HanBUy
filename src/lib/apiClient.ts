@@ -10,6 +10,7 @@ const API_BASE_URL = getApiBaseUrl();
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000, // 30 seconds
+  withCredentials: true, // Enable CORS with cookies/credentials
   headers: {
     'Content-Type': 'application/json',
   },
